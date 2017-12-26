@@ -51,6 +51,7 @@ import com.hazelcast.mapreduce.JobTracker;
 import com.hazelcast.quorum.QuorumService;
 import com.hazelcast.ringbuffer.Ringbuffer;
 import com.hazelcast.scheduledexecutor.IScheduledExecutorService;
+import com.hazelcast.simplemap.SimpleMap;
 import com.hazelcast.spi.impl.SerializationServiceSupport;
 import com.hazelcast.spi.serialization.SerializationService;
 import com.hazelcast.transaction.HazelcastXAResource;
@@ -72,6 +73,11 @@ public class HazelcastClientProxy implements HazelcastInstance, SerializationSer
 
     public HazelcastClientProxy(HazelcastClientInstanceImpl client) {
         this.client = client;
+    }
+
+    @Override
+    public <K, V> SimpleMap<K, V> getSimpleMap(String name) {
+        throw new UnsupportedOperationException();
     }
 
     @Override

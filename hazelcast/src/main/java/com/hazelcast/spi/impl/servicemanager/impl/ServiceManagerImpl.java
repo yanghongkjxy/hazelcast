@@ -49,6 +49,7 @@ import com.hazelcast.quorum.impl.QuorumServiceImpl;
 import com.hazelcast.replicatedmap.impl.ReplicatedMapService;
 import com.hazelcast.ringbuffer.impl.RingbufferService;
 import com.hazelcast.scheduledexecutor.impl.DistributedScheduledExecutorService;
+import com.hazelcast.simplemap.impl.SimpleMapService;
 import com.hazelcast.spi.ConfigurableService;
 import com.hazelcast.spi.ManagedService;
 import com.hazelcast.spi.NodeEngine;
@@ -164,6 +165,7 @@ public final class ServiceManagerImpl implements ServiceManager {
         registerService(XAService.SERVICE_NAME, new XAService(nodeEngine));
         registerService(CardinalityEstimatorService.SERVICE_NAME, new CardinalityEstimatorService());
         registerService(DistributedScheduledExecutorService.SERVICE_NAME, new DistributedScheduledExecutorService());
+        registerService(SimpleMapService.SERVICE_NAME, new SimpleMapService());
         registerCacheServiceIfAvailable();
         readServiceDescriptors();
     }

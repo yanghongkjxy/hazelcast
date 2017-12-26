@@ -51,6 +51,7 @@ import com.hazelcast.config.SemaphoreConfig;
 import com.hazelcast.config.SerializationConfig;
 import com.hazelcast.config.ServicesConfig;
 import com.hazelcast.config.SetConfig;
+import com.hazelcast.config.SimpleMapConfig;
 import com.hazelcast.config.TopicConfig;
 import com.hazelcast.config.UserCodeDeploymentConfig;
 import com.hazelcast.config.WanReplicationConfig;
@@ -174,6 +175,12 @@ public class DynamicConfigurationAwareConfig extends Config {
     }
 
     @Override
+    public SimpleMapConfig findSimpleMapConfig(String name) {
+        return getSimpleMapConfigInternal(name, "default").getAsReadOnly();
+    }
+
+
+    @Override
     public MapConfig getMapConfig(String name) {
         return getMapConfigInternal(name, name);
     }
@@ -213,6 +220,19 @@ public class DynamicConfigurationAwareConfig extends Config {
         }
         if (mapConfig == null) {
             mapConfig = staticConfig.getMapConfig(fallbackName);
+        }
+        return mapConfig;
+    }
+
+    private SimpleMapConfig getSimpleMapConfigInternal(String name, String fallbackName) {
+        String baseName = getBaseName(name);
+        Map<String, SimpleMapConfig> staticMapConfigs = staticConfig.getSimpleMapConfigs();
+        SimpleMapConfig mapConfig = lookupByPattern(configPatternMatcher, staticMapConfigs, baseName);
+//        if (mapConfig == null) {
+//            mapConfig = configurationService.findSimpleMapConfig(baseName);
+//        }
+        if (mapConfig == null) {
+            mapConfig = staticConfig.getSimpleMapConfig(fallbackName);
         }
         return mapConfig;
     }

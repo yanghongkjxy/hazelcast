@@ -51,6 +51,7 @@ import com.hazelcast.osgi.HazelcastOSGiService;
 import com.hazelcast.quorum.QuorumService;
 import com.hazelcast.ringbuffer.Ringbuffer;
 import com.hazelcast.scheduledexecutor.IScheduledExecutorService;
+import com.hazelcast.simplemap.SimpleMap;
 import com.hazelcast.transaction.HazelcastXAResource;
 import com.hazelcast.transaction.TransactionContext;
 import com.hazelcast.transaction.TransactionException;
@@ -81,6 +82,11 @@ class HazelcastOSGiInstanceImpl
     @Override
     public String getName() {
         return delegatedInstance.getName();
+    }
+
+    @Override
+    public <K, V> SimpleMap<K, V> getSimpleMap(String name) {
+        return delegatedInstance.getSimpleMap(name);
     }
 
     @Override

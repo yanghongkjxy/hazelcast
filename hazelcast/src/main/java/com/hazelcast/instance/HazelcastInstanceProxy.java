@@ -50,6 +50,7 @@ import com.hazelcast.mapreduce.JobTracker;
 import com.hazelcast.quorum.QuorumService;
 import com.hazelcast.ringbuffer.Ringbuffer;
 import com.hazelcast.scheduledexecutor.IScheduledExecutorService;
+import com.hazelcast.simplemap.SimpleMap;
 import com.hazelcast.spi.annotation.PrivateApi;
 import com.hazelcast.spi.impl.SerializationServiceSupport;
 import com.hazelcast.transaction.HazelcastXAResource;
@@ -90,6 +91,11 @@ public final class HazelcastInstanceProxy implements HazelcastInstance, Serializ
     @Override
     public String getName() {
         return name;
+    }
+
+    @Override
+    public <K, V> SimpleMap<K, V> getSimpleMap(String name) {
+        return getOriginal().getSimpleMap(name);
     }
 
     @Override

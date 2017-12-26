@@ -26,6 +26,7 @@ import com.hazelcast.reliableidgen.ReliableIdGenerator;
 import com.hazelcast.replicatedmap.ReplicatedMapCantBeCreatedOnLiteMemberException;
 import com.hazelcast.ringbuffer.Ringbuffer;
 import com.hazelcast.scheduledexecutor.IScheduledExecutorService;
+import com.hazelcast.simplemap.SimpleMap;
 import com.hazelcast.transaction.HazelcastXAResource;
 import com.hazelcast.transaction.TransactionContext;
 import com.hazelcast.transaction.TransactionException;
@@ -50,6 +51,8 @@ public interface HazelcastInstance {
      * @return name of this Hazelcast instance
      */
     String getName();
+
+    <K, V> SimpleMap<K, V> getSimpleMap(String name);
 
     /**
      * Returns the distributed queue instance with the specified name.
@@ -260,7 +263,6 @@ public interface HazelcastInstance {
      *
      * @param name name of the {@link IdGenerator}
      * @return IdGenerator for the given name
-     *
      * @deprecated The implementation can produce duplicate IDs in case of network split, even
      * with split-brain protection enabled (during short window while split-brain is detected).
      * Use {@link #getReliableIdGenerator(String)} for an alternative implementation which does not

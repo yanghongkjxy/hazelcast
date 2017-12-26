@@ -19,10 +19,10 @@ package com.hazelcast.config;
 import com.hazelcast.config.matcher.MatchingPointConfigPatternMatcher;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.ManagedContext;
-import com.hazelcast.reliableidgen.ReliableIdGenerator;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.Logger;
 import com.hazelcast.partition.strategy.StringPartitioningStrategy;
+import com.hazelcast.reliableidgen.ReliableIdGenerator;
 import com.hazelcast.util.StringUtil;
 
 import java.io.File;
@@ -73,6 +73,8 @@ public class Config {
     private ConfigPatternMatcher configPatternMatcher = new MatchingPointConfigPatternMatcher();
 
     private final Map<String, MapConfig> mapConfigs = new ConcurrentHashMap<String, MapConfig>();
+
+    private final Map<String, SimpleMapConfig> simpleMapConfigs = new ConcurrentHashMap<String, SimpleMapConfig>();
 
     private final Map<String, CacheSimpleConfig> cacheConfigs = new ConcurrentHashMap<String, CacheSimpleConfig>();
 
@@ -358,6 +360,59 @@ public class Config {
         this.networkConfig = networkConfig;
         return this;
     }
+
+    // =====
+
+    public SimpleMapConfig findSimpleMapConfig(String name) {
+        name = getBaseName(name);
+        SimpleMapConfig config = lookupByPattern(configPatternMatcher, simpleMapConfigs, name);
+        if (config != null) {
+            return config.getAsReadOnly();
+        }
+        return getSimpleMapConfig("default").getAsReadOnly();
+    }
+
+    public SimpleMapConfig getSimpleMapConfigOrNull(String name) {
+        name = getBaseName(name);
+        return lookupByPattern(configPatternMatcher, simpleMapConfigs, name);
+    }
+
+    public SimpleMapConfig getSimpleMapConfig(String name) {
+        name = getBaseName(name);
+        SimpleMapConfig config = lookupByPattern(configPatternMatcher, simpleMapConfigs, name);
+        if (config != null) {
+            return config;
+        }
+        SimpleMapConfig defConfig = simpleMapConfigs.get("default");
+        if (defConfig == null) {
+            defConfig = new SimpleMapConfig();
+            defConfig.setName("default");
+            simpleMapConfigs.put(defConfig.getName(), defConfig);
+        }
+        config = new SimpleMapConfig(defConfig);
+        config.setName(name);
+        simpleMapConfigs.put(config.getName(), config);
+        return config;
+    }
+
+    public Config addSimpleMapConfig(SimpleMapConfig mapConfig) {
+        simpleMapConfigs.put(mapConfig.getName(), mapConfig);
+        return this;
+    }
+
+    /**
+     * Returns the map of {@link com.hazelcast.core.IMap} configurations,
+     * mapped by config name. The config name may be a pattern with which the
+     * configuration was initially obtained.
+     *
+     * @return the map configurations mapped by config name
+     */
+    public Map<String, SimpleMapConfig> getSimpleMapConfigs() {
+        return simpleMapConfigs;
+    }
+
+
+    // ======
 
     /**
      * Returns a read-only {@link com.hazelcast.core.IMap} configuration for
