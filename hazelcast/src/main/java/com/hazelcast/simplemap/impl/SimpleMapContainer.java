@@ -13,7 +13,6 @@ public class SimpleMapContainer {
         this.config = config;
         this.nodeEngine = nodeEngine;
         this.recordStores = new SimpleRecordStore[nodeEngine.getPartitionService().getPartitionCount()];
-
     }
 
     public SimpleRecordStore getRecordStore(int partitionId) {

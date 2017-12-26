@@ -4,6 +4,7 @@ import com.hazelcast.config.Config;
 import com.hazelcast.config.SimpleMapConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.query.SqlPredicate;
 import com.hazelcast.spi.properties.GroupProperty;
 import org.junit.Test;
 
@@ -25,9 +26,26 @@ public class SimpleMapTest {
         }
     }
 
+
+    @Test
+    public void compileQuery() {
+        Config config = new Config();
+        config.setProperty(GroupProperty.PARTITION_COUNT.getName(), "1");
+        config.addSimpleMapConfig(new SimpleMapConfig("foo").setKeyClass(Long.class).setValueClass(Employee.class));
+
+        HazelcastInstance hz = Hazelcast.newHazelcastInstance(config);
+
+        SimpleMap<Long, Employee> simpleMap = hz.getSimpleMap("foo");
+        for (int k = 0; k < 5; k++) {
+            simpleMap.insert((long) k, new Employee(k, k, k));
+        }
+
+        simpleMap.compile(new SqlPredicate("age>$age and iq>$iq and height>150"));
+    }
+
     public static class Employee implements Serializable {
         public int age;
-        public  int iq;
+        public  long iq;
         public  int height;
         public  int money = 100;
         public  int money2 = 200;

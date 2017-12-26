@@ -8,12 +8,11 @@ import com.hazelcast.simplemap.impl.SimpleMapDataSerializerHook;
 import com.hazelcast.simplemap.impl.SimpleMapService;
 import com.hazelcast.spi.NamedOperation;
 import com.hazelcast.spi.Operation;
-import com.hazelcast.spi.PartitionAwareOperation;
 
 import java.io.IOException;
 
 public abstract class SimpleMapOperation extends Operation
-        implements PartitionAwareOperation, IdentifiedDataSerializable, NamedOperation {
+        implements IdentifiedDataSerializable, NamedOperation {
 
     private String name;
     protected SimpleMapService simpleMapservice;
@@ -61,7 +60,6 @@ public abstract class SimpleMapOperation extends Operation
     @Override
     protected void toString(StringBuilder sb) {
         super.toString(sb);
-
         sb.append(", name=").append(name);
     }
 }

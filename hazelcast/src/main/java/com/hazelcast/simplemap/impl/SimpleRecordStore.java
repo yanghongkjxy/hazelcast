@@ -3,16 +3,20 @@ package com.hazelcast.simplemap.impl;
 import com.hazelcast.config.SimpleMapConfig;
 import com.hazelcast.internal.memory.impl.UnsafeUtil;
 import com.hazelcast.nio.serialization.Data;
+import com.hazelcast.query.Predicate;
 import com.hazelcast.spi.serialization.SerializationService;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.HashMap;
+import java.util.Map;
 
 import static java.lang.String.format;
 
 public class SimpleRecordStore {
 
+    private final Map<String, Field> fields = new HashMap<String, Field>();
     private final SimpleMapConfig config;
     private final SerializationService serializationService;
     private final Class valueClass;
@@ -38,9 +42,6 @@ public class SimpleRecordStore {
             throw new RuntimeException(format("Expected value of class '%s', but found '%s' ",
                     record.getClass().getName(), valueClass.getClass().getName()));
         }
-       // System.out.println("----------");
-
-      //  System.out.println("record to insert:"+record);
 
         unsafe.copyMemory(
                 record,
@@ -49,12 +50,6 @@ public class SimpleRecordStore {
                 slabPointer + (recordIndex * recordDataSize),
                 recordDataSize);
         recordIndex++;
-
-//        // verifying what has been stored so far.
-//        for (int k = 0; k < recordIndex; k++) {
-//            // reads the first int for each record
-//            System.out.println("#" + k + " " + unsafe.getInt(slabPointer + (k * recordDataSize)));
-//        }
     }
 
     private void initRecordData(Class clazz) {
@@ -67,7 +62,10 @@ public class SimpleRecordStore {
                     continue;
                 }
 
+                fields.put(f.getName(), f);
+
                 long fieldOffset = unsafe.objectFieldOffset(f);
+
                 if (fieldOffset > maxFieldOffset) {
                     maxFieldOffset = fieldOffset;
                     System.out.println("fieldOffset:" + fieldOffset + " field.name:" + f.getName());
@@ -106,5 +104,13 @@ public class SimpleRecordStore {
         } else {
             throw new RuntimeException();
         }
+    }
+
+    public void compile(Predicate predicate) {
+        TableScanCompiler tableScanCompiler = new TableScanCompiler(fields, predicate, recordDataOffset, recordDataSize);
+        tableScanCompiler.compile();
+
+        System.out.println("compile:" + predicate);
+        System.out.println(tableScanCompiler.toJavacode() + "\n");
     }
 }
