@@ -2,31 +2,31 @@ package com.hazelcast.simplemap.impl.operations;
 
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
-import com.hazelcast.query.Predicate;
 import com.hazelcast.simplemap.impl.SimpleMapDataSerializerHook;
 import com.hazelcast.spi.Operation;
 import com.hazelcast.spi.OperationFactory;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
-public class CompilePredicateOperationFactory implements OperationFactory {
+public class QueryOperationFactory implements OperationFactory{
 
-    private  String compiledQueryUuid;
-    private String name;
-    private Predicate predicate;
+    private  String name;
+    private String compiledQueryUuid;
+    private Map<String,Object> bindings;
 
-    public CompilePredicateOperationFactory() {
-    }
+    public QueryOperationFactory(){}
 
-    public CompilePredicateOperationFactory(String name,String compiledQueryUuid, Predicate predicate) {
+    public QueryOperationFactory(String name, String compiledQueryUuid, Map<String, Object> bindings) {
         this.name = name;
         this.compiledQueryUuid = compiledQueryUuid;
-        this.predicate = predicate;
+        this.bindings = bindings;
     }
 
     @Override
     public Operation createOperation() {
-        return new CompilePredicateOperation(name, compiledQueryUuid, predicate);
+        return new QueryOperation(name, compiledQueryUuid, bindings);
     }
 
     @Override
@@ -36,20 +36,28 @@ public class CompilePredicateOperationFactory implements OperationFactory {
 
     @Override
     public int getId() {
-        return SimpleMapDataSerializerHook.COMPILE_PREDICATE_OPERATION_FACTORY;
+        return SimpleMapDataSerializerHook.QUERY_OPERATION_FACTORY;
     }
 
     @Override
     public void writeData(ObjectDataOutput out) throws IOException {
         out.writeUTF(name);
         out.writeUTF(compiledQueryUuid);
-        out.writeObject(predicate);
+        out.writeInt(bindings.size());
+        for(Map.Entry<String,Object> entry: bindings.entrySet()){
+            out.writeUTF(entry.getKey());
+            out.writeObject(entry.getValue());
+        }
     }
 
     @Override
     public void readData(ObjectDataInput in) throws IOException {
         name = in.readUTF();
         compiledQueryUuid = in.readUTF();
-        predicate = in.readObject();
+        int size = in.readInt();
+        bindings = new HashMap<String, Object>();
+        for(int k=0;k<size;k++){
+            bindings.put(in.readUTF(), in.readObject());
+        }
     }
 }

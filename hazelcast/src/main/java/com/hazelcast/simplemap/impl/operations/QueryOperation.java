@@ -1,7 +1,25 @@
 package com.hazelcast.simplemap.impl.operations;
 
-import com.hazelcast.spi.Operation;
+import com.hazelcast.simplemap.impl.SimpleMapDataSerializerHook;
 
-public class QueryOperation extends Operation {
+import java.util.Map;
 
+public class QueryOperation extends SimpleMapOperation {
+
+    private Map<String, Object> bindings;
+    private String compiledQueryUuid;
+
+    public QueryOperation() {
+    }
+
+    public QueryOperation(String name, String compiledQueryUuid, Map<String, Object> bindings) {
+        super(name);
+        this.compiledQueryUuid = compiledQueryUuid;
+        this.bindings = bindings;
+    }
+
+    @Override
+    public int getId() {
+        return SimpleMapDataSerializerHook.QUERY;
+    }
 }

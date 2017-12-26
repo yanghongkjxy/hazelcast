@@ -22,13 +22,15 @@ public class SimpleRecordStore {
     private final Class valueClass;
     private final Unsafe unsafe = UnsafeUtil.UNSAFE;
     private final long slabPointer;
+    private final FullTableScanCompiler compiler;
     private long recordIndex = 0;
     private long recordDataSize;
     private long recordDataOffset;
 
-    public SimpleRecordStore(SimpleMapConfig config, SerializationService serializationService) {
+    public SimpleRecordStore(SimpleMapConfig config, SerializationService serializationService, FullTableScanCompiler compiler) {
         this.config = config;
         this.valueClass = config.getValueClass();
+       this.compiler = compiler;
         this.serializationService = serializationService;
         this.slabPointer = unsafe.allocateMemory(config.getSizeBytesPerPartition());
         initRecordData(valueClass);
@@ -106,11 +108,13 @@ public class SimpleRecordStore {
         }
     }
 
-    public void compile(Predicate predicate) {
-        TableScanCompiler tableScanCompiler = new TableScanCompiler(fields, predicate, recordDataOffset, recordDataSize);
-        tableScanCompiler.compile();
+    public void compile(String compiledQueryUuid, Predicate predicate) {
+        FullTableScanCodeGenerator fullTableScanCodeGenerator = new FullTableScanCodeGenerator(compiledQueryUuid, fields, predicate, recordDataOffset, recordDataSize);
+        fullTableScanCodeGenerator.compile();
+
+        compiler.compile(compiledQueryUuid, fullTableScanCodeGenerator.toJavacode());
 
         System.out.println("compile:" + predicate);
-        System.out.println(tableScanCompiler.toJavacode() + "\n");
+        System.out.println(fullTableScanCodeGenerator.toJavacode() + "\n");
     }
 }

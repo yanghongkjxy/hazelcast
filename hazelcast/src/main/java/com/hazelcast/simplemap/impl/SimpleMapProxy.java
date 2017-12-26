@@ -11,6 +11,7 @@ import com.hazelcast.spi.NodeEngine;
 import com.hazelcast.spi.Operation;
 import com.hazelcast.spi.OperationService;
 import com.hazelcast.spi.partition.IPartitionService;
+import com.hazelcast.util.UuidUtil;
 
 import java.util.Map;
 
@@ -47,14 +48,16 @@ public class SimpleMapProxy<K, V> extends AbstractDistributedObject<SimpleMapSer
     public CompiledPredicate<V> compile(Predicate query) {
         checkNotNull(query, "query can't be null");
 
+        String compiledQueryUuid = UuidUtil.newUnsecureUuidString().replace("-","");
+
         try {
             Map<Integer, Object> result = operationService.invokeOnAllPartitions(
-                    SimpleMapService.SERVICE_NAME, new CompilePredicateOperationFactory(name, query));
+                    SimpleMapService.SERVICE_NAME, new CompilePredicateOperationFactory(name, compiledQueryUuid, query));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
-        return new CompiledPredicate<V>();
+        return new CompiledPredicate<V>(operationService, name, compiledQueryUuid);
     }
 
     @Override

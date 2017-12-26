@@ -8,6 +8,7 @@ public class SimpleMapContainer {
     private final SimpleRecordStore[] recordStores;
     private final SimpleMapConfig config;
     private final NodeEngineImpl nodeEngine;
+    private final FullTableScanCompiler compiler = new FullTableScanCompiler();
 
     public SimpleMapContainer(SimpleMapConfig config, NodeEngineImpl nodeEngine) {
         this.config = config;
@@ -18,7 +19,7 @@ public class SimpleMapContainer {
     public SimpleRecordStore getRecordStore(int partitionId) {
         SimpleRecordStore recordStore = recordStores[partitionId];
         if (recordStore == null) {
-            recordStore = new SimpleRecordStore(config, nodeEngine.getSerializationService());
+            recordStore = new SimpleRecordStore(config, nodeEngine.getSerializationService(),compiler);
             recordStores[partitionId] = recordStore;
         }
         return recordStore;

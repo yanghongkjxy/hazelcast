@@ -10,14 +10,13 @@ import com.hazelcast.query.impl.predicates.GreaterLessPredicate;
 import com.hazelcast.query.impl.predicates.NotEqualPredicate;
 import com.hazelcast.query.impl.predicates.NotPredicate;
 import com.hazelcast.query.impl.predicates.OrPredicate;
-import com.hazelcast.util.UuidUtil;
 import sun.misc.Unsafe;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 
-class TableScanCompiler {
+class FullTableScanCodeGenerator {
 
     private final StringBuffer codeBuffer = new StringBuffer();
     private final Map<String, Field> variables = new HashMap<String, Field>();
@@ -28,19 +27,20 @@ class TableScanCompiler {
     private final long recordDataSize;
     private final String className;
 
-    public TableScanCompiler(Map<String, Field> fields, Predicate predicate, long recordDataOffset, long recordDataSize) {
+    public FullTableScanCodeGenerator(String compiledQueryUuid, Map<String, Field> fields, Predicate predicate, long recordDataOffset, long recordDataSize) {
         this.fields = fields;
         this.predicate = predicate;
         this.recordDataOffset = recordDataOffset;
         this.recordDataSize = recordDataSize;
-        this.className = "FullTableScan_" + UuidUtil.newUnsecureUuidString().replace("-","");
+        this.className = "FullTableScan_" + compiledQueryUuid;
     }
 
     public void compile() {
+        codeBuffer.append("import java.util.*;\n");
         codeBuffer.append("public class " + className + " extends com.hazelcast.simplemap.impl.FullTableScan{\n");
         codeBuffer.append("    public void run(){\n");
         codeBuffer.append("       long offset=slabPointer;\n");
-        codeBuffer.append("       for(long l=0;l<index;l++){\n");
+        codeBuffer.append("       for(long l=0;l<recordIndex;l++){\n");
         codeBuffer.append("           if(");
         predicateToCode(predicate);
         codeBuffer.append("){\n");
@@ -53,13 +53,35 @@ class TableScanCompiler {
         for (Map.Entry<String, Field> variable : variables.entrySet()) {
             Field variableField = variable.getValue();
             String variableName = variable.getKey();
-            codeBuffer.append("    private final ").append(variableField.getType()).append(" ").append(variableName).append(";\n");
+            codeBuffer.append("    private final ").append(variableField.getType()).append(" ");
+
+            codeBuffer.append(variableName).append(";\n");
         }
 
         codeBuffer.append("    public " + className + "(Map<String, Object> binding){\n");
         for (Map.Entry<String, Field> variable : variables.entrySet()) {
+            Field variableField = variable.getValue();
             String variableName = variable.getKey();
-            codeBuffer.append("        ").append(variableName).append("=").append("binding.get(").append(variableName).append(");\n");
+            codeBuffer.append("        "+variableName+"=");
+            codeBuffer.append("(");
+            if (variableField.getType().equals(Integer.TYPE)) {
+                codeBuffer.append("Integer");
+            } else if (variableField.getType().equals(Long.TYPE)) {
+                codeBuffer.append("Long");
+            } else if (variableField.getType().equals(Short.TYPE)) {
+                codeBuffer.append("Short");
+            } else if (variableField.getType().equals(Float.TYPE)) {
+                codeBuffer.append("Float");
+            } else if (variableField.getType().equals(Double.TYPE)) {
+                codeBuffer.append("Double");
+            } else if (variableField.getType().equals(Boolean.TYPE)) {
+                codeBuffer.append("Boolean");
+            } else if (variableField.getType().equals(Short.TYPE)) {
+                codeBuffer.append("Short");
+            } else {
+                throw new RuntimeException();
+            }
+            codeBuffer.append(")binding.get(\""+variableName+"\");\n");
         }
         codeBuffer.append("    }\n");
 
