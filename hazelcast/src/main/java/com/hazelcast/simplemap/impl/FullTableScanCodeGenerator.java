@@ -41,10 +41,12 @@ class FullTableScanCodeGenerator {
         codeBuffer.append("    public void run(){\n");
         codeBuffer.append("       long offset=slabPointer;\n");
         codeBuffer.append("       for(long l=0;l<recordIndex;l++){\n");
+        //codeBuffer.append("           System.out.println(\"checking \"+l);\n");
+
         codeBuffer.append("           if(");
         predicateToCode(predicate);
         codeBuffer.append("){\n");
-        codeBuffer.append("                //todo\n");
+        codeBuffer.append("                System.out.println(\"found\");//todo\n");
         codeBuffer.append("           }\n");
         codeBuffer.append("           offset+=recordDataSize;\n");
         codeBuffer.append("        }\n");
@@ -53,12 +55,12 @@ class FullTableScanCodeGenerator {
         for (Map.Entry<String, Field> variable : variables.entrySet()) {
             Field variableField = variable.getValue();
             String variableName = variable.getKey();
-            codeBuffer.append("    private final ").append(variableField.getType()).append(" ");
+            codeBuffer.append("    private ").append(variableField.getType()).append(" ");
 
             codeBuffer.append(variableName).append(";\n");
         }
 
-        codeBuffer.append("    public " + className + "(Map<String, Object> binding){\n");
+        codeBuffer.append("    public void init(Map<String, Object> binding){\n");
         for (Map.Entry<String, Field> variable : variables.entrySet()) {
             Field variableField = variable.getValue();
             String variableName = variable.getKey();
@@ -82,6 +84,7 @@ class FullTableScanCodeGenerator {
                 throw new RuntimeException();
             }
             codeBuffer.append(")binding.get(\""+variableName+"\");\n");
+            codeBuffer.append("        System.out.println(\""+variableName+"\"+"+variableName+");\n");
         }
         codeBuffer.append("    }\n");
 

@@ -9,6 +9,8 @@ import com.hazelcast.spi.properties.GroupProperty;
 import org.junit.Test;
 
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
 
 public class SimpleMapTest {
 
@@ -36,19 +38,23 @@ public class SimpleMapTest {
         HazelcastInstance hz = Hazelcast.newHazelcastInstance(config);
 
         SimpleMap<Long, Employee> simpleMap = hz.getSimpleMap("foo");
-        for (int k = 0; k < 5; k++) {
+        for (int k = 0; k < 1000; k++) {
             simpleMap.insert((long) k, new Employee(k, k, k));
         }
 
-        simpleMap.compile(new SqlPredicate("age>$age and iq>$iq and height>150"));
+        CompiledPredicate compiledPredicate = simpleMap.compile(new SqlPredicate("age==$age and iq==$iq and height>10"));
+        Map<String, Object> bindings = new HashMap<String, Object>();
+        bindings.put("age", 100);
+        bindings.put("iq", 100l);
+        compiledPredicate.execute(bindings);
     }
 
     public static class Employee implements Serializable {
         public int age;
-        public  long iq;
-        public  int height;
-        public  int money = 100;
-        public  int money2 = 200;
+        public long iq;
+        public int height;
+        public int money = 100;
+        public int money2 = 200;
 
         public Employee(int age, int iq, int height) {
             this.age = age;

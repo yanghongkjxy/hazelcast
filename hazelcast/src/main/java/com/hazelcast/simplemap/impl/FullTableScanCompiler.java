@@ -18,6 +18,8 @@ import java.net.URLClassLoader;
 import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import static java.lang.String.format;
 import static java.security.AccessController.doPrivileged;
@@ -29,19 +31,23 @@ public class FullTableScanCompiler {
 
     private final JavaCompiler javaCompiler = ToolProvider.getSystemJavaCompiler();
     private final File targetDirectory = new File(getUserDir(), "simplemap");
-    private final Map<String, Class> classes = new HashMap<String, Class>();
+    private final ConcurrentMap<String, Class> classes = new ConcurrentHashMap<String, Class>();
 
     public synchronized Class compile(String compiledQueryUuid, String javacode) {
         ensureExistingDirectory(targetDirectory);
 
         String className = "FullTableScan_" + compiledQueryUuid.replace("-","");
-        Class clazz = classes.get(className);
+        Class clazz = classes.get(compiledQueryUuid);
         if (clazz == null) {
             JavaFileObject file = createJavaFileObject(className, javacode);
             clazz = compile(javaCompiler, file, className);
-            classes.put(className, clazz);
+            classes.put(compiledQueryUuid, clazz);
         }
         return clazz;
+    }
+
+    public Class<FullTableScan> load(String compileQueryUuid){
+        return classes.get(compileQueryUuid);
     }
 
     private Class compile(JavaCompiler compiler, JavaFileObject file, final String className) {

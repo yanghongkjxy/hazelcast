@@ -30,7 +30,7 @@ public class SimpleRecordStore {
     public SimpleRecordStore(SimpleMapConfig config, SerializationService serializationService, FullTableScanCompiler compiler) {
         this.config = config;
         this.valueClass = config.getValueClass();
-       this.compiler = compiler;
+        this.compiler = compiler;
         this.serializationService = serializationService;
         this.slabPointer = unsafe.allocateMemory(config.getSizeBytesPerPartition());
         initRecordData(valueClass);
@@ -109,12 +109,33 @@ public class SimpleRecordStore {
     }
 
     public void compile(String compiledQueryUuid, Predicate predicate) {
-        FullTableScanCodeGenerator fullTableScanCodeGenerator = new FullTableScanCodeGenerator(compiledQueryUuid, fields, predicate, recordDataOffset, recordDataSize);
+        FullTableScanCodeGenerator fullTableScanCodeGenerator = new FullTableScanCodeGenerator(
+                compiledQueryUuid, fields, predicate, recordDataOffset, recordDataSize);
         fullTableScanCodeGenerator.compile();
 
         compiler.compile(compiledQueryUuid, fullTableScanCodeGenerator.toJavacode());
 
         System.out.println("compile:" + predicate);
         System.out.println(fullTableScanCodeGenerator.toJavacode() + "\n");
+    }
+
+    public void fullTableScan(String compiledQueryUuid, Map<String, Object> bindings) {
+
+        Class<FullTableScan> fullTableScanClass = compiler.load(compiledQueryUuid);
+        FullTableScan fullTableScan;
+        try {
+            fullTableScan = fullTableScanClass.newInstance();
+        } catch (InstantiationException e) {
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+
+        fullTableScan.unsafe = unsafe;
+        fullTableScan.recordDataSize = recordDataSize;
+        fullTableScan.recordIndex = recordIndex;
+        fullTableScan.slabPointer = slabPointer;
+        fullTableScan.init(bindings);
+        fullTableScan.run();
     }
 }
