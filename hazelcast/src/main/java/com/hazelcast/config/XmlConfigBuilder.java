@@ -69,7 +69,6 @@ import static com.hazelcast.config.XmlElements.CARDINALITY_ESTIMATOR;
 import static com.hazelcast.config.XmlElements.DURABLE_EXECUTOR_SERVICE;
 import static com.hazelcast.config.XmlElements.EVENT_JOURNAL;
 import static com.hazelcast.config.XmlElements.EXECUTOR_SERVICE;
-import static com.hazelcast.config.XmlElements.RELIABLE_ID_GENERATOR;
 import static com.hazelcast.config.XmlElements.GROUP;
 import static com.hazelcast.config.XmlElements.HOT_RESTART_PERSISTENCE;
 import static com.hazelcast.config.XmlElements.IMPORT;
@@ -90,6 +89,7 @@ import static com.hazelcast.config.XmlElements.PARTITION_GROUP;
 import static com.hazelcast.config.XmlElements.PROPERTIES;
 import static com.hazelcast.config.XmlElements.QUEUE;
 import static com.hazelcast.config.XmlElements.QUORUM;
+import static com.hazelcast.config.XmlElements.RELIABLE_ID_GENERATOR;
 import static com.hazelcast.config.XmlElements.RELIABLE_TOPIC;
 import static com.hazelcast.config.XmlElements.REPLICATED_MAP;
 import static com.hazelcast.config.XmlElements.RINGBUFFER;
@@ -99,6 +99,7 @@ import static com.hazelcast.config.XmlElements.SEMAPHORE;
 import static com.hazelcast.config.XmlElements.SERIALIZATION;
 import static com.hazelcast.config.XmlElements.SERVICES;
 import static com.hazelcast.config.XmlElements.SET;
+import static com.hazelcast.config.XmlElements.SIMPLE_MAP;
 import static com.hazelcast.config.XmlElements.TOPIC;
 import static com.hazelcast.config.XmlElements.USER_CODE_DEPLOYMENT;
 import static com.hazelcast.config.XmlElements.WAN_REPLICATION;
@@ -332,6 +333,8 @@ public class XmlConfigBuilder extends AbstractConfigBuilder implements ConfigBui
             handleQueue(node);
         } else if (MAP.isEqual(nodeName)) {
             handleMap(node);
+        } else if (SIMPLE_MAP.isEqual(nodeName)) {
+            handleSimpleMap(node);
         } else if (MULTIMAP.isEqual(nodeName)) {
             handleMultiMap(node);
         } else if (REPLICATED_MAP.isEqual(nodeName)) {
@@ -1007,6 +1010,39 @@ public class XmlConfigBuilder extends AbstractConfigBuilder implements ConfigBui
         config.addLockConfig(lockConfig);
     }
 
+    private void handleSimpleMap(Node node) {
+        Node attName = node.getAttributes().getNamedItem("name");
+        String name = getTextContent(attName);
+        SimpleMapConfig simpleMapConfig = new SimpleMapConfig();
+        simpleMapConfig.setName(name);
+        for (Node n : childElements(node)) {
+            String nodeName = cleanNodeName(n);
+            String value = getTextContent(n).trim();
+            if ("size-bytes-per-partition".equals(nodeName)) {
+                simpleMapConfig.setSizeBytesPerPartition(getIntegerValue("size-bytes-per-partition", value));
+            } else if ("key-class".equals(nodeName)) {
+                ClassLoader classLoader = XmlConfigBuilder.class.getClassLoader();
+                Class keyClass;
+                try {
+                    keyClass = classLoader.loadClass(value);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
+                simpleMapConfig.setKeyClass(keyClass);
+            } else if ("value-class".equals(nodeName)) {
+                ClassLoader classLoader = XmlConfigBuilder.class.getClassLoader();
+                Class valueClass;
+                try {
+                    valueClass = classLoader.loadClass(value);
+                } catch (ClassNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
+                simpleMapConfig.setValueClass(valueClass);
+            }
+        }
+        config.addSimpleMapConfig(simpleMapConfig);
+    }
+
     private void handleQueue(Node node) {
         Node attName = node.getAttributes().getNamedItem("name");
         String name = getTextContent(attName);
@@ -1175,6 +1211,7 @@ public class XmlConfigBuilder extends AbstractConfigBuilder implements ConfigBui
         }
         config.addReplicatedMapConfig(replicatedMapConfig);
     }
+
 
     @SuppressWarnings("deprecation")
     private void handleMap(Node parentNode) {

@@ -35,12 +35,14 @@ public class InsertOperation extends SimpleMapOperation {
 
     @Override
     protected void writeInternal(ObjectDataOutput out) throws IOException {
+        super.writeInternal(out);
         out.writeData(key);
         out.writeData(value);
     }
 
     @Override
     protected void readInternal(ObjectDataInput in) throws IOException {
+        super.readInternal(in);
         key = in.readData();
         value = in.readData();
     }

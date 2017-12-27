@@ -6,7 +6,9 @@ import com.hazelcast.simplemap.CompiledPredicate;
 import com.hazelcast.simplemap.SimpleMap;
 import com.hazelcast.simplemap.impl.operations.CompilePredicateOperationFactory;
 import com.hazelcast.simplemap.impl.operations.InsertOperation;
+import com.hazelcast.simplemap.impl.operations.SizeOperationFactory;
 import com.hazelcast.spi.AbstractDistributedObject;
+import com.hazelcast.spi.InternalCompletableFuture;
 import com.hazelcast.spi.NodeEngine;
 import com.hazelcast.spi.Operation;
 import com.hazelcast.spi.OperationService;
@@ -32,6 +34,11 @@ public class SimpleMapProxy<K, V> extends AbstractDistributedObject<SimpleMapSer
 
     @Override
     public void insert(K key, V value) {
+        insertAsync(key, value).join();
+    }
+
+    @Override
+    public InternalCompletableFuture<Object> insertAsync(K key, V value) {
         checkNotNull(key, "key can't be null");
         checkNotNull(value, "value can't be null");
 
@@ -41,14 +48,14 @@ public class SimpleMapProxy<K, V> extends AbstractDistributedObject<SimpleMapSer
         Operation op = new InsertOperation(name, keyData, valueData)
                 .setPartitionId(partitionService.getPartitionId(key));
 
-        operationService.invokeOnPartition(op).join();
+        return operationService.invokeOnPartition(op);
     }
 
     @Override
     public CompiledPredicate<V> compile(Predicate query) {
         checkNotNull(query, "query can't be null");
 
-        String compiledQueryUuid = UuidUtil.newUnsecureUuidString().replace("-","");
+        String compiledQueryUuid = UuidUtil.newUnsecureUuidString().replace("-", "");
 
         try {
             Map<Integer, Object> result = operationService.invokeOnAllPartitions(
@@ -58,6 +65,22 @@ public class SimpleMapProxy<K, V> extends AbstractDistributedObject<SimpleMapSer
         }
 
         return new CompiledPredicate<V>(operationService, name, compiledQueryUuid);
+    }
+
+    @Override
+    public long size() {
+        try {
+            Map<Integer, Object> result = operationService.invokeOnAllPartitions(
+                    SimpleMapService.SERVICE_NAME, new SizeOperationFactory(name));
+
+            long size = 0;
+            for (Object value : result.values()) {
+                size += ((Long) value);
+            }
+            return size;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

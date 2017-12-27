@@ -16,16 +16,14 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.security.PrivilegedAction;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import static com.hazelcast.nio.IOUtil.closeResource;
 import static java.lang.String.format;
 import static java.security.AccessController.doPrivileged;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
-import static org.codehaus.groovy.runtime.DefaultGroovyMethodsSupport.closeQuietly;
 
 public class FullTableScanCompiler {
 
@@ -36,7 +34,7 @@ public class FullTableScanCompiler {
     public synchronized Class compile(String compiledQueryUuid, String javacode) {
         ensureExistingDirectory(targetDirectory);
 
-        String className = "FullTableScan_" + compiledQueryUuid.replace("-","");
+        String className = "FullTableScan_" + compiledQueryUuid.replace("-", "");
         Class clazz = classes.get(compiledQueryUuid);
         if (clazz == null) {
             JavaFileObject file = createJavaFileObject(className, javacode);
@@ -46,7 +44,7 @@ public class FullTableScanCompiler {
         return clazz;
     }
 
-    public Class<FullTableScan> load(String compileQueryUuid){
+    public Class<FullTableScan> load(String compileQueryUuid) {
         return classes.get(compileQueryUuid);
     }
 
@@ -147,9 +145,9 @@ public class FullTableScanCompiler {
         } catch (IOException e) {
             throw new RuntimeException(e);
         } finally {
-            closeQuietly(writer);
-            closeQuietly(streamWriter);
-            closeQuietly(stream);
+            closeResource(writer);
+            closeResource(streamWriter);
+            closeResource(stream);
         }
     }
 

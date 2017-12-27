@@ -32,12 +32,13 @@ public class SimpleMapTest {
     @Test
     public void compileQuery() {
         Config config = new Config();
-        config.setProperty(GroupProperty.PARTITION_COUNT.getName(), "1");
+        config.setProperty(GroupProperty.PARTITION_COUNT.getName(), "10");
         config.addSimpleMapConfig(new SimpleMapConfig("foo").setKeyClass(Long.class).setValueClass(Employee.class));
 
-        HazelcastInstance hz = Hazelcast.newHazelcastInstance(config);
+        HazelcastInstance hz1 = Hazelcast.newHazelcastInstance(config);
+        HazelcastInstance hz2 = Hazelcast.newHazelcastInstance(config);
 
-        SimpleMap<Long, Employee> simpleMap = hz.getSimpleMap("foo");
+        SimpleMap<Long, Employee> simpleMap = hz1.getSimpleMap("foo");
         for (int k = 0; k < 1000; k++) {
             simpleMap.insert((long) k, new Employee(k, k, k));
         }

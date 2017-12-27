@@ -59,7 +59,7 @@ public class SimpleRecordStore {
         long minFieldOffset = Long.MAX_VALUE;
         long maxFieldOffset = 0;
         do {
-            for (Field f : valueClass.getDeclaredFields()) {
+            for (Field f : clazz.getDeclaredFields()) {
                 if (Modifier.isStatic(f.getModifiers())) {
                     continue;
                 }
@@ -101,10 +101,8 @@ public class SimpleRecordStore {
             return 8;
         } else if (field.getType().equals(Boolean.TYPE)) {
             return 1;
-        } else if (field.getType().equals(Short.TYPE)) {
-            return 2;
         } else {
-            throw new RuntimeException();
+            throw new RuntimeException("Unrecognized field type: field '"+field.getName()+"' ,type '"+field.getType().getName()+"' ");
         }
     }
 
@@ -137,5 +135,9 @@ public class SimpleRecordStore {
         fullTableScan.slabPointer = slabPointer;
         fullTableScan.init(bindings);
         fullTableScan.run();
+    }
+
+    public long size() {
+        return recordIndex;
     }
 }

@@ -25,6 +25,8 @@ import com.hazelcast.simplemap.impl.operations.CompilePredicateOperation;
 import com.hazelcast.simplemap.impl.operations.CompilePredicateOperationFactory;
 import com.hazelcast.simplemap.impl.operations.InsertOperation;
 import com.hazelcast.simplemap.impl.operations.QueryOperationFactory;
+import com.hazelcast.simplemap.impl.operations.SizeOperation;
+import com.hazelcast.simplemap.impl.operations.SizeOperationFactory;
 
 import static com.hazelcast.internal.serialization.impl.FactoryIdHelper.SIMPLE_MAP_GENERATOR_DS_FACTORY;
 import static com.hazelcast.internal.serialization.impl.FactoryIdHelper.SIMPLE_MAP_GENERATOR_DS_FACTORY_ID;
@@ -38,6 +40,8 @@ public final class SimpleMapDataSerializerHook implements DataSerializerHook {
     public static final int COMPILE_PREDICATE_OPERATION_FACTORY = 2;
     public static final int QUERY =3;
     public static final int QUERY_OPERATION_FACTORY = 4;
+    public static final int SIZE = 5;
+    public static final int SIZE_OPERATION_FACTORY = 6;
 
     @Override
     public int getFactoryId() {
@@ -60,6 +64,10 @@ public final class SimpleMapDataSerializerHook implements DataSerializerHook {
                         return new QueryOperation();
                     case QUERY_OPERATION_FACTORY:
                         return new QueryOperationFactory();
+                    case SIZE:
+                        return new SizeOperation();
+                    case SIZE_OPERATION_FACTORY:
+                        return new SizeOperationFactory();
                     default:
                         return null;
                 }

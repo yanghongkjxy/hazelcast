@@ -1,10 +1,13 @@
 package com.hazelcast.config;
 
+import static com.hazelcast.util.Preconditions.checkNotNull;
+import static com.hazelcast.util.Preconditions.checkPositive;
+
 public class SimpleMapConfig {
     private String name;
     private Class keyClass;
     private Class valueClass;
-    private long sizeBytesPerPartition = 256 * 1024 * 1024;
+    private long sizeBytesPerPartition = 32 * 1024 * 1024;
 
     public SimpleMapConfig() {
     }
@@ -25,7 +28,7 @@ public class SimpleMapConfig {
     }
 
     public SimpleMapConfig setSizeBytesPerPartition(long sizeBytesPerPartition) {
-        this.sizeBytesPerPartition = sizeBytesPerPartition;
+        this.sizeBytesPerPartition = checkPositive(sizeBytesPerPartition, "sizeBytesPerPartition should be larger than 0");
         return this;
     }
 
@@ -34,7 +37,7 @@ public class SimpleMapConfig {
     }
 
     public SimpleMapConfig setKeyClass(Class keyClass) {
-        this.keyClass = keyClass;
+        this.keyClass = checkNotNull(keyClass, "keyClass");
         return this;
     }
 
@@ -43,7 +46,7 @@ public class SimpleMapConfig {
     }
 
     public SimpleMapConfig setValueClass(Class valueClass) {
-        this.valueClass = valueClass;
+        this.valueClass = checkNotNull(valueClass, "valueClass");
         return this;
     }
 

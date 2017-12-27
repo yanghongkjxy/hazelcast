@@ -28,6 +28,10 @@ class FullTableScanCodeGenerator {
     private final String className;
 
     public FullTableScanCodeGenerator(String compiledQueryUuid, Map<String, Field> fields, Predicate predicate, long recordDataOffset, long recordDataSize) {
+        if(unsafe == null){
+            throw new RuntimeException("Unsafe can't be null");
+        }
+
         this.fields = fields;
         this.predicate = predicate;
         this.recordDataOffset = recordDataOffset;
@@ -38,6 +42,7 @@ class FullTableScanCodeGenerator {
     public void compile() {
         codeBuffer.append("import java.util.*;\n");
         codeBuffer.append("public class " + className + " extends com.hazelcast.simplemap.impl.FullTableScan{\n");
+        codeBuffer.append("    private long count;\n");
         codeBuffer.append("    public void run(){\n");
         codeBuffer.append("       long offset=slabPointer;\n");
         codeBuffer.append("       for(long l=0;l<recordIndex;l++){\n");
@@ -46,11 +51,12 @@ class FullTableScanCodeGenerator {
         codeBuffer.append("           if(");
         predicateToCode(predicate);
         codeBuffer.append("){\n");
-        codeBuffer.append("                System.out.println(\"found\");//todo\n");
+        codeBuffer.append("                count++;\n");
         codeBuffer.append("           }\n");
         codeBuffer.append("           offset+=recordDataSize;\n");
         codeBuffer.append("        }\n");
-        codeBuffer.append("\n");
+
+        codeBuffer.append("        if(count>0)System.out.println(\"count=\"+count);\n");
         codeBuffer.append("    }\n");
         for (Map.Entry<String, Field> variable : variables.entrySet()) {
             Field variableField = variable.getValue();
@@ -182,12 +188,13 @@ class FullTableScanCodeGenerator {
         } else if (field.getType().equals(Double.TYPE)) {
             sb.append("unsafe.getDouble(");
         } else if (field.getType().equals(Boolean.TYPE)) {
-            sb.append("unsafe.getBoolean(");
+            sb.append("unsafe.getBoolean(null,");
         } else if (field.getType().equals(Short.TYPE)) {
             sb.append("unsafe.getShort(");
         } else {
             throw new RuntimeException();
         }
+
         sb.append("offset+").append(offset);
         sb.append(")");
         sb.append(operator);
