@@ -24,7 +24,7 @@ public class SimpleMapTest {
 
         SimpleMap<Long, Employee> simpleMap = hz.getSimpleMap("foo");
         for (int k = 0; k < 5; k++) {
-            simpleMap.insert((long) k, new Employee(k, k, k));
+            simpleMap.set((long) k, new Employee(k, k, k));
         }
     }
 
@@ -40,7 +40,7 @@ public class SimpleMapTest {
 
         SimpleMap<Long, Employee> simpleMap = hz1.getSimpleMap("foo");
         for (int k = 0; k < 1000; k++) {
-            simpleMap.insert((long) k, new Employee(k, k, k));
+            simpleMap.set((long) k, new Employee(k, k, k));
         }
 
         CompiledPredicate compiledPredicate = simpleMap.compile(new SqlPredicate("age==$age and iq==$iq and height>10"));

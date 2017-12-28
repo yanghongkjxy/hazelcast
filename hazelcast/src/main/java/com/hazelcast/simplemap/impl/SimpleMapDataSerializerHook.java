@@ -23,7 +23,7 @@ import com.hazelcast.nio.serialization.DataSerializableFactory;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
 import com.hazelcast.simplemap.impl.operations.CompilePredicateOperation;
 import com.hazelcast.simplemap.impl.operations.CompilePredicateOperationFactory;
-import com.hazelcast.simplemap.impl.operations.InsertOperation;
+import com.hazelcast.simplemap.impl.operations.SetOperation;
 import com.hazelcast.simplemap.impl.operations.QueryOperationFactory;
 import com.hazelcast.simplemap.impl.operations.SizeOperation;
 import com.hazelcast.simplemap.impl.operations.SizeOperationFactory;
@@ -35,7 +35,7 @@ public final class SimpleMapDataSerializerHook implements DataSerializerHook {
 
     public static final int F_ID = FactoryIdHelper.getFactoryId(SIMPLE_MAP_GENERATOR_DS_FACTORY, SIMPLE_MAP_GENERATOR_DS_FACTORY_ID);
 
-    public static final int INSERT = 0;
+    public static final int SET = 0;
     public static final int COMPILE_PREDICATE = 1;
     public static final int COMPILE_PREDICATE_OPERATION_FACTORY = 2;
     public static final int QUERY =3;
@@ -54,8 +54,8 @@ public final class SimpleMapDataSerializerHook implements DataSerializerHook {
             @Override
             public IdentifiedDataSerializable create(int typeId) {
                 switch (typeId) {
-                    case INSERT:
-                        return new InsertOperation();
+                    case SET:
+                        return new SetOperation();
                     case COMPILE_PREDICATE:
                         return new CompilePredicateOperation();
                     case COMPILE_PREDICATE_OPERATION_FACTORY:

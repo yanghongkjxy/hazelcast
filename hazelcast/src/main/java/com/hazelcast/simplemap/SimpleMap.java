@@ -6,11 +6,13 @@ import com.hazelcast.query.Predicate;
 
 public interface SimpleMap<K, V> {
 
-    void insert(K key, V value);
+    void set(K key, V value);
 
-    ICompletableFuture insertAsync(K key, V value);
+    ICompletableFuture setAsync(K key, V value);
 
     CompiledPredicate<V> compile(Predicate predicate);
+
+
 
     long size();
 }

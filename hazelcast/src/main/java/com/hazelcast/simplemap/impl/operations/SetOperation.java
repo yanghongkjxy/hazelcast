@@ -8,15 +8,15 @@ import com.hazelcast.simplemap.impl.SimpleRecordStore;
 
 import java.io.IOException;
 
-public class InsertOperation extends SimpleMapOperation {
+public class SetOperation extends SimpleMapOperation {
 
     private Data key;
     private Data value;
 
-    public InsertOperation() {
+    public SetOperation() {
     }
 
-    public InsertOperation(String name, Data key, Data value) {
+    public SetOperation(String name, Data key, Data value) {
         super(name);
         this.key = key;
         this.value = value;
@@ -25,12 +25,12 @@ public class InsertOperation extends SimpleMapOperation {
     @Override
     public void run() throws Exception {
         SimpleRecordStore recordStore = container.getRecordStore(getPartitionId());
-        recordStore.insert(key, value);
+        recordStore.set(key, value);
     }
 
     @Override
     public int getId() {
-        return SimpleMapDataSerializerHook.INSERT;
+        return SimpleMapDataSerializerHook.SET;
     }
 
     @Override

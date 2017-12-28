@@ -5,7 +5,7 @@ import com.hazelcast.query.Predicate;
 import com.hazelcast.simplemap.CompiledPredicate;
 import com.hazelcast.simplemap.SimpleMap;
 import com.hazelcast.simplemap.impl.operations.CompilePredicateOperationFactory;
-import com.hazelcast.simplemap.impl.operations.InsertOperation;
+import com.hazelcast.simplemap.impl.operations.SetOperation;
 import com.hazelcast.simplemap.impl.operations.SizeOperationFactory;
 import com.hazelcast.spi.AbstractDistributedObject;
 import com.hazelcast.spi.InternalCompletableFuture;
@@ -33,19 +33,19 @@ public class SimpleMapProxy<K, V> extends AbstractDistributedObject<SimpleMapSer
     }
 
     @Override
-    public void insert(K key, V value) {
-        insertAsync(key, value).join();
+    public void set(K key, V value) {
+        setAsync(key, value).join();
     }
 
     @Override
-    public InternalCompletableFuture<Object> insertAsync(K key, V value) {
+    public InternalCompletableFuture<Object> setAsync(K key, V value) {
         checkNotNull(key, "key can't be null");
         checkNotNull(value, "value can't be null");
 
         Data keyData = toData(key);
         Data valueData = toData(value);
 
-        Operation op = new InsertOperation(name, keyData, valueData)
+        Operation op = new SetOperation(name, keyData, valueData)
                 .setPartitionId(partitionService.getPartitionId(key));
 
         return operationService.invokeOnPartition(op);

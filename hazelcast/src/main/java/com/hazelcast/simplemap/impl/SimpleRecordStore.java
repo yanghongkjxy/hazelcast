@@ -38,7 +38,7 @@ public class SimpleRecordStore {
         System.out.println("record size:" + recordDataSize);
     }
 
-    public void insert(Data keyData, Data valueData) {
+    public void set(Data keyData, Data valueData) {
         Object record = serializationService.toObject(valueData);
         if (record.getClass() != valueClass) {
             throw new RuntimeException(format("Expected value of class '%s', but found '%s' ",
