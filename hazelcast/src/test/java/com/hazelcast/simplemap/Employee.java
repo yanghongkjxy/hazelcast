@@ -6,8 +6,7 @@ public class Employee implements Serializable {
     public int age;
     public long iq;
     public int height;
-    public int money = 100;
-    public int money2 = 200;
+    public int salary = 100;
 
     public Employee(){}
 
@@ -23,8 +22,7 @@ public class Employee implements Serializable {
                 "age=" + age +
                 ", iq=" + iq +
                 ", height=" + height +
-                ", money=" + money +
-                ", money2=" + money2 +
+                ", money=" + salary +
                 '}';
     }
 }
