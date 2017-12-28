@@ -2,47 +2,47 @@ package com.hazelcast.simplemap.impl.operations;
 
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
-import com.hazelcast.query.Predicate;
+import com.hazelcast.simplemap.ProjectionInfo;
 
 import java.io.IOException;
 
-import static com.hazelcast.simplemap.impl.SimpleMapDataSerializerHook.COMPILE_PREDICATE;
+import static com.hazelcast.simplemap.impl.SimpleMapDataSerializerHook.COMPILE_PROJECTION;
 
-public class CompilePredicateOperation extends SimpleMapOperation {
+public class CompileProjectionOperation extends SimpleMapOperation {
 
-    public Predicate predicate;
+    public ProjectionInfo projectionInfo;
     private String compiledQueryUuid;
 
-    public CompilePredicateOperation() {
+    public CompileProjectionOperation() {
     }
 
-    public CompilePredicateOperation(String name, String compiledQueryUuid, Predicate predicate) {
+    public CompileProjectionOperation(String name, String compiledQueryUuid, ProjectionInfo projectionInfo) {
         super(name);
-        this.predicate = predicate;
+        this.projectionInfo = projectionInfo;
         this.compiledQueryUuid = compiledQueryUuid;
     }
 
     @Override
     public int getId() {
-        return COMPILE_PREDICATE;
+        return COMPILE_PROJECTION;
     }
 
     @Override
     public void run() throws Exception {
-        container.getRecordStore(getPartitionId()).compilePredicate(compiledQueryUuid, predicate);
+        container.getRecordStore(getPartitionId()).compileProjection(compiledQueryUuid, projectionInfo);
     }
 
     @Override
     protected void writeInternal(ObjectDataOutput out) throws IOException {
         super.writeInternal(out);
         out.writeUTF(compiledQueryUuid);
-        out.writeObject(predicate);
+        out.writeObject(projectionInfo);
     }
 
     @Override
     protected void readInternal(ObjectDataInput in) throws IOException {
         super.readInternal(in);
         compiledQueryUuid = in.readUTF();
-        predicate = in.readObject();
+        projectionInfo = in.readObject();
     }
 }

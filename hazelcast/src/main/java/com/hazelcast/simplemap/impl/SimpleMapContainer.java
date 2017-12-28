@@ -8,7 +8,7 @@ public class SimpleMapContainer {
     private final SimpleRecordStore[] recordStores;
     private final SimpleMapConfig config;
     private final NodeEngineImpl nodeEngine;
-    private final FullTableScanCompiler compiler = new FullTableScanCompiler();
+    private final Compiler compiler = new Compiler();
 
     public SimpleMapContainer(SimpleMapConfig config, NodeEngineImpl nodeEngine) {
         this.config = config;

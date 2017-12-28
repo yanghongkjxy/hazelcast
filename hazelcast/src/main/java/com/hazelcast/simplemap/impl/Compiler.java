@@ -25,27 +25,27 @@ import static java.security.AccessController.doPrivileged;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 
-public class FullTableScanCompiler {
+public class Compiler {
 
     private final JavaCompiler javaCompiler = ToolProvider.getSystemJavaCompiler();
     private final File targetDirectory = new File(getUserDir(), "simplemap");
     private final ConcurrentMap<String, Class> classes = new ConcurrentHashMap<String, Class>();
 
-    public synchronized Class compile(String compiledQueryUuid, String javacode) {
+    // synchronized is a hack; not very nice. but this is a poc.
+    public synchronized Class compile(String className, String javacode) {
         ensureExistingDirectory(targetDirectory);
 
-        String className = "FullTableScan_" + compiledQueryUuid.replace("-", "");
-        Class clazz = classes.get(compiledQueryUuid);
+        Class clazz = classes.get(className);
         if (clazz == null) {
             JavaFileObject file = createJavaFileObject(className, javacode);
             clazz = compile(javaCompiler, file, className);
-            classes.put(compiledQueryUuid, clazz);
+            classes.put(className, clazz);
         }
         return clazz;
     }
 
-    public Class<FullTableScan> load(String compileQueryUuid) {
-        return classes.get(compileQueryUuid);
+    public Class<QueryScan> load(String className) {
+        return classes.get(className);
     }
 
     private Class compile(JavaCompiler compiler, JavaFileObject file, final String className) {
@@ -91,11 +91,11 @@ public class FullTableScanCompiler {
         });
     }
 
-    public static File getUserDir() {
+    private static File getUserDir() {
         return new File(System.getProperty("user.dir"));
     }
 
-    public static File ensureExistingDirectory(File dir) {
+    private static File ensureExistingDirectory(File dir) {
         if (dir.isDirectory()) {
             return dir;
         }
@@ -117,9 +117,7 @@ public class FullTableScanCompiler {
         return dir;
     }
 
-    private JavaFileObject createJavaFileObject(
-            String className,
-            String javaCode) {
+    private JavaFileObject createJavaFileObject(String className, String javaCode) {
         try {
             File javaFile = new File(targetDirectory, className + ".java");
             writeText(javaCode, javaFile);
@@ -129,10 +127,7 @@ public class FullTableScanCompiler {
         }
     }
 
-    public static void writeText(String text, File file) {
-//        checkNotNull(text, "Text can't be null");
-//        checkNotNull(file, "File can't be null");
-
+    private static void writeText(String text, File file) {
         FileOutputStream stream = null;
         OutputStreamWriter streamWriter = null;
         BufferedWriter writer = null;

@@ -3,8 +3,11 @@ package com.hazelcast.simplemap.impl;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.query.Predicate;
 import com.hazelcast.simplemap.CompiledPredicate;
+import com.hazelcast.simplemap.CompiledProjection;
+import com.hazelcast.simplemap.ProjectionInfo;
 import com.hazelcast.simplemap.SimpleMap;
 import com.hazelcast.simplemap.impl.operations.CompilePredicateOperationFactory;
+import com.hazelcast.simplemap.impl.operations.CompileProjectionOperationFactory;
 import com.hazelcast.simplemap.impl.operations.SetOperation;
 import com.hazelcast.simplemap.impl.operations.SizeOperationFactory;
 import com.hazelcast.spi.AbstractDistributedObject;
@@ -65,6 +68,22 @@ public class SimpleMapProxy<K, V> extends AbstractDistributedObject<SimpleMapSer
         }
 
         return new CompiledPredicate<V>(operationService, name, compiledQueryUuid);
+    }
+
+    @Override
+    public <E> CompiledProjection<E> compile(ProjectionInfo<E> projectionInfo) {
+        checkNotNull(projectionInfo, "projectionInfo can't be null");
+
+        String compiledQueryUuid = UuidUtil.newUnsecureUuidString().replace("-", "");
+
+        try {
+            Map<Integer, Object> result = operationService.invokeOnAllPartitions(
+                    SimpleMapService.SERVICE_NAME, new CompileProjectionOperationFactory(name, compiledQueryUuid, projectionInfo));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        return new CompiledProjection<E>(operationService, name, compiledQueryUuid);
     }
 
     @Override

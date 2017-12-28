@@ -4,140 +4,93 @@ import com.hazelcast.config.SimpleMapConfig;
 import com.hazelcast.internal.memory.impl.UnsafeUtil;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.query.Predicate;
+import com.hazelcast.simplemap.ProjectionInfo;
 import com.hazelcast.spi.serialization.SerializationService;
 import sun.misc.Unsafe;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
-import java.util.HashMap;
 import java.util.Map;
 
 import static java.lang.String.format;
 
 public class SimpleRecordStore {
 
-    private final Map<String, Field> fields = new HashMap<String, Field>();
-    private final SimpleMapConfig config;
     private final SerializationService serializationService;
-    private final Class valueClass;
     private final Unsafe unsafe = UnsafeUtil.UNSAFE;
     private final long slabPointer;
-    private final FullTableScanCompiler compiler;
+    private final Compiler compiler;
     private long recordIndex = 0;
-    private long recordDataSize;
-    private long recordDataOffset;
+    private RecordMetadata recordMetadata;
 
-    public SimpleRecordStore(SimpleMapConfig config, SerializationService serializationService, FullTableScanCompiler compiler) {
-        this.config = config;
-        this.valueClass = config.getValueClass();
+    public SimpleRecordStore(SimpleMapConfig config, SerializationService serializationService, Compiler compiler) {
         this.compiler = compiler;
+        this.recordMetadata = new RecordMetadata(config);
         this.serializationService = serializationService;
         this.slabPointer = unsafe.allocateMemory(config.getSizeBytesPerPartition());
-        initRecordData(valueClass);
 
-        System.out.println("record size:" + recordDataSize);
     }
 
     public void set(Data keyData, Data valueData) {
         Object record = serializationService.toObject(valueData);
-        if (record.getClass() != valueClass) {
+        if (record.getClass() != recordMetadata.getValueClass()) {
             throw new RuntimeException(format("Expected value of class '%s', but found '%s' ",
-                    record.getClass().getName(), valueClass.getClass().getName()));
+                    record.getClass().getName(), recordMetadata.getValueClass().getClass().getName()));
         }
 
         unsafe.copyMemory(
                 record,
-                recordDataOffset,
+                recordMetadata.getRecordDataOffset(),
                 null,
-                slabPointer + (recordIndex * recordDataSize),
-                recordDataSize);
+                slabPointer + (recordIndex * recordMetadata.getRecordDataSize()),
+                recordMetadata.getRecordDataSize());
         recordIndex++;
     }
 
-    private void initRecordData(Class clazz) {
-        long end = 0;
-        long minFieldOffset = Long.MAX_VALUE;
-        long maxFieldOffset = 0;
-        do {
-            for (Field f : clazz.getDeclaredFields()) {
-                if (Modifier.isStatic(f.getModifiers())) {
-                    continue;
-                }
+    public void compilePredicate(String compiledQueryUuid, Predicate predicate) {
+        ScanCodeGenerator codeGenerator = new QueryScanCodeGenerator(
+                compiledQueryUuid, predicate, recordMetadata);
+        codeGenerator.generate();
 
-                fields.put(f.getName(), f);
-
-                long fieldOffset = unsafe.objectFieldOffset(f);
-
-                if (fieldOffset > maxFieldOffset) {
-                    maxFieldOffset = fieldOffset;
-                    System.out.println("fieldOffset:" + fieldOffset + " field.name:" + f.getName());
-                    end = fieldOffset + fieldSize(f);
-                }
-
-                if (fieldOffset < minFieldOffset) {
-                    minFieldOffset = fieldOffset;
-                }
-            }
-        } while ((clazz = clazz.getSuperclass()) != null);
-
-        System.out.println("minFieldOffset:" + minFieldOffset);
-        System.out.println("maxFieldOffset:" + maxFieldOffset);
-        System.out.println("end:" + end);
-
-        this.recordDataSize = end - minFieldOffset;
-        this.recordDataOffset = minFieldOffset;
-    }
-
-    private int fieldSize(Field field) {
-        if (field.getType().equals(Integer.TYPE)) {
-            return 4;
-        } else if (field.getType().equals(Long.TYPE)) {
-            return 8;
-        } else if (field.getType().equals(Short.TYPE)) {
-            return 2;
-        } else if (field.getType().equals(Float.TYPE)) {
-            return 4;
-        } else if (field.getType().equals(Double.TYPE)) {
-            return 8;
-        } else if (field.getType().equals(Boolean.TYPE)) {
-            return 1;
-        } else {
-            throw new RuntimeException("Unrecognized field type: field '"+field.getName()+"' ,type '"+field.getType().getName()+"' ");
-        }
-    }
-
-    public void compile(String compiledQueryUuid, Predicate predicate) {
-        FullTableScanCodeGenerator fullTableScanCodeGenerator = new FullTableScanCodeGenerator(
-                compiledQueryUuid, fields, predicate, recordDataOffset, recordDataSize);
-        fullTableScanCodeGenerator.compile();
-
-        compiler.compile(compiledQueryUuid, fullTableScanCodeGenerator.toJavacode());
+        compiler.compile(codeGenerator.getClassName(), codeGenerator.getCode());
 
         System.out.println("compile:" + predicate);
-        System.out.println(fullTableScanCodeGenerator.toJavacode() + "\n");
+        System.out.println(codeGenerator.getCode() + "\n");
     }
 
     public void fullTableScan(String compiledQueryUuid, Map<String, Object> bindings) {
-
-        Class<FullTableScan> fullTableScanClass = compiler.load(compiledQueryUuid);
-        FullTableScan fullTableScan;
+        Class<QueryScan> fullTableScanClass = compiler.load("QueryScan_" + compiledQueryUuid);
+        QueryScan scan;
         try {
-            fullTableScan = fullTableScanClass.newInstance();
+            scan = fullTableScanClass.newInstance();
         } catch (InstantiationException e) {
             throw new RuntimeException(e);
         } catch (IllegalAccessException e) {
             throw new RuntimeException(e);
         }
 
-        fullTableScan.unsafe = unsafe;
-        fullTableScan.recordDataSize = recordDataSize;
-        fullTableScan.recordIndex = recordIndex;
-        fullTableScan.slabPointer = slabPointer;
-        fullTableScan.init(bindings);
-        fullTableScan.run();
+        scan.unsafe = unsafe;
+        scan.recordDataSize = recordMetadata.getRecordDataSize();
+        scan.recordIndex = recordIndex;
+        scan.slabPointer = slabPointer;
+        scan.init(bindings);
+        scan.run();
+    }
+
+    public void compileProjection(String compiledQueryUuid, ProjectionInfo extraction) {
+        ScanCodeGenerator codeGenerator = new ProjectionCodeGenerator(
+                compiledQueryUuid, extraction, recordMetadata);
+        codeGenerator.generate();
+
+        compiler.compile(codeGenerator.getClassName(), codeGenerator.getCode());
+
+        System.out.println("compile:" + extraction.getPredicate());
+        System.out.println(codeGenerator.getCode() + "\n");
     }
 
     public long size() {
         return recordIndex;
+    }
+
+    public void projection(String compiledQueryUuid, Map<String, Object> bindings) {
+
     }
 }

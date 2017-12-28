@@ -4,7 +4,7 @@ import sun.misc.Unsafe;
 
 import java.util.Map;
 
-public abstract class FullTableScan {
+public abstract class Scan {
 
     public Unsafe unsafe;
     public long slabPointer;
@@ -13,5 +13,4 @@ public abstract class FullTableScan {
 
     public abstract void init(Map<String,Object> bindings);
 
-    public abstract void run();
 }
