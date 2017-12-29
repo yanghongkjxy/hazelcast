@@ -1,6 +1,7 @@
 package com.hazelcast.dataset;
 
 import com.hazelcast.aggregation.Aggregator;
+import com.hazelcast.aggregation.impl.LongAverageAggregator;
 import com.hazelcast.aggregation.impl.LongSumAggregator;
 import com.hazelcast.aggregation.impl.MaxAggregator;
 import com.hazelcast.aggregation.impl.MinAggregator;
@@ -128,6 +129,37 @@ public class DataSetTest {
        // bindings.put("age", 200);
         //bindings.put("iq", 100l);
         System.out.println("max inserted age:"+maxAge);
+        System.out.println(compiledAggregation.execute(bindings));
+    }
+
+    @Test
+    public void compileAggregationAverage() {
+        Config config = new Config();
+        config.setProperty(GroupProperty.PARTITION_COUNT.getName(), "10");
+        config.addDataSetConfig(new DataSetConfig("foo").setKeyClass(Long.class).setValueClass(Employee.class));
+
+        HazelcastInstance hz1 = Hazelcast.newHazelcastInstance(config);
+        HazelcastInstance hz2 = Hazelcast.newHazelcastInstance(config);
+
+        DataSet<Long, Employee> dataSet = hz1.getDataSet("foo");
+        double totalAge = 0;
+        Random random = new Random();
+        int count = 1000;
+        for (int k = 0; k < count; k++) {
+            int age = random.nextInt(100000);
+            totalAge+=age;
+            dataSet.set((long) k, new Employee(age, k, k));
+        }
+
+
+        Aggregator aggregator = new LongAverageAggregator();
+
+        CompiledAggregation compiledAggregation = dataSet.compile(
+                new AggregationRecipe<Long, Age>(Age.class, aggregator, new SqlPredicate("true")));
+        Map<String, Object> bindings = new HashMap<String, Object>();
+        // bindings.put("age", 200);
+        //bindings.put("iq", 100l);
+        System.out.println("average age:"+(totalAge/count));
         System.out.println(compiledAggregation.execute(bindings));
     }
 

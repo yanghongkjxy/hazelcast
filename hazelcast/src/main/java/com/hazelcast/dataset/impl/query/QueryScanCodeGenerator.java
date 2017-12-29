@@ -28,8 +28,8 @@ public class QueryScanCodeGenerator extends ScanCodeGenerator {
 
     private void generateRunMethod() {
         append("    public void run(){\n");
-        append("       long offset = slabPointer;\n");
-        append("       for(long l=0; l<recordIndex; l++){\n");
+        append("       long offset=slabPointer;\n");
+        append("       for(long l=0;l<recordIndex;l++){\n");
         append("           if(");
         toCode(predicate);
         append("){\n");

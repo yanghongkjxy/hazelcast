@@ -2,6 +2,8 @@ package com.hazelcast.dataset.impl.aggregation;
 
 import com.hazelcast.aggregation.Aggregator;
 import com.hazelcast.aggregation.impl.CountAggregator;
+import com.hazelcast.aggregation.impl.DoubleSumAggregator;
+import com.hazelcast.aggregation.impl.LongAverageAggregator;
 import com.hazelcast.aggregation.impl.LongSumAggregator;
 import com.hazelcast.aggregation.impl.MaxAggregator;
 import com.hazelcast.aggregation.impl.MinAggregator;
@@ -76,15 +78,20 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
         } else if (aggregator instanceof LongSumAggregator) {
             append("       long result=0;\n");
         } else if (aggregator instanceof MinAggregator) {
-            append("       long result = Long.MAX_VALUE;\n");
+            append("       long result=Long.MAX_VALUE;\n");
         } else if (aggregator instanceof MaxAggregator) {
-            append("       long result = Long.MIN_VALUE;\n");
+            append("       long result=Long.MIN_VALUE;\n");
+        } else if (aggregator instanceof LongAverageAggregator) {
+            append("       long sum=0;\n");
+            append("       long count=0;\n");
+        } else if (aggregator instanceof DoubleSumAggregator) {
+            append("       double result=0;\n");
         } else {
             throw new RuntimeException();
         }
 
-        append("       long offset = slabPointer;\n");
-        append("       for(long l=0; l<recordIndex; l++){\n");
+        append("       long offset=slabPointer;\n");
+        append("       for(long l=0;l<recordIndex;l++){\n");
         append("           if(");
         toCode(predicate);
         append("){\n");
@@ -93,6 +100,11 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
             append("               result+=1;\n");
         } else if (aggregator instanceof LongSumAggregator) {
             append("               result+=");
+            generateGetField(field().getName());
+            append(";\n");
+        } else if (aggregator instanceof LongAverageAggregator) {
+            append("               count+=1;\n");
+            append("               sum+=");
             generateGetField(field().getName());
             append(";\n");
         } else if (aggregator instanceof MinAggregator) {
@@ -105,12 +117,20 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
             generateGetField(field().getName());
             append(";\n");
             append("               if(value>result) result=value;\n");
+        } else if (aggregator instanceof DoubleSumAggregator) {
+            append("               result+=");
+            generateGetField(field().getName());
+            append(";\n");
         }
         //append("                count++;\n");
         append("           }\n");
-        append("           offset += recordDataSize;\n");
+        append("           offset+=recordDataSize;\n");
         append("        }\n");
-        append("        aggregator.accumulate(result);\n");
+        if(aggregator instanceof LongAverageAggregator){
+            append("        aggregator.init(sum,count);\n");
+        }else {
+            append("        aggregator.accumulate(result);\n");
+        }
         append("    }\n\n");
     }
 

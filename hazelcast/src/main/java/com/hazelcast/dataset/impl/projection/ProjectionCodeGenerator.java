@@ -46,21 +46,21 @@ public class ProjectionCodeGenerator extends ScanCodeGenerator {
 
     private void generateRunMethod() {
         append("    public void run(){\n");
-        append("       long offset = slabPointer;\n");
-        append("       " + projectionClass.getName() + " object = new " + projectionClass.getName() + "();\n");
-        append("       for(long l=0; l<recordIndex; l++){\n");
+        append("       long offset=slabPointer;\n");
+        append("       " + projectionClass.getName() + " object=new " + projectionClass.getName() + "();\n");
+        append("       for(long l=0;l<recordIndex;l++){\n");
         append("           if(");
         toCode(predicate);
         append("){\n");
 
         for (Field field : extractedFields()) {
-            append("               object.").append(field.getName()).append(" = ");
+            append("               object.").append(field.getName()).append("=");
             generateGetField(field.getName());
             append(";\n");
         }
         append("               consumer.accept(object);\n");
         append("           }\n");
-        append("           offset += recordDataSize;\n");
+        append("           offset+=recordDataSize;\n");
         append("        }\n");
         append("    }\n\n");
     }
