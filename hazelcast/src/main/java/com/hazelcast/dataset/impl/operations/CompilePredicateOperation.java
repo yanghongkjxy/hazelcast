@@ -6,9 +6,9 @@ import com.hazelcast.query.Predicate;
 
 import java.io.IOException;
 
-import static com.hazelcast.dataset.impl.SimpleMapDataSerializerHook.COMPILE_PREDICATE;
+import static com.hazelcast.dataset.impl.DataSetDataSerializerHook.COMPILE_PREDICATE;
 
-public class CompilePredicateOperation extends SimpleMapOperation {
+public class CompilePredicateOperation extends DataStoreOperation {
 
     public Predicate predicate;
     private String compiledQueryUuid;

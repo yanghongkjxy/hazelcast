@@ -74,7 +74,7 @@ public class Config {
 
     private final Map<String, MapConfig> mapConfigs = new ConcurrentHashMap<String, MapConfig>();
 
-    private final Map<String, SimpleMapConfig> simpleMapConfigs = new ConcurrentHashMap<String, SimpleMapConfig>();
+    private final Map<String, DataSetConfig> dataSetConfigs = new ConcurrentHashMap<String, DataSetConfig>();
 
     private final Map<String, CacheSimpleConfig> cacheConfigs = new ConcurrentHashMap<String, CacheSimpleConfig>();
 
@@ -363,40 +363,40 @@ public class Config {
 
     // =====
 
-    public SimpleMapConfig findSimpleMapConfig(String name) {
+    public DataSetConfig findDataSetConfig(String name) {
         name = getBaseName(name);
-        SimpleMapConfig config = lookupByPattern(configPatternMatcher, simpleMapConfigs, name);
+        DataSetConfig config = lookupByPattern(configPatternMatcher, dataSetConfigs, name);
         if (config != null) {
             return config.getAsReadOnly();
         }
-        return getSimpleMapConfig("default").getAsReadOnly();
+        return getDataSetConfig("default").getAsReadOnly();
     }
 
-    public SimpleMapConfig getSimpleMapConfigOrNull(String name) {
+    public DataSetConfig getDataSetConfigOrNull(String name) {
         name = getBaseName(name);
-        return lookupByPattern(configPatternMatcher, simpleMapConfigs, name);
+        return lookupByPattern(configPatternMatcher, dataSetConfigs, name);
     }
 
-    public SimpleMapConfig getSimpleMapConfig(String name) {
+    public DataSetConfig getDataSetConfig(String name) {
         name = getBaseName(name);
-        SimpleMapConfig config = lookupByPattern(configPatternMatcher, simpleMapConfigs, name);
+        DataSetConfig config = lookupByPattern(configPatternMatcher, dataSetConfigs, name);
         if (config != null) {
             return config;
         }
-        SimpleMapConfig defConfig = simpleMapConfigs.get("default");
+        DataSetConfig defConfig = dataSetConfigs.get("default");
         if (defConfig == null) {
-            defConfig = new SimpleMapConfig();
+            defConfig = new DataSetConfig();
             defConfig.setName("default");
-            simpleMapConfigs.put(defConfig.getName(), defConfig);
+            dataSetConfigs.put(defConfig.getName(), defConfig);
         }
-        config = new SimpleMapConfig(defConfig);
+        config = new DataSetConfig(defConfig);
         config.setName(name);
-        simpleMapConfigs.put(config.getName(), config);
+        dataSetConfigs.put(config.getName(), config);
         return config;
     }
 
-    public Config addSimpleMapConfig(SimpleMapConfig mapConfig) {
-        simpleMapConfigs.put(mapConfig.getName(), mapConfig);
+    public Config addDataSetConfig(DataSetConfig dataSetConfig) {
+        dataSetConfigs.put(dataSetConfig.getName(), dataSetConfig);
         return this;
     }
 
@@ -407,8 +407,8 @@ public class Config {
      *
      * @return the map configurations mapped by config name
      */
-    public Map<String, SimpleMapConfig> getSimpleMapConfigs() {
-        return simpleMapConfigs;
+    public Map<String, DataSetConfig> getDataSetConfigs() {
+        return dataSetConfigs;
     }
 
 

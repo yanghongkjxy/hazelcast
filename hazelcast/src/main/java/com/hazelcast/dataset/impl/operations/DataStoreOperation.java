@@ -1,7 +1,8 @@
 package com.hazelcast.dataset.impl.operations;
 
 import com.hazelcast.dataset.impl.DataSetContainer;
-import com.hazelcast.dataset.impl.SimpleMapDataSerializerHook;
+import com.hazelcast.dataset.impl.DataSetDataSerializerHook;
+import com.hazelcast.dataset.impl.DataSetService;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
@@ -10,30 +11,30 @@ import com.hazelcast.spi.Operation;
 
 import java.io.IOException;
 
-public abstract class SimpleMapOperation extends Operation
+public abstract class DataStoreOperation extends Operation
         implements IdentifiedDataSerializable, NamedOperation {
 
     private String name;
-    protected com.hazelcast.dataset.impl.DataSetService simpleMapservice;
+    protected DataSetService dataSetService;
     protected DataSetContainer container;
 
-    public SimpleMapOperation() {
+    public DataStoreOperation() {
     }
 
-    public SimpleMapOperation(String name) {
+    public DataStoreOperation(String name) {
         this.name = name;
     }
 
     @Override
     public void beforeRun() throws Exception {
         super.beforeRun();
-        simpleMapservice = getService();
-        container = simpleMapservice.getDataSetContainer(name);
+        dataSetService = getService();
+        container = dataSetService.getDataSetContainer(name);
     }
 
     @Override
     public String getServiceName() {
-        return com.hazelcast.dataset.impl.DataSetService.SERVICE_NAME;
+        return DataSetService.SERVICE_NAME;
     }
 
     @Override
@@ -43,7 +44,7 @@ public abstract class SimpleMapOperation extends Operation
 
     @Override
     public int getFactoryId() {
-        return SimpleMapDataSerializerHook.F_ID;
+        return DataSetDataSerializerHook.F_ID;
     }
 
     @Override

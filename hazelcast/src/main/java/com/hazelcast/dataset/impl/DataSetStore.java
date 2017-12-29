@@ -1,6 +1,6 @@
 package com.hazelcast.dataset.impl;
 
-import com.hazelcast.config.SimpleMapConfig;
+import com.hazelcast.config.DataSetConfig;
 import com.hazelcast.internal.memory.impl.UnsafeUtil;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.query.Predicate;
@@ -12,7 +12,7 @@ import java.util.Map;
 
 import static java.lang.String.format;
 
-public class SimpleRecordStore {
+public class DataSetStore {
 
     private final SerializationService serializationService;
     private final Unsafe unsafe = UnsafeUtil.UNSAFE;
@@ -21,7 +21,7 @@ public class SimpleRecordStore {
     private long recordIndex = 0;
     private RecordMetadata recordMetadata;
 
-    public SimpleRecordStore(SimpleMapConfig config, SerializationService serializationService, Compiler compiler) {
+    public DataSetStore(DataSetConfig config, SerializationService serializationService, Compiler compiler) {
         this.compiler = compiler;
         this.recordMetadata = new RecordMetadata(config);
         this.serializationService = serializationService;

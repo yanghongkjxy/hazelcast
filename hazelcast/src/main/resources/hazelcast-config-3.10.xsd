@@ -46,7 +46,7 @@
                 <xs:element name="event-journal" type="event-journal" minOccurs="0" maxOccurs="unbounded"/>
                 <xs:element name="queue" type="queue" minOccurs="0" maxOccurs="unbounded"/>
                 <xs:element name="map" type="map" minOccurs="0" maxOccurs="unbounded"/>
-                <xs:element name="simplemap" type="simplemap" minOccurs="0" maxOccurs="unbounded"/>
+                <xs:element name="dataset" type="dataset" minOccurs="0" maxOccurs="unbounded"/>
                 <xs:element name="multimap" type="multimap" minOccurs="0" maxOccurs="unbounded"/>
                 <xs:element name="replicatedmap" type="replicatedmap" minOccurs="0" maxOccurs="unbounded"/>
                 <xs:element name="cache" type="cache" minOccurs="0" maxOccurs="unbounded"/>
@@ -610,7 +610,7 @@
         </xs:attribute>
     </xs:complexType>
 
-    <xs:complexType name="simplemap">
+    <xs:complexType name="dataset">
         <xs:all>
             <xs:element name="size-bytes-per-partition" type="xs:unsignedInt" minOccurs="0" maxOccurs="1" default="33554432"/>
             <xs:element name="key-class" type="xs:string" minOccurs="0" maxOccurs="1"/>

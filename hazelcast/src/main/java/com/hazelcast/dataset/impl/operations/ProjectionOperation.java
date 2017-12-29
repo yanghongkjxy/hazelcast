@@ -2,14 +2,14 @@ package com.hazelcast.dataset.impl.operations;
 
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
-import com.hazelcast.dataset.impl.SimpleMapDataSerializerHook;
-import com.hazelcast.dataset.impl.SimpleRecordStore;
+import com.hazelcast.dataset.impl.DataSetDataSerializerHook;
+import com.hazelcast.dataset.impl.DataSetStore;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ProjectionOperation  extends SimpleMapOperation {
+public class ProjectionOperation  extends DataStoreOperation {
 
     private Map<String, Object> bindings;
     private String compiledQueryUuid;
@@ -25,13 +25,13 @@ public class ProjectionOperation  extends SimpleMapOperation {
 
     @Override
     public void run() throws Exception {
-        SimpleRecordStore recordStore = container.getRecordStore(getPartitionId());
+        DataSetStore recordStore = container.getRecordStore(getPartitionId());
         recordStore.projection(compiledQueryUuid, bindings);
     }
 
     @Override
     public int getId() {
-        return SimpleMapDataSerializerHook.QUERY;
+        return DataSetDataSerializerHook.QUERY;
     }
 
     @Override

@@ -67,7 +67,7 @@ import com.hazelcast.collection.impl.set.SetService;
 import com.hazelcast.concurrent.atomiclong.AtomicLongService;
 import com.hazelcast.concurrent.atomicreference.AtomicReferenceService;
 import com.hazelcast.concurrent.countdownlatch.CountDownLatchService;
-import com.hazelcast.dataset.SimpleMap;
+import com.hazelcast.dataset.DataSet;
 import com.hazelcast.reliableidgen.impl.ReliableIdGeneratorService;
 import com.hazelcast.concurrent.idgen.IdGeneratorService;
 import com.hazelcast.concurrent.lock.LockServiceImpl;
@@ -484,7 +484,7 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
     }
 
     @Override
-    public <K, V> SimpleMap<K, V> getSimpleMap(String name) {
+    public <K, V> DataSet<K, V> getDataSet(String name) {
         throw new UnsupportedOperationException();
     }
 

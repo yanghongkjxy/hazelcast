@@ -387,7 +387,7 @@
                 </hz:query-caches>
             </hz:map>
 
-            <hz:map name="simpleMap"
+            <hz:map name="dataSet"
                     backup-count="3"
                     async-backup-count="1"
                     time-to-live-seconds="1"

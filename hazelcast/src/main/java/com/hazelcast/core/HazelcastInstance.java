@@ -18,7 +18,7 @@ package com.hazelcast.core;
 
 import com.hazelcast.cardinality.CardinalityEstimator;
 import com.hazelcast.config.Config;
-import com.hazelcast.dataset.SimpleMap;
+import com.hazelcast.dataset.DataSet;
 import com.hazelcast.durableexecutor.DurableExecutorService;
 import com.hazelcast.logging.LoggingService;
 import com.hazelcast.mapreduce.JobTracker;
@@ -52,7 +52,7 @@ public interface HazelcastInstance {
      */
     String getName();
 
-    <K, V> SimpleMap<K, V> getSimpleMap(String name);
+    <K, V> DataSet<K, V> getDataSet(String name);
 
     /**
      * Returns the distributed queue instance with the specified name.

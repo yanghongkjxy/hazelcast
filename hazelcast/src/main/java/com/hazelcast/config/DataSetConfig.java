@@ -3,20 +3,20 @@ package com.hazelcast.config;
 import static com.hazelcast.util.Preconditions.checkNotNull;
 import static com.hazelcast.util.Preconditions.checkPositive;
 
-public class SimpleMapConfig {
+public class DataSetConfig {
     private String name;
     private Class keyClass;
     private Class valueClass;
     private long sizeBytesPerPartition = 32 * 1024 * 1024;
 
-    public SimpleMapConfig() {
+    public DataSetConfig() {
     }
 
-    public SimpleMapConfig(String name) {
+    public DataSetConfig(String name) {
         this.name = name;
     }
 
-    public SimpleMapConfig(SimpleMapConfig defConfig) {
+    public DataSetConfig(DataSetConfig defConfig) {
         this.name = defConfig.name;
         this.keyClass = defConfig.keyClass;
         this.valueClass = defConfig.valueClass;
@@ -27,7 +27,7 @@ public class SimpleMapConfig {
         return sizeBytesPerPartition;
     }
 
-    public SimpleMapConfig setSizeBytesPerPartition(long sizeBytesPerPartition) {
+    public DataSetConfig setSizeBytesPerPartition(long sizeBytesPerPartition) {
         this.sizeBytesPerPartition = checkPositive(sizeBytesPerPartition, "sizeBytesPerPartition should be larger than 0");
         return this;
     }
@@ -36,7 +36,7 @@ public class SimpleMapConfig {
         return keyClass;
     }
 
-    public SimpleMapConfig setKeyClass(Class keyClass) {
+    public DataSetConfig setKeyClass(Class keyClass) {
         this.keyClass = checkNotNull(keyClass, "keyClass");
         return this;
     }
@@ -45,7 +45,7 @@ public class SimpleMapConfig {
         return valueClass;
     }
 
-    public SimpleMapConfig setValueClass(Class valueClass) {
+    public DataSetConfig setValueClass(Class valueClass) {
         this.valueClass = checkNotNull(valueClass, "valueClass");
         return this;
     }
@@ -58,7 +58,7 @@ public class SimpleMapConfig {
         return name;
     }
 
-    public SimpleMapConfig getAsReadOnly() {
+    public DataSetConfig getAsReadOnly() {
         return this;
     }
 }

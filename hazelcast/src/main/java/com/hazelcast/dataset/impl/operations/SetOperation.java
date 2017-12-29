@@ -3,12 +3,12 @@ package com.hazelcast.dataset.impl.operations;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.Data;
-import com.hazelcast.dataset.impl.SimpleMapDataSerializerHook;
-import com.hazelcast.dataset.impl.SimpleRecordStore;
+import com.hazelcast.dataset.impl.DataSetDataSerializerHook;
+import com.hazelcast.dataset.impl.DataSetStore;
 
 import java.io.IOException;
 
-public class SetOperation extends SimpleMapOperation {
+public class SetOperation extends DataStoreOperation {
 
     private Data key;
     private Data value;
@@ -24,13 +24,13 @@ public class SetOperation extends SimpleMapOperation {
 
     @Override
     public void run() throws Exception {
-        SimpleRecordStore recordStore = container.getRecordStore(getPartitionId());
+        DataSetStore recordStore = container.getRecordStore(getPartitionId());
         recordStore.set(key, value);
     }
 
     @Override
     public int getId() {
-        return SimpleMapDataSerializerHook.SET;
+        return DataSetDataSerializerHook.SET;
     }
 
     @Override

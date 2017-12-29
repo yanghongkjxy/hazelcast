@@ -51,7 +51,7 @@ import com.hazelcast.query.Predicate;
  * @param <K>
  * @param <V>
  */
-public interface SimpleMap<K, V> {
+public interface DataSet<K, V> {
 
     void set(K key, V value);
 

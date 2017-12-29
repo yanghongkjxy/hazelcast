@@ -1,6 +1,6 @@
 package com.hazelcast.dataset.impl;
 
-import com.hazelcast.config.SimpleMapConfig;
+import com.hazelcast.config.DataSetConfig;
 import com.hazelcast.internal.memory.impl.UnsafeUtil;
 import sun.misc.Unsafe;
 
@@ -22,11 +22,11 @@ public class RecordMetadata {
     private final Map<String, Field> fields = new HashMap<String, Field>();
     private long recordDataOffset;
     private long recordDataSize;
-    private final SimpleMapConfig config;
+    private final DataSetConfig config;
     private final Unsafe unsafe = UnsafeUtil.UNSAFE;
 
-    public RecordMetadata(SimpleMapConfig simpleMapConfig) {
-        this.config = simpleMapConfig;
+    public RecordMetadata(DataSetConfig dataSetConfig) {
+        this.config = dataSetConfig;
         initRecordData(config.getValueClass());
 
         System.out.println("record size:" + recordDataSize);

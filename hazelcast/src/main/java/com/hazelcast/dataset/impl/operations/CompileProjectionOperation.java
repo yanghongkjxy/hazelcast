@@ -6,9 +6,9 @@ import com.hazelcast.dataset.ProjectionRecipe;
 
 import java.io.IOException;
 
-import static com.hazelcast.dataset.impl.SimpleMapDataSerializerHook.COMPILE_PROJECTION;
+import static com.hazelcast.dataset.impl.DataSetDataSerializerHook.COMPILE_PROJECTION;
 
-public class CompileProjectionOperation extends SimpleMapOperation {
+public class CompileProjectionOperation extends DataStoreOperation {
 
     public ProjectionRecipe projectionRecipe;
     private String compiledQueryUuid;

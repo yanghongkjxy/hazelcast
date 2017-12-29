@@ -1,9 +1,9 @@
 package com.hazelcast.dataset.impl.operations;
 
-import com.hazelcast.dataset.impl.SimpleMapDataSerializerHook;
-import com.hazelcast.dataset.impl.SimpleRecordStore;
+import com.hazelcast.dataset.impl.DataSetDataSerializerHook;
+import com.hazelcast.dataset.impl.DataSetStore;
 
-public class SizeOperation extends SimpleMapOperation {
+public class SizeOperation extends DataStoreOperation {
 
     private long response;
 
@@ -16,7 +16,7 @@ public class SizeOperation extends SimpleMapOperation {
 
     @Override
     public void run() throws Exception {
-        SimpleRecordStore recordStore = container.getRecordStore(getPartitionId());
+        DataSetStore recordStore = container.getRecordStore(getPartitionId());
         response = recordStore.size();
     }
 
@@ -27,6 +27,6 @@ public class SizeOperation extends SimpleMapOperation {
 
     @Override
     public int getId() {
-        return SimpleMapDataSerializerHook.SIZE;
+        return DataSetDataSerializerHook.SIZE;
     }
 }

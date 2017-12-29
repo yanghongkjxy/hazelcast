@@ -31,12 +31,12 @@ import com.hazelcast.dataset.impl.operations.QueryOperationFactory;
 import com.hazelcast.dataset.impl.operations.SizeOperation;
 import com.hazelcast.dataset.impl.operations.SizeOperationFactory;
 
-import static com.hazelcast.internal.serialization.impl.FactoryIdHelper.SIMPLE_MAP_GENERATOR_DS_FACTORY;
-import static com.hazelcast.internal.serialization.impl.FactoryIdHelper.SIMPLE_MAP_GENERATOR_DS_FACTORY_ID;
+import static com.hazelcast.internal.serialization.impl.FactoryIdHelper.DATA_SET_DS_FACTORY;
+import static com.hazelcast.internal.serialization.impl.FactoryIdHelper.DATA_SET_DS_FACTORY_ID;
 
-public final class SimpleMapDataSerializerHook implements DataSerializerHook {
+public final class DataSetDataSerializerHook implements DataSerializerHook {
 
-    public static final int F_ID = FactoryIdHelper.getFactoryId(SIMPLE_MAP_GENERATOR_DS_FACTORY, SIMPLE_MAP_GENERATOR_DS_FACTORY_ID);
+    public static final int F_ID = FactoryIdHelper.getFactoryId(DATA_SET_DS_FACTORY, DATA_SET_DS_FACTORY_ID);
 
     public static final int SET = 0;
     public static final int COMPILE_PREDICATE = 1;

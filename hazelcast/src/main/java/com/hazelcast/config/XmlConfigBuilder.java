@@ -334,7 +334,7 @@ public class XmlConfigBuilder extends AbstractConfigBuilder implements ConfigBui
         } else if (MAP.isEqual(nodeName)) {
             handleMap(node);
         } else if (SIMPLE_MAP.isEqual(nodeName)) {
-            handleSimpleMap(node);
+            handleDataSet(node);
         } else if (MULTIMAP.isEqual(nodeName)) {
             handleMultiMap(node);
         } else if (REPLICATED_MAP.isEqual(nodeName)) {
@@ -1010,16 +1010,16 @@ public class XmlConfigBuilder extends AbstractConfigBuilder implements ConfigBui
         config.addLockConfig(lockConfig);
     }
 
-    private void handleSimpleMap(Node node) {
+    private void handleDataSet(Node node) {
         Node attName = node.getAttributes().getNamedItem("name");
         String name = getTextContent(attName);
-        SimpleMapConfig simpleMapConfig = new SimpleMapConfig();
-        simpleMapConfig.setName(name);
+        DataSetConfig dataSetConfig = new DataSetConfig();
+        dataSetConfig.setName(name);
         for (Node n : childElements(node)) {
             String nodeName = cleanNodeName(n);
             String value = getTextContent(n).trim();
             if ("size-bytes-per-partition".equals(nodeName)) {
-                simpleMapConfig.setSizeBytesPerPartition(getIntegerValue("size-bytes-per-partition", value));
+                dataSetConfig.setSizeBytesPerPartition(getIntegerValue("size-bytes-per-partition", value));
             } else if ("key-class".equals(nodeName)) {
                 ClassLoader classLoader = XmlConfigBuilder.class.getClassLoader();
                 Class keyClass;
@@ -1028,7 +1028,7 @@ public class XmlConfigBuilder extends AbstractConfigBuilder implements ConfigBui
                 } catch (ClassNotFoundException e) {
                     throw new RuntimeException(e);
                 }
-                simpleMapConfig.setKeyClass(keyClass);
+                dataSetConfig.setKeyClass(keyClass);
             } else if ("value-class".equals(nodeName)) {
                 ClassLoader classLoader = XmlConfigBuilder.class.getClassLoader();
                 Class valueClass;
@@ -1037,10 +1037,10 @@ public class XmlConfigBuilder extends AbstractConfigBuilder implements ConfigBui
                 } catch (ClassNotFoundException e) {
                     throw new RuntimeException(e);
                 }
-                simpleMapConfig.setValueClass(valueClass);
+                dataSetConfig.setValueClass(valueClass);
             }
         }
-        config.addSimpleMapConfig(simpleMapConfig);
+        config.addDataSetConfig(dataSetConfig);
     }
 
     private void handleQueue(Node node) {

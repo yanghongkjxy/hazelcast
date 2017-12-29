@@ -2,7 +2,7 @@ package com.hazelcast.dataset.impl.operations;
 
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
-import com.hazelcast.dataset.impl.SimpleMapDataSerializerHook;
+import com.hazelcast.dataset.impl.DataSetDataSerializerHook;
 import com.hazelcast.spi.Operation;
 import com.hazelcast.spi.OperationFactory;
 
@@ -26,12 +26,12 @@ public class SizeOperationFactory implements OperationFactory {
 
     @Override
     public int getFactoryId() {
-        return SimpleMapDataSerializerHook.F_ID;
+        return DataSetDataSerializerHook.F_ID;
     }
 
     @Override
     public int getId() {
-        return SimpleMapDataSerializerHook.SIZE_OPERATION_FACTORY;
+        return DataSetDataSerializerHook.SIZE_OPERATION_FACTORY;
     }
 
     @Override

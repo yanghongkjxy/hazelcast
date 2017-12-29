@@ -1,5 +1,6 @@
 package com.hazelcast.dataset.impl;
 
+import com.hazelcast.dataset.DataSet;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.query.Predicate;
 import com.hazelcast.dataset.AggregationRecipe;
@@ -7,7 +8,6 @@ import com.hazelcast.dataset.CompiledAggregation;
 import com.hazelcast.dataset.CompiledPredicate;
 import com.hazelcast.dataset.CompiledProjection;
 import com.hazelcast.dataset.ProjectionRecipe;
-import com.hazelcast.dataset.SimpleMap;
 import com.hazelcast.dataset.impl.operations.CompilePredicateOperationFactory;
 import com.hazelcast.dataset.impl.operations.CompileProjectionOperationFactory;
 import com.hazelcast.dataset.impl.operations.SetOperation;
@@ -24,13 +24,13 @@ import java.util.Map;
 
 import static com.hazelcast.util.Preconditions.checkNotNull;
 
-public class SimpleMapProxy<K, V> extends AbstractDistributedObject<DataSetService> implements SimpleMap<K, V> {
+public class DataSetProxy<K, V> extends AbstractDistributedObject<DataSetService> implements DataSet<K, V> {
 
     private final String name;
     protected final IPartitionService partitionService;
     protected final OperationService operationService;
 
-    public SimpleMapProxy(String name, NodeEngine nodeEngine, DataSetService dataSetService) {
+    public DataSetProxy(String name, NodeEngine nodeEngine, DataSetService dataSetService) {
         super(nodeEngine, dataSetService);
         this.name = name;
         this.partitionService = nodeEngine.getPartitionService();
