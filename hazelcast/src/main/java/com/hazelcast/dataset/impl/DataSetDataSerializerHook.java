@@ -16,6 +16,7 @@
 
 package com.hazelcast.dataset.impl;
 
+import com.hazelcast.dataset.impl.aggregation.AggregateOperationFactory;
 import com.hazelcast.dataset.impl.aggregation.CompileAggregationOperation;
 import com.hazelcast.dataset.impl.aggregation.CompileAggregationOperationFactory;
 import com.hazelcast.internal.serialization.DataSerializerHook;
@@ -49,8 +50,8 @@ public final class DataSetDataSerializerHook implements DataSerializerHook {
     public static final int SIZE_OPERATION_FACTORY = 6;
     public static final int COMPILE_PROJECTION_OPERATION = 7;
     public static final int COMPILE_PROJECTION_OPERATION_FACTORY = 8;
-    public static final int AGGREGATE_PROJECTION_OPERATION = 9;
-    public static final int AGGREGATE_PROJECTION_OPERATION_FACTORY = 10;
+    public static final int AGGREGATE_OPERATION = 9;
+    public static final int AGGREGATE_OPERATION_FACTORY = 10;
     public static final int COMPILE_AGGREGATION = 11;
     public static final int COMPILE_AGGREGATION_OPERATION_FACTORY = 12;
 
@@ -83,8 +84,10 @@ public final class DataSetDataSerializerHook implements DataSerializerHook {
                         return new CompileProjectionOperation();
                     case COMPILE_PROJECTION_OPERATION_FACTORY:
                         return new CompileProjectionOperationFactory();
-                    case AGGREGATE_PROJECTION_OPERATION:
+                    case AGGREGATE_OPERATION:
                         return new AggregateOperation();
+                    case AGGREGATE_OPERATION_FACTORY:
+                        return new AggregateOperationFactory();
                     case COMPILE_AGGREGATION:
                         return new CompileAggregationOperation();
                     case COMPILE_AGGREGATION_OPERATION_FACTORY:

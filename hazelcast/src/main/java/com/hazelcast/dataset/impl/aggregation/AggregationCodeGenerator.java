@@ -37,12 +37,11 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
         }
 
         this.extractedFields = extractedFields();
-
     }
 
     @Override
     public String className() {
-        return aggregator.getClass().getSimpleName()+"_" + compilationId;
+        return "Aggregation_" + compilationId;
     }
 
     public Field field() {
@@ -52,11 +51,21 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
     @Override
     public void generate() {
         append("import java.util.*;\n");
-        append("public class " + className() + " extends com.hazelcast.dataset.impl.aggregation.AggregationScan {\n");
+        append("public class " + className() + " extends com.hazelcast.dataset.impl.aggregation.AggregationScan {\n\n");
+        generateAggregatorField();
+        generateAggregatorGetter();
         generateRunMethod();
         generateBindFields();
         generateBindMethod();
         append("}\n");
+    }
+
+    private void generateAggregatorField() {
+        append("    private final "+aggregator.getClass().getName()+" aggregator = new "+aggregator.getClass().getName()+"();\n\n");
+    }
+
+    private void generateAggregatorGetter() {
+        append("    public "+aggregator.getClass().getName()+" getAggregator(){return aggregator;}\n\n");
     }
 
     private void generateRunMethod() {
@@ -74,7 +83,7 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
             throw new RuntimeException();
         }
 
-        append("       long offset=slabPointer;\n");
+        append("       long offset = slabPointer;\n");
         append("       for(long l=0; l<recordIndex; l++){\n");
         append("           if(");
         toCode(predicate);
@@ -102,7 +111,7 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
         append("           offset += recordDataSize;\n");
         append("        }\n");
         append("        aggregator.accumulate(result);\n");
-        append("    }\n");
+        append("    }\n\n");
     }
 
     private Set<Field> extractedFields() {

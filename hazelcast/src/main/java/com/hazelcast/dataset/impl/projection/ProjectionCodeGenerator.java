@@ -35,7 +35,7 @@ public class ProjectionCodeGenerator extends ScanCodeGenerator {
     @Override
     public void generate() {
         append("import java.util.*;\n");
-        append("public class " + className() + " extends com.hazelcast.dataset.impl.projection.ProjectionScan {\n");
+        append("public class " + className() + " extends com.hazelcast.dataset.impl.projection.ProjectionScan {\n\n");
 
         generateRunMethod();
         generateBindFields();
@@ -46,7 +46,7 @@ public class ProjectionCodeGenerator extends ScanCodeGenerator {
 
     private void generateRunMethod() {
         append("    public void run(){\n");
-        append("       long offset=slabPointer;\n");
+        append("       long offset = slabPointer;\n");
         append("       " + projectionClass.getName() + " object = new " + projectionClass.getName() + "();\n");
         append("       for(long l=0; l<recordIndex; l++){\n");
         append("           if(");
@@ -62,7 +62,7 @@ public class ProjectionCodeGenerator extends ScanCodeGenerator {
         append("           }\n");
         append("           offset += recordDataSize;\n");
         append("        }\n");
-        append("    }\n");
+        append("    }\n\n");
     }
 
     private Set<Field> extractedFields() {

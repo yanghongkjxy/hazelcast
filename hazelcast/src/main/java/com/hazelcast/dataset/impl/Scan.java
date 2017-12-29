@@ -11,6 +11,6 @@ public abstract class Scan {
     public long recordDataSize;
     public long recordIndex;
 
-    public abstract void init(Map<String,Object> bindings);
+    public abstract void bind(Map<String,Object> bindings);
 
 }

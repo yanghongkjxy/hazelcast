@@ -44,6 +44,7 @@ public abstract class ScanCodeGenerator {
 
             append(variableName).append(";\n");
         }
+        append("\n");
     }
 
     public ScanCodeGenerator append(Object s){
@@ -52,7 +53,7 @@ public abstract class ScanCodeGenerator {
     }
 
     protected void generateBindMethod() {
-        append("    public void init(Map<String, Object> binding){\n");
+        append("    public void bind(Map<String, Object> binding){\n");
         for (Map.Entry<String, Field> variable : variables.entrySet()) {
             Field variableField = variable.getValue();
             String variableName = variable.getKey();
@@ -77,7 +78,7 @@ public abstract class ScanCodeGenerator {
             }
             append(")binding.get(\"").append(variableName).append("\");\n");
         }
-        append("    }\n");
+        append("    }\n\n");
     }
 
     public String getCode() {
@@ -128,7 +129,13 @@ public abstract class ScanCodeGenerator {
     }
 
     private void toCode(EqualPredicate predicate) {
-        comparisonToCode( predicate.getAttributeName(), predicate.getValue(), "==");
+        String attributeName = predicate.getAttributeName();
+        Comparable value = predicate.getValue();
+        if(attributeName.equals("true") && value.equals("true")){
+            append(" true ");
+        }else {
+            comparisonToCode(attributeName, value, "==");
+        }
     }
 
     private void toCode(NotEqualPredicate predicate) {

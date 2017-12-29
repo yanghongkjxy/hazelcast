@@ -1,5 +1,10 @@
 package com.hazelcast.dataset;
 
+import com.hazelcast.aggregation.Aggregator;
+import com.hazelcast.dataset.impl.DataSetService;
+import com.hazelcast.dataset.impl.aggregation.AggregateOperationFactory;
+import com.hazelcast.map.impl.query.AggregationResult;
+import com.hazelcast.map.impl.query.Target;
 import com.hazelcast.spi.OperationService;
 
 import java.util.Map;
@@ -17,18 +22,24 @@ public class CompiledAggregation<E> {
     }
 
     public E execute(Map<String, Object> bindings) {
-        return null;
-//        try {
-//           Map<Integer,AggregationResult> result = (Map<Integer,E>)operationService.invokeOnAllPartitions(
-//                    DataSetService.SERVICE_NAME, new QueryOperationFactory(name, compileId, bindings));
-//            return null;
-//
-//
-//            AggregationResult result = queryEngine.execute(query, Target.ALL_NODES);
-//            return result.<R>getAggregator().aggregate();
-//
-//        } catch (Exception e) {
-//            throw new RuntimeException();
-//        }
+        try {
+            Map<Integer, Object> result = operationService.invokeOnAllPartitions(
+                    DataSetService.SERVICE_NAME, new AggregateOperationFactory(name, compileId, bindings));
+
+            Aggregator aggregator = null;
+            for(Object v: result.values()){
+                Aggregator a = (Aggregator)v;
+                if(aggregator == null){
+                    aggregator = a;
+                }else{
+                    aggregator.combine(a);
+                }
+            }
+
+            aggregator.onCombinationFinished();
+            return (E)aggregator.aggregate();
+        } catch (Exception e) {
+            throw new RuntimeException();
+        }
     }
 }

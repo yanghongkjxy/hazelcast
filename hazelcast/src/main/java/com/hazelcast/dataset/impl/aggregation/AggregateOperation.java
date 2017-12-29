@@ -1,5 +1,6 @@
 package com.hazelcast.dataset.impl.aggregation;
 
+import com.hazelcast.aggregation.Aggregator;
 import com.hazelcast.dataset.impl.operations.DataSetOperation;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
@@ -14,6 +15,7 @@ public class AggregateOperation extends DataSetOperation {
 
     private Map<String, Object> bindings;
     private String compileId;
+    private transient Aggregator response;
 
     public AggregateOperation() {
     }
@@ -27,12 +29,17 @@ public class AggregateOperation extends DataSetOperation {
     @Override
     public void run() throws Exception {
         DataSetStore recordStore = container.getRecordStore(getPartitionId());
-        recordStore.aggregate(compileId, bindings);
+        response = recordStore.aggregate(compileId, bindings);
+    }
+
+    @Override
+    public Object getResponse() {
+        return response;
     }
 
     @Override
     public int getId() {
-        return DataSetDataSerializerHook.QUERY_OPERATION;
+        return DataSetDataSerializerHook.AGGREGATE_OPERATION;
     }
 
     @Override

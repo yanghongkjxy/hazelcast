@@ -13,7 +13,7 @@ public class QueryScanCodeGenerator extends ScanCodeGenerator {
     @Override
     public void generate() {
         append("import java.util.*;\n");
-        append("public class " + className() + " extends com.hazelcast.dataset.impl.query.QueryScan {\n");
+        append("public class " + className() + " extends com.hazelcast.dataset.impl.query.QueryScan {\n\n");
         append("    private long count;\n");
         generateRunMethod();
         generateBindFields();
@@ -28,7 +28,7 @@ public class QueryScanCodeGenerator extends ScanCodeGenerator {
 
     private void generateRunMethod() {
         append("    public void run(){\n");
-        append("       long offset=slabPointer;\n");
+        append("       long offset = slabPointer;\n");
         append("       for(long l=0; l<recordIndex; l++){\n");
         append("           if(");
         toCode(predicate);
@@ -39,6 +39,6 @@ public class QueryScanCodeGenerator extends ScanCodeGenerator {
         append("        }\n");
 
         append("        if(count>0) System.out.println(\"count=\"+count);\n");
-        append("    }\n");
+        append("    }\n\n");
     }
 }

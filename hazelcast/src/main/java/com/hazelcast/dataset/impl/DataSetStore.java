@@ -1,8 +1,10 @@
 package com.hazelcast.dataset.impl;
 
+import com.hazelcast.aggregation.Aggregator;
 import com.hazelcast.config.DataSetConfig;
 import com.hazelcast.dataset.AggregationRecipe;
 import com.hazelcast.dataset.impl.aggregation.AggregationCodeGenerator;
+import com.hazelcast.dataset.impl.aggregation.AggregationScan;
 import com.hazelcast.dataset.impl.projection.ProjectionCodeGenerator;
 import com.hazelcast.dataset.impl.projection.ProjectionScan;
 import com.hazelcast.dataset.impl.query.QueryScan;
@@ -77,7 +79,7 @@ public class DataSetStore {
         scan.recordDataSize = recordMetadata.getRecordDataSize();
         scan.recordIndex = recordIndex;
         scan.slabPointer = slabPointer;
-        scan.init(bindings);
+        scan.bind(bindings);
         scan.run();
     }
 
@@ -112,12 +114,28 @@ public class DataSetStore {
         scan.recordIndex = recordIndex;
         scan.slabPointer = slabPointer;
         //scan.consumer = todo;
-        scan.init(bindings);
+        scan.bind(bindings);
         scan.run();
     }
 
-    public void aggregate(String compileId, Map<String, Object> bindings) {
+    public Aggregator aggregate(String compileId, Map<String, Object> bindings) {
+        Class<Scan> scanClass = compiler.load("Aggregation_" + compileId);
+        AggregationScan aggregation;
+        try {
+            aggregation = (AggregationScan) scanClass.newInstance();
+        } catch (InstantiationException e) {
+            throw new RuntimeException(e);
+        } catch (IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
 
+        aggregation.unsafe = unsafe;
+        aggregation.recordDataSize = recordMetadata.getRecordDataSize();
+        aggregation.recordIndex = recordIndex;
+        aggregation.slabPointer = slabPointer;
+        aggregation.bind(bindings);
+        aggregation.run();
+        return aggregation.getAggregator();
     }
 
     public void compileAggregation(String compileId, AggregationRecipe aggregationRecipe) {

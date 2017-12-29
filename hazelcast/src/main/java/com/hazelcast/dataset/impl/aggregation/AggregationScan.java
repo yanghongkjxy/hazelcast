@@ -5,7 +5,7 @@ import com.hazelcast.dataset.impl.Scan;
 
 public abstract class AggregationScan extends Scan {
 
-    public Aggregator aggregator;
-
     public abstract void run();
+
+    public abstract Aggregator getAggregator();
 }
