@@ -26,6 +26,7 @@ import com.hazelcast.collection.impl.set.SetService;
 import com.hazelcast.concurrent.atomiclong.AtomicLongService;
 import com.hazelcast.concurrent.atomicreference.AtomicReferenceService;
 import com.hazelcast.concurrent.countdownlatch.CountDownLatchService;
+import com.hazelcast.dataset.impl.DataSetService;
 import com.hazelcast.reliableidgen.impl.ReliableIdGeneratorService;
 import com.hazelcast.concurrent.idgen.IdGeneratorService;
 import com.hazelcast.concurrent.lock.LockService;
@@ -49,7 +50,6 @@ import com.hazelcast.quorum.impl.QuorumServiceImpl;
 import com.hazelcast.replicatedmap.impl.ReplicatedMapService;
 import com.hazelcast.ringbuffer.impl.RingbufferService;
 import com.hazelcast.scheduledexecutor.impl.DistributedScheduledExecutorService;
-import com.hazelcast.simplemap.impl.SimpleMapService;
 import com.hazelcast.spi.ConfigurableService;
 import com.hazelcast.spi.ManagedService;
 import com.hazelcast.spi.NodeEngine;
@@ -165,7 +165,7 @@ public final class ServiceManagerImpl implements ServiceManager {
         registerService(XAService.SERVICE_NAME, new XAService(nodeEngine));
         registerService(CardinalityEstimatorService.SERVICE_NAME, new CardinalityEstimatorService());
         registerService(DistributedScheduledExecutorService.SERVICE_NAME, new DistributedScheduledExecutorService());
-        registerService(SimpleMapService.SERVICE_NAME, new SimpleMapService());
+        registerService(DataSetService.SERVICE_NAME, new DataSetService());
         registerCacheServiceIfAvailable();
         readServiceDescriptors();
     }

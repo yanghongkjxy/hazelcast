@@ -25,6 +25,8 @@ import com.hazelcast.collection.impl.set.SetService;
 import com.hazelcast.concurrent.atomiclong.AtomicLongService;
 import com.hazelcast.concurrent.atomicreference.AtomicReferenceService;
 import com.hazelcast.concurrent.countdownlatch.CountDownLatchService;
+import com.hazelcast.dataset.SimpleMap;
+import com.hazelcast.dataset.impl.DataSetService;
 import com.hazelcast.reliableidgen.impl.ReliableIdGeneratorService;
 import com.hazelcast.concurrent.idgen.IdGeneratorService;
 import com.hazelcast.concurrent.lock.LockService;
@@ -72,8 +74,6 @@ import com.hazelcast.ringbuffer.Ringbuffer;
 import com.hazelcast.ringbuffer.impl.RingbufferService;
 import com.hazelcast.scheduledexecutor.IScheduledExecutorService;
 import com.hazelcast.scheduledexecutor.impl.DistributedScheduledExecutorService;
-import com.hazelcast.simplemap.SimpleMap;
-import com.hazelcast.simplemap.impl.SimpleMapService;
 import com.hazelcast.spi.ProxyService;
 import com.hazelcast.spi.annotation.PrivateApi;
 import com.hazelcast.spi.impl.SerializationServiceSupport;
@@ -184,7 +184,7 @@ public class HazelcastInstanceImpl implements HazelcastInstance, SerializationSe
     @Override
     public <K, V> SimpleMap<K, V> getSimpleMap(String name) {
         checkNotNull(name, "Retrieving a map instance with a null name is not allowed!");
-        return getDistributedObject(SimpleMapService.SERVICE_NAME, name);
+        return getDistributedObject(DataSetService.SERVICE_NAME, name);
     }
 
     @Override
