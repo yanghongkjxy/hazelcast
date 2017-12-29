@@ -40,15 +40,20 @@ public abstract class ScanCodeGenerator {
         for (Map.Entry<String, Field> variable : variables.entrySet()) {
             Field variableField = variable.getValue();
             String variableName = variable.getKey();
-            append("    private ").append(variableField.getType()).append(" ");
+            append("    private ").append(variableField.getType().getName()).append(" ");
 
             append(variableName).append(";\n");
         }
         append("\n");
     }
 
-    public ScanCodeGenerator append(Object s){
-        codeBuffer.append(s);
+    public ScanCodeGenerator append(String s, Object... args) {
+        codeBuffer.append(String.format(s, (Object[]) args));
+        return this;
+    }
+
+    public ScanCodeGenerator append(long i) {
+        codeBuffer.append(i);
         return this;
     }
 
@@ -85,31 +90,31 @@ public abstract class ScanCodeGenerator {
         return codeBuffer.toString();
     }
 
-    protected void toCode(Predicate predicate) {
+    protected void toCode(Predicate predicate, int unrollIndex) {
         if (predicate instanceof SqlPredicate) {
-            toCode((SqlPredicate) predicate);
+            toCode((SqlPredicate) predicate, unrollIndex);
         } else if (predicate instanceof TruePredicate) {
             append(" true ");
         } else if (predicate instanceof NotPredicate) {
-            toCode((NotPredicate) predicate);
+            toCode((NotPredicate) predicate, unrollIndex);
         } else if (predicate instanceof AndPredicate) {
-            toCode((AndPredicate) predicate);
+            toCode((AndPredicate) predicate, unrollIndex);
         } else if (predicate instanceof OrPredicate) {
-            toCode((OrPredicate) predicate);
+            toCode((OrPredicate) predicate, unrollIndex);
         } else if (predicate instanceof BetweenPredicate) {
-            toCode((BetweenPredicate) predicate);
+            toCode((BetweenPredicate) predicate, unrollIndex);
         } else if (predicate instanceof NotEqualPredicate) {
-            toCode((NotEqualPredicate) predicate);
+            toCode((NotEqualPredicate) predicate, unrollIndex);
         } else if (predicate instanceof EqualPredicate) {
-            toCode((EqualPredicate) predicate);
+            toCode((EqualPredicate) predicate, unrollIndex);
         } else if (predicate instanceof GreaterLessPredicate) {
-            toCode((GreaterLessPredicate) predicate);
+            toCode((GreaterLessPredicate) predicate, unrollIndex);
         } else {
             throw new RuntimeException("Unhandled predicate:" + predicate.getClass());
         }
     }
 
-    private void toCode(GreaterLessPredicate predicate) {
+    private void toCode(GreaterLessPredicate predicate, int unrollIndex) {
         String operator;
         if (predicate.isEqual()) {
             if (predicate.isLess()) {
@@ -125,34 +130,34 @@ public abstract class ScanCodeGenerator {
             }
         }
 
-        comparisonToCode( predicate.getAttributeName(), predicate.getValue(), operator);
+        comparisonToCode(predicate.getAttributeName(), predicate.getValue(), operator, unrollIndex);
     }
 
-    private void toCode(EqualPredicate predicate) {
+    private void toCode(EqualPredicate predicate, int unrollIndex) {
         String attributeName = predicate.getAttributeName();
         Comparable value = predicate.getValue();
-        if(attributeName.equals("true") && value.equals("true")){
+        if (attributeName.equals("true") && value.equals("true")) {
             append(" true ");
-        }else {
-            comparisonToCode(attributeName, value, "==");
+        } else {
+            comparisonToCode(attributeName, value, "==", unrollIndex);
         }
     }
 
-    private void toCode(NotEqualPredicate predicate) {
-        comparisonToCode(predicate.getAttributeName(), predicate.getValue(), "!=");
+    private void toCode(NotEqualPredicate predicate, int unrollIndex) {
+        comparisonToCode(predicate.getAttributeName(), predicate.getValue(), "!=", unrollIndex);
     }
 
-    private void toCode(BetweenPredicate predicate) {
+    private void toCode(BetweenPredicate predicate, int unrollIndex) {
         // between predicate is rewritten to:((attribute>=from) and (attribute<=to))
         GreaterLessPredicate left = new GreaterLessPredicate(
                 predicate.getAttributeName(), predicate.getFrom(), true, false);
         GreaterLessPredicate right = new GreaterLessPredicate(
                 predicate.getAttributeName(), predicate.getTo(), true, true);
         AndPredicate andPredicate = new AndPredicate(left, right);
-        toCode((Predicate) andPredicate);
+        toCode((Predicate) andPredicate, unrollIndex);
     }
 
-    private void toCode(OrPredicate predicate) {
+    private void toCode(OrPredicate predicate, int unrollIndex) {
         boolean first = true;
         for (Predicate p : predicate.getPredicates()) {
             if (first) {
@@ -161,12 +166,12 @@ public abstract class ScanCodeGenerator {
                 append(" || ");
             }
             append("(");
-            toCode(p);
+            toCode(p, unrollIndex);
             append(")");
         }
     }
 
-    private void toCode(AndPredicate predicate) {
+    private void toCode(AndPredicate predicate, int unrollIndex) {
         boolean first = true;
         for (Predicate p : predicate.getPredicates()) {
             if (first) {
@@ -175,23 +180,23 @@ public abstract class ScanCodeGenerator {
                 append(" && ");
             }
             append("(");
-            toCode(p);
+            toCode(p, unrollIndex);
             append(")");
         }
     }
 
-    private void toCode(NotPredicate predicate) {
+    private void toCode(NotPredicate predicate, int unrollIndex) {
         append(" !(");
-        toCode((Predicate) predicate);
+        toCode((Predicate) predicate, unrollIndex);
         append(")");
     }
 
-    private void toCode(SqlPredicate predicate) {
-        toCode(predicate.getPredicate());
+    private void toCode(SqlPredicate predicate, int unrollIndex) {
+        toCode(predicate.getPredicate(), unrollIndex);
     }
 
-    private void comparisonToCode(String attributeName, Comparable value, String operator) {
-        Field field = generateGetField(attributeName);
+    private void comparisonToCode(String attributeName, Comparable value, String operator, int unrollIndex) {
+        Field field = generateGetField(attributeName, unrollIndex);
         append(operator);
 
         if (value instanceof String) {
@@ -204,11 +209,11 @@ public abstract class ScanCodeGenerator {
                 append(valueString);
             }
         } else {
-            append(value);
+            append(value.toString());
         }
     }
 
-    protected Field generateGetField(String attributeName) {
+    protected Field generateGetField(String attributeName, int unrollIndex) {
         Field field = recordMetadata.getField(attributeName);
         long offset = unsafe.objectFieldOffset(field) - recordMetadata.getRecordDataOffset();
 
@@ -232,7 +237,7 @@ public abstract class ScanCodeGenerator {
             throw new RuntimeException("Unhandled field comparison: '" + field.getType() + "' for attribute:" + attributeName);
         }
 
-        append("offset+").append(offset);
+        append("offset+").append("" + (recordMetadata.getRecordDataSize() * unrollIndex)).append("+").append(offset);
         append(")");
         return field;
     }

@@ -31,7 +31,7 @@ public class QueryScanCodeGenerator extends ScanCodeGenerator {
         append("       long offset=slabPointer;\n");
         append("       for(long l=0;l<recordIndex;l++){\n");
         append("           if(");
-        toCode(predicate);
+        toCode(predicate, 0);
         append("){\n");
         append("                count++;\n");
         append("           }\n");

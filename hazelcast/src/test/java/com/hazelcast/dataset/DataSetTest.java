@@ -94,13 +94,13 @@ public class DataSetTest {
             dataSet.set((long) k, new Employee(k, k, k));
         }
 
-        CompiledProjection<AgeSalary> compiledProjection = dataSet.compile(new ProjectionRecipe<AgeSalary>(AgeSalary.class, true, new SqlPredicate("age==$age and iq==$iq and height>10")));
+        CompiledProjection<AgeSalary> compiledProjection = dataSet.compile(
+                new ProjectionRecipe<AgeSalary>(AgeSalary.class, true, new SqlPredicate("age==$age and iq==$iq and height>10")));
 //        Map<String, Object> bindings = new HashMap<String, Object>();
 //        bindings.put("age", 100);
 //        bindings.put("iq", 100l);
 //        compiledPredicate.execute(bindings);
     }
-
 
     @Test
     public void compileAggregation() {
@@ -119,7 +119,6 @@ public class DataSetTest {
             maxAge = Math.min(maxAge, age);
             dataSet.set((long) k, new Employee(age, k, k));
         }
-
 
         Aggregator aggregator = new MinAggregator();
 

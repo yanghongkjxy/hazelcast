@@ -63,73 +63,91 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
     }
 
     private void generateAggregatorField() {
-        append("    private final "+aggregator.getClass().getName()+" aggregator = new "+aggregator.getClass().getName()+"();\n\n");
+        append("    private final " + aggregator.getClass().getName() + " aggregator = new " + aggregator.getClass().getName() + "();\n\n");
     }
 
     private void generateAggregatorGetter() {
-        append("    public "+aggregator.getClass().getName()+" getAggregator(){return aggregator;}\n\n");
+        append("    public " + aggregator.getClass().getName() + " getAggregator(){return aggregator;}\n\n");
     }
 
     private void generateRunMethod() {
         append("    public void run(){\n");
 
-        if (aggregator instanceof CountAggregator) {
-            append("       long result=0;\n");
-        } else if (aggregator instanceof LongSumAggregator) {
-            append("       long result=0;\n");
-        } else if (aggregator instanceof MinAggregator) {
-            append("       long result=Long.MAX_VALUE;\n");
-        } else if (aggregator instanceof MaxAggregator) {
-            append("       long result=Long.MIN_VALUE;\n");
-        } else if (aggregator instanceof LongAverageAggregator) {
-            append("       long sum=0;\n");
-            append("       long count=0;\n");
-        } else if (aggregator instanceof DoubleSumAggregator) {
-            append("       double result=0;\n");
-        } else {
-            throw new RuntimeException();
+        int unrollCount = 4;
+
+        for (int unrollIndex = 0; unrollIndex < unrollCount; unrollIndex++) {
+            if (aggregator instanceof CountAggregator) {
+                append("       long result_%d=0;\n", unrollIndex);
+            } else if (aggregator instanceof LongSumAggregator) {
+                append("       long result_%d=0;\n", unrollIndex);
+            } else if (aggregator instanceof MinAggregator) {
+                append("       long result_%d=Long.MAX_VALUE;\n", unrollIndex);
+            } else if (aggregator instanceof MaxAggregator) {
+                append("       long result_%d=Long.MIN_VALUE;\n", unrollIndex);
+            } else if (aggregator instanceof LongAverageAggregator) {
+                append("       long sum_%d=0;\n", unrollIndex);
+                append("       long count_%d=0;\n", unrollIndex);
+            } else if (aggregator instanceof DoubleSumAggregator) {
+                append("       double result_%d=0;\n", unrollIndex);
+            } else {
+                throw new RuntimeException();
+            }
         }
 
         append("       long offset=slabPointer;\n");
-        append("       for(long l=0;l<recordIndex;l++){\n");
-        append("           if(");
-        toCode(predicate);
-        append("){\n");
+        append("       for(long l=0;l<recordIndex;l+=%d){\n", unrollCount);
 
-        if (aggregator instanceof CountAggregator) {
-            append("               result+=1;\n");
-        } else if (aggregator instanceof LongSumAggregator) {
-            append("               result+=");
-            generateGetField(field().getName());
-            append(";\n");
-        } else if (aggregator instanceof LongAverageAggregator) {
-            append("               count+=1;\n");
-            append("               sum+=");
-            generateGetField(field().getName());
-            append(";\n");
-        } else if (aggregator instanceof MinAggregator) {
-            append("               long value=");
-            generateGetField(field().getName());
-            append(";\n");
-            append("               if(value<result) result=value;\n");
-        } else if (aggregator instanceof MaxAggregator) {
-            append("               long value=");
-            generateGetField(field().getName());
-            append(";\n");
-            append("               if(value>result) result=value;\n");
-        } else if (aggregator instanceof DoubleSumAggregator) {
-            append("               result+=");
-            generateGetField(field().getName());
-            append(";\n");
+        for (int unrollIndex = 0; unrollIndex < unrollCount; unrollIndex++) {
+            append("           if(");
+            toCode(predicate, unrollIndex);
+            append("){\n");
+
+            if (aggregator instanceof CountAggregator) {
+                append("               result_%d+=1;\n", unrollIndex);
+            } else if (aggregator instanceof LongSumAggregator) {
+                append("               result_%d+=", unrollIndex);
+                generateGetField(field().getName(), unrollIndex);
+                append(";\n");
+            } else if (aggregator instanceof LongAverageAggregator) {
+                append("               count_%d+=1;\n", unrollIndex);
+                append("               sum_%d+=", unrollIndex);
+                generateGetField(field().getName(), unrollIndex);
+                append(";\n");
+            } else if (aggregator instanceof MinAggregator) {
+                append("               long value_%d=", unrollIndex);
+                generateGetField(field().getName(), unrollIndex);
+                append(";\n");
+                append("               if(value_%d<result_%d) result_%d=value_%d;\n", unrollIndex, unrollIndex, unrollIndex, unrollIndex);
+            } else if (aggregator instanceof MaxAggregator) {
+                append("               long value=");
+                generateGetField(field().getName(), unrollIndex);
+                append(";\n");
+                append("               if(value_%d>result_%d) result_%d=value_%d;\n", unrollIndex, unrollIndex, unrollIndex, unrollIndex);
+            } else if (aggregator instanceof DoubleSumAggregator) {
+                append("               result_%d+=", unrollIndex);
+                generateGetField(field().getName(), unrollIndex);
+                append(";\n");
+            }
+            //append("                count++;\n");
+            append("           }\n");
         }
-        //append("                count++;\n");
-        append("           }\n");
-        append("           offset+=recordDataSize;\n");
+
+        append("           offset+=%d*recordDataSize;\n", unrollCount);
         append("        }\n");
-        if(aggregator instanceof LongAverageAggregator){
+        if (aggregator instanceof LongAverageAggregator) {
+            append("        long sum=0;\n");
+            append("        long count=0;\n");
+
+            for (int unrollIndex = 0; unrollIndex < unrollCount; unrollIndex++) {
+                append("        sum+=sum_%d;\n", unrollIndex);
+                append("        count+=count_%d;\n", unrollIndex);
+            }
+
             append("        aggregator.init(sum,count);\n");
-        }else {
-            append("        aggregator.accumulate(result);\n");
+        } else {
+            for (int unrollIndex = 0; unrollIndex < unrollCount; unrollIndex++) {
+                append("        aggregator.accumulate(result_%d);\n", unrollIndex);
+            }
         }
         append("    }\n\n");
     }

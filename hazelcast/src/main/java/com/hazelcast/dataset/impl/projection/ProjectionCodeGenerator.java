@@ -50,12 +50,12 @@ public class ProjectionCodeGenerator extends ScanCodeGenerator {
         append("       " + projectionClass.getName() + " object=new " + projectionClass.getName() + "();\n");
         append("       for(long l=0;l<recordIndex;l++){\n");
         append("           if(");
-        toCode(predicate);
+        toCode(predicate,0);
         append("){\n");
 
         for (Field field : extractedFields()) {
             append("               object.").append(field.getName()).append("=");
-            generateGetField(field.getName());
+            generateGetField(field.getName(),0);
             append(";\n");
         }
         append("               consumer.accept(object);\n");
