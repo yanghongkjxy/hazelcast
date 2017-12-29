@@ -1,48 +1,49 @@
-package com.hazelcast.dataset.impl.operations;
+package com.hazelcast.dataset.impl.projection;
 
+import com.hazelcast.dataset.impl.operations.DataSetOperation;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.dataset.ProjectionRecipe;
 
 import java.io.IOException;
 
-import static com.hazelcast.dataset.impl.DataSetDataSerializerHook.COMPILE_PROJECTION;
+import static com.hazelcast.dataset.impl.DataSetDataSerializerHook.COMPILE_PROJECTION_OPERATION;
 
-public class CompileProjectionOperation extends DataStoreOperation {
+public class CompileProjectionOperation extends DataSetOperation {
 
     public ProjectionRecipe projectionRecipe;
-    private String compiledQueryUuid;
+    private String compileId;
 
     public CompileProjectionOperation() {
     }
 
-    public CompileProjectionOperation(String name, String compiledQueryUuid, ProjectionRecipe projectionRecipe) {
+    public CompileProjectionOperation(String name, String compileId, ProjectionRecipe projectionRecipe) {
         super(name);
         this.projectionRecipe = projectionRecipe;
-        this.compiledQueryUuid = compiledQueryUuid;
+        this.compileId = compileId;
     }
 
     @Override
     public int getId() {
-        return COMPILE_PROJECTION;
+        return COMPILE_PROJECTION_OPERATION;
     }
 
     @Override
     public void run() throws Exception {
-        container.getRecordStore(getPartitionId()).compileProjection(compiledQueryUuid, projectionRecipe);
+        container.getRecordStore(getPartitionId()).compileProjection(compileId, projectionRecipe);
     }
 
     @Override
     protected void writeInternal(ObjectDataOutput out) throws IOException {
         super.writeInternal(out);
-        out.writeUTF(compiledQueryUuid);
+        out.writeUTF(compileId);
         out.writeObject(projectionRecipe);
     }
 
     @Override
     protected void readInternal(ObjectDataInput in) throws IOException {
         super.readInternal(in);
-        compiledQueryUuid = in.readUTF();
+        compileId = in.readUTF();
         projectionRecipe = in.readObject();
     }
 }

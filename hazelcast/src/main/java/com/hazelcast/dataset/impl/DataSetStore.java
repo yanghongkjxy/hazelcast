@@ -1,6 +1,12 @@
 package com.hazelcast.dataset.impl;
 
 import com.hazelcast.config.DataSetConfig;
+import com.hazelcast.dataset.AggregationRecipe;
+import com.hazelcast.dataset.impl.aggregation.AggregationCodeGenerator;
+import com.hazelcast.dataset.impl.projection.ProjectionCodeGenerator;
+import com.hazelcast.dataset.impl.projection.ProjectionScan;
+import com.hazelcast.dataset.impl.query.QueryScan;
+import com.hazelcast.dataset.impl.query.QueryScanCodeGenerator;
 import com.hazelcast.internal.memory.impl.UnsafeUtil;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.query.Predicate;
@@ -45,19 +51,19 @@ public class DataSetStore {
         recordIndex++;
     }
 
-    public void compilePredicate(String compiledQueryUuid, Predicate predicate) {
+    public void compilePredicate(String compileId, Predicate predicate) {
         ScanCodeGenerator codeGenerator = new QueryScanCodeGenerator(
-                compiledQueryUuid, predicate, recordMetadata);
+                compileId, predicate, recordMetadata);
         codeGenerator.generate();
 
-        compiler.compile(codeGenerator.getClassName(), codeGenerator.getCode());
+        compiler.compile(codeGenerator.className(), codeGenerator.getCode());
 
         System.out.println("compile:" + predicate);
         System.out.println(codeGenerator.getCode() + "\n");
     }
 
-    public void fullTableScan(String compiledQueryUuid, Map<String, Object> bindings) {
-        Class<Scan> clazz = compiler.load("QueryScan_" + compiledQueryUuid);
+    public void fullTableScan(String compileId, Map<String, Object> bindings) {
+        Class<Scan> clazz = compiler.load("QueryScan_" + compileId);
         QueryScan scan;
         try {
             scan = (QueryScan) clazz.newInstance();
@@ -75,12 +81,12 @@ public class DataSetStore {
         scan.run();
     }
 
-    public void compileProjection(String compiledQueryUuid, ProjectionRecipe extraction) {
+    public void compileProjection(String compileId, ProjectionRecipe extraction) {
         ScanCodeGenerator codeGenerator = new ProjectionCodeGenerator(
-                compiledQueryUuid, extraction, recordMetadata);
+                compileId, extraction, recordMetadata);
         codeGenerator.generate();
 
-        compiler.compile(codeGenerator.getClassName(), codeGenerator.getCode());
+        compiler.compile(codeGenerator.className(), codeGenerator.getCode());
 
         System.out.println("compile:" + extraction.getPredicate());
         System.out.println(codeGenerator.getCode() + "\n");
@@ -90,8 +96,8 @@ public class DataSetStore {
         return recordIndex;
     }
 
-    public void projection(String compiledQueryUuid, Map<String, Object> bindings) {
-        Class<Scan> fullTableScanClass = compiler.load("ProjectionScan_" + compiledQueryUuid);
+    public void projection(String compileId, Map<String, Object> bindings) {
+        Class<Scan> fullTableScanClass = compiler.load("ProjectionScan_" + compileId);
         ProjectionScan scan;
         try {
             scan = (ProjectionScan) fullTableScanClass.newInstance();
@@ -110,7 +116,18 @@ public class DataSetStore {
         scan.run();
     }
 
-    public void aggregate(String compiledQueryUuid, Map<String, Object> bindings) {
+    public void aggregate(String compileId, Map<String, Object> bindings) {
 
+    }
+
+    public void compileAggregation(String compileId, AggregationRecipe aggregationRecipe) {
+        ScanCodeGenerator codeGenerator = new AggregationCodeGenerator(
+                compileId, aggregationRecipe, recordMetadata);
+        codeGenerator.generate();
+
+        compiler.compile(codeGenerator.className(), codeGenerator.getCode());
+
+        System.out.println("compile:" + aggregationRecipe.getPredicate());
+        System.out.println(codeGenerator.getCode() + "\n");
     }
 }

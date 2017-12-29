@@ -1,4 +1,4 @@
-package com.hazelcast.dataset.impl.operations;
+package com.hazelcast.dataset.impl.projection;
 
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
@@ -11,22 +11,22 @@ import java.io.IOException;
 
 public class CompileProjectionOperationFactory implements OperationFactory {
 
-    private  String compiledQueryUuid;
+    private  String compileId;
     private String name;
     private ProjectionRecipe projectionRecipe;
 
     public CompileProjectionOperationFactory() {
     }
 
-    public CompileProjectionOperationFactory(String name,String compiledQueryUuid, ProjectionRecipe projectionRecipe) {
+    public CompileProjectionOperationFactory(String name,String compileId, ProjectionRecipe projectionRecipe) {
         this.name = name;
-        this.compiledQueryUuid = compiledQueryUuid;
+        this.compileId = compileId;
         this.projectionRecipe = projectionRecipe;
     }
 
     @Override
     public Operation createOperation() {
-        return new CompileProjectionOperation(name, compiledQueryUuid, projectionRecipe);
+        return new CompileProjectionOperation(name, compileId, projectionRecipe);
     }
 
     @Override
@@ -42,14 +42,14 @@ public class CompileProjectionOperationFactory implements OperationFactory {
     @Override
     public void writeData(ObjectDataOutput out) throws IOException {
         out.writeUTF(name);
-        out.writeUTF(compiledQueryUuid);
+        out.writeUTF(compileId);
         out.writeObject(projectionRecipe);
     }
 
     @Override
     public void readData(ObjectDataInput in) throws IOException {
         name = in.readUTF();
-        compiledQueryUuid = in.readUTF();
+        compileId = in.readUTF();
         projectionRecipe = in.readObject();
     }
 }

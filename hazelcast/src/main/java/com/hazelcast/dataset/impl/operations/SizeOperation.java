@@ -3,7 +3,7 @@ package com.hazelcast.dataset.impl.operations;
 import com.hazelcast.dataset.impl.DataSetDataSerializerHook;
 import com.hazelcast.dataset.impl.DataSetStore;
 
-public class SizeOperation extends DataStoreOperation {
+public class SizeOperation extends DataSetOperation {
 
     private long response;
 
@@ -27,6 +27,6 @@ public class SizeOperation extends DataStoreOperation {
 
     @Override
     public int getId() {
-        return DataSetDataSerializerHook.SIZE;
+        return DataSetDataSerializerHook.SIZE_OPERATION;
     }
 }

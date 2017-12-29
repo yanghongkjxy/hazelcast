@@ -11,17 +11,17 @@ import com.hazelcast.spi.Operation;
 
 import java.io.IOException;
 
-public abstract class DataStoreOperation extends Operation
+public abstract class DataSetOperation extends Operation
         implements IdentifiedDataSerializable, NamedOperation {
 
     private String name;
     protected DataSetService dataSetService;
     protected DataSetContainer container;
 
-    public DataStoreOperation() {
+    public DataSetOperation() {
     }
 
-    public DataStoreOperation(String name) {
+    public DataSetOperation(String name) {
         this.name = name;
     }
 

@@ -1,4 +1,4 @@
-package com.hazelcast.dataset.impl.operations;
+package com.hazelcast.dataset.impl.query;
 
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
@@ -11,22 +11,22 @@ import java.io.IOException;
 
 public class CompilePredicateOperationFactory implements OperationFactory {
 
-    private  String compiledQueryUuid;
+    private  String compileId;
     private String name;
     private Predicate predicate;
 
     public CompilePredicateOperationFactory() {
     }
 
-    public CompilePredicateOperationFactory(String name,String compiledQueryUuid, Predicate predicate) {
+    public CompilePredicateOperationFactory(String name,String compileId, Predicate predicate) {
         this.name = name;
-        this.compiledQueryUuid = compiledQueryUuid;
+        this.compileId = compileId;
         this.predicate = predicate;
     }
 
     @Override
     public Operation createOperation() {
-        return new CompilePredicateOperation(name, compiledQueryUuid, predicate);
+        return new CompilePredicateOperation(name, compileId, predicate);
     }
 
     @Override
@@ -42,14 +42,14 @@ public class CompilePredicateOperationFactory implements OperationFactory {
     @Override
     public void writeData(ObjectDataOutput out) throws IOException {
         out.writeUTF(name);
-        out.writeUTF(compiledQueryUuid);
+        out.writeUTF(compileId);
         out.writeObject(predicate);
     }
 
     @Override
     public void readData(ObjectDataInput in) throws IOException {
         name = in.readUTF();
-        compiledQueryUuid = in.readUTF();
+        compileId = in.readUTF();
         predicate = in.readObject();
     }
 }

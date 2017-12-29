@@ -1,8 +1,8 @@
-package com.hazelcast.dataset.impl.operations;
+package com.hazelcast.dataset.impl.query;
 
+import com.hazelcast.dataset.impl.DataSetDataSerializerHook;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
-import com.hazelcast.dataset.impl.DataSetDataSerializerHook;
 import com.hazelcast.spi.Operation;
 import com.hazelcast.spi.OperationFactory;
 
@@ -10,23 +10,24 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
-public class QueryOperationFactory implements OperationFactory{
+public class QueryOperationFactory implements OperationFactory {
 
-    private  String name;
-    private String compiledQueryUuid;
-    private Map<String,Object> bindings;
+    private String name;
+    private String compileId;
+    private Map<String, Object> bindings;
 
-    public QueryOperationFactory(){}
+    public QueryOperationFactory() {
+    }
 
-    public QueryOperationFactory(String name, String compiledQueryUuid, Map<String, Object> bindings) {
+    public QueryOperationFactory(String name, String compileId, Map<String, Object> bindings) {
         this.name = name;
-        this.compiledQueryUuid = compiledQueryUuid;
+        this.compileId = compileId;
         this.bindings = bindings;
     }
 
     @Override
     public Operation createOperation() {
-        return new QueryOperation(name, compiledQueryUuid, bindings);
+        return new QueryOperation(name, compileId, bindings);
     }
 
     @Override
@@ -42,9 +43,9 @@ public class QueryOperationFactory implements OperationFactory{
     @Override
     public void writeData(ObjectDataOutput out) throws IOException {
         out.writeUTF(name);
-        out.writeUTF(compiledQueryUuid);
+        out.writeUTF(compileId);
         out.writeInt(bindings.size());
-        for(Map.Entry<String,Object> entry: bindings.entrySet()){
+        for (Map.Entry<String, Object> entry : bindings.entrySet()) {
             out.writeUTF(entry.getKey());
             out.writeObject(entry.getValue());
         }
@@ -53,10 +54,10 @@ public class QueryOperationFactory implements OperationFactory{
     @Override
     public void readData(ObjectDataInput in) throws IOException {
         name = in.readUTF();
-        compiledQueryUuid = in.readUTF();
+        compileId = in.readUTF();
         int size = in.readInt();
         bindings = new HashMap<String, Object>();
-        for(int k=0;k<size;k++){
+        for (int k = 0; k < size; k++) {
             bindings.put(in.readUTF(), in.readObject());
         }
     }

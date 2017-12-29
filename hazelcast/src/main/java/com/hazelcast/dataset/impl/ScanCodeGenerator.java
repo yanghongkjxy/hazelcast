@@ -23,15 +23,16 @@ public abstract class ScanCodeGenerator {
     private final Map<String, Field> variables = new HashMap<String, Field>();
     private final Unsafe unsafe = UnsafeUtil.UNSAFE;
     protected final Predicate predicate;
-    protected final String className;
     protected final RecordMetadata recordMetadata;
+    protected final String compilationId;
 
-    public ScanCodeGenerator(String className,
-                             Predicate predicate, RecordMetadata recordMetadata) {
+    public ScanCodeGenerator(String compilationId, Predicate predicate, RecordMetadata recordMetadata) {
+        this.compilationId = compilationId;
         this.predicate = predicate;
         this.recordMetadata = recordMetadata;
-        this.className = className;
     }
+
+    public abstract String className();
 
     public abstract void generate();
 
@@ -45,7 +46,7 @@ public abstract class ScanCodeGenerator {
         }
     }
 
-    protected ScanCodeGenerator append(Object s){
+    public ScanCodeGenerator append(Object s){
         codeBuffer.append(s);
         return this;
     }
@@ -77,10 +78,6 @@ public abstract class ScanCodeGenerator {
             append(")binding.get(\"").append(variableName).append("\");\n");
         }
         append("    }\n");
-    }
-
-    public String getClassName() {
-        return className;
     }
 
     public String getCode() {

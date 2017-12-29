@@ -8,7 +8,7 @@ import com.hazelcast.dataset.impl.DataSetStore;
 
 import java.io.IOException;
 
-public class SetOperation extends DataStoreOperation {
+public class SetOperation extends DataSetOperation {
 
     private Data key;
     private Data value;
@@ -30,7 +30,7 @@ public class SetOperation extends DataStoreOperation {
 
     @Override
     public int getId() {
-        return DataSetDataSerializerHook.SET;
+        return DataSetDataSerializerHook.SET_OPERATION;
     }
 
     @Override

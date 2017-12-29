@@ -1,6 +1,7 @@
 package com.hazelcast.dataset.impl;
 
 import com.hazelcast.dataset.DataSet;
+import com.hazelcast.dataset.impl.aggregation.CompileAggregationOperationFactory;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.query.Predicate;
 import com.hazelcast.dataset.AggregationRecipe;
@@ -8,8 +9,8 @@ import com.hazelcast.dataset.CompiledAggregation;
 import com.hazelcast.dataset.CompiledPredicate;
 import com.hazelcast.dataset.CompiledProjection;
 import com.hazelcast.dataset.ProjectionRecipe;
-import com.hazelcast.dataset.impl.operations.CompilePredicateOperationFactory;
-import com.hazelcast.dataset.impl.operations.CompileProjectionOperationFactory;
+import com.hazelcast.dataset.impl.query.CompilePredicateOperationFactory;
+import com.hazelcast.dataset.impl.projection.CompileProjectionOperationFactory;
 import com.hazelcast.dataset.impl.operations.SetOperation;
 import com.hazelcast.dataset.impl.operations.SizeOperationFactory;
 import com.hazelcast.spi.AbstractDistributedObject;
@@ -60,37 +61,48 @@ public class DataSetProxy<K, V> extends AbstractDistributedObject<DataSetService
     public CompiledPredicate<V> compile(Predicate query) {
         checkNotNull(query, "query can't be null");
 
-        String compiledQueryUuid = UuidUtil.newUnsecureUuidString().replace("-", "");
+        String compileId = UuidUtil.newUnsecureUuidString().replace("-", "");
 
         try {
             Map<Integer, Object> result = operationService.invokeOnAllPartitions(
-                    DataSetService.SERVICE_NAME, new CompilePredicateOperationFactory(name, compiledQueryUuid, query));
+                    DataSetService.SERVICE_NAME, new CompilePredicateOperationFactory(name, compileId, query));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
-        return new CompiledPredicate<V>(operationService, name, compiledQueryUuid);
+        return new CompiledPredicate<V>(operationService, name, compileId);
     }
 
     @Override
     public <E> CompiledProjection<E> compile(ProjectionRecipe<E> projectionRecipe) {
         checkNotNull(projectionRecipe, "projectionRecipe can't be null");
 
-        String compiledQueryUuid = UuidUtil.newUnsecureUuidString().replace("-", "");
+        String compileId = UuidUtil.newUnsecureUuidString().replace("-", "");
 
         try {
             Map<Integer, Object> result = operationService.invokeOnAllPartitions(
-                   DataSetService.SERVICE_NAME, new CompileProjectionOperationFactory(name, compiledQueryUuid, projectionRecipe));
+                   DataSetService.SERVICE_NAME, new CompileProjectionOperationFactory(name, compileId, projectionRecipe));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
 
-        return new CompiledProjection<E>(operationService, name, compiledQueryUuid);
+        return new CompiledProjection<E>(operationService, name, compileId);
     }
 
     @Override
     public <T, E> CompiledAggregation<E> compile(AggregationRecipe<T, E> aggregationRecipe) {
-        return null;
+        checkNotNull(aggregationRecipe, "aggregationRecipe can't be null");
+
+        String compileId = UuidUtil.newUnsecureUuidString().replace("-", "");
+
+        try {
+            Map<Integer, Object> result = operationService.invokeOnAllPartitions(
+                    DataSetService.SERVICE_NAME, new CompileAggregationOperationFactory(name, compileId, aggregationRecipe));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
+        return new CompiledAggregation<E>(operationService, name, compileId);
     }
 
     @Override
