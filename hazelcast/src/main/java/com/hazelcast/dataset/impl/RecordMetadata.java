@@ -28,8 +28,7 @@ public class RecordMetadata {
     public RecordMetadata(DataSetConfig dataSetConfig) {
         this.config = dataSetConfig;
         initRecordData(config.getValueClass());
-
-        System.out.println("record size:" + recordDataSize);
+        //System.out.println("record size:" + recordDataSize);
     }
 
     public Class getValueClass() {
@@ -68,7 +67,7 @@ public class RecordMetadata {
 
                 if (fieldOffset > maxFieldOffset) {
                     maxFieldOffset = fieldOffset;
-                    System.out.println("fieldOffset:" + fieldOffset + " field.name:" + f.getName());
+                    //System.out.println("fieldOffset:" + fieldOffset + " field.name:" + f.getName());
                     end = fieldOffset + fieldSize(f);
                 }
 
@@ -78,9 +77,9 @@ public class RecordMetadata {
             }
         } while ((clazz = clazz.getSuperclass()) != null);
 
-        System.out.println("minFieldOffset:" + minFieldOffset);
-        System.out.println("maxFieldOffset:" + maxFieldOffset);
-        System.out.println("end:" + end);
+       // System.out.println("minFieldOffset:" + minFieldOffset);
+       // System.out.println("maxFieldOffset:" + maxFieldOffset);
+       // System.out.println("end:" + end);
 
         this.recordDataSize = end - minFieldOffset;
         this.recordDataOffset = minFieldOffset;

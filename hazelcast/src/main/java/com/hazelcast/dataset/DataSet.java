@@ -64,4 +64,6 @@ public interface DataSet<K, V> {
     <T,E> CompiledAggregation<E> compile(AggregationRecipe<T,E> aggregationRecipe);
 
     long size();
+
+    long memoryConsumption();
 }

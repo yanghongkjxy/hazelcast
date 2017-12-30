@@ -19,6 +19,8 @@ package com.hazelcast.dataset.impl;
 import com.hazelcast.dataset.impl.aggregation.AggregateOperationFactory;
 import com.hazelcast.dataset.impl.aggregation.CompileAggregationOperation;
 import com.hazelcast.dataset.impl.aggregation.CompileAggregationOperationFactory;
+import com.hazelcast.dataset.impl.operations.UsedMemoryOperation;
+import com.hazelcast.dataset.impl.operations.UsedMemoryOperationFactory;
 import com.hazelcast.internal.serialization.DataSerializerHook;
 import com.hazelcast.internal.serialization.impl.FactoryIdHelper;
 import com.hazelcast.map.impl.query.QueryOperation;
@@ -54,6 +56,8 @@ public final class DataSetDataSerializerHook implements DataSerializerHook {
     public static final int AGGREGATE_OPERATION_FACTORY = 10;
     public static final int COMPILE_AGGREGATION = 11;
     public static final int COMPILE_AGGREGATION_OPERATION_FACTORY = 12;
+    public static final int USED_MEMORY_OPERATION = 13;
+    public static final int USED_MEMORY_OPERATION_FACTORY = 14;
 
     @Override
     public int getFactoryId() {
@@ -92,6 +96,10 @@ public final class DataSetDataSerializerHook implements DataSerializerHook {
                         return new CompileAggregationOperation();
                     case COMPILE_AGGREGATION_OPERATION_FACTORY:
                         return new CompileAggregationOperationFactory();
+                    case USED_MEMORY_OPERATION:
+                        return new UsedMemoryOperation();
+                    case USED_MEMORY_OPERATION_FACTORY:
+                        return new UsedMemoryOperationFactory();
                     default:
                         return null;
                 }

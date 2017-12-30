@@ -38,6 +38,36 @@ public class DataSetTest {
         }
     }
 
+    @Test
+    public void testSize() {
+        Config config = new Config();
+        config.addDataSetConfig(new DataSetConfig("foo").setKeyClass(Long.class).setValueClass(Employee.class));
+
+        HazelcastInstance hz = Hazelcast.newHazelcastInstance(config);
+
+        DataSet<Long, Employee> dataSet = hz.getDataSet("foo");
+        for (int k = 0; k < 5; k++) {
+            dataSet.set((long) k, new Employee(k, k, k));
+        }
+
+        assertEquals(5, dataSet.size());
+    }
+
+    @Test
+    public void testMemoryConsumption() {
+        Config config = new Config();
+        config.addDataSetConfig(new DataSetConfig("foo").setKeyClass(Long.class).setValueClass(Employee.class));
+
+        HazelcastInstance hz = Hazelcast.newHazelcastInstance(config);
+
+        DataSet<Long, Employee> dataSet = hz.getDataSet("foo");
+        for (int k = 0; k < 5; k++) {
+            dataSet.set((long) k, new Employee(k, k, k));
+        }
+
+        assertEquals(20*5, dataSet.memoryConsumption());
+    }
+
 
     @Test
     public void compileQuery() {

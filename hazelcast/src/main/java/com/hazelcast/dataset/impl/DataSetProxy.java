@@ -1,18 +1,19 @@
 package com.hazelcast.dataset.impl;
 
-import com.hazelcast.dataset.DataSet;
-import com.hazelcast.dataset.impl.aggregation.CompileAggregationOperationFactory;
-import com.hazelcast.nio.serialization.Data;
-import com.hazelcast.query.Predicate;
 import com.hazelcast.dataset.AggregationRecipe;
 import com.hazelcast.dataset.CompiledAggregation;
 import com.hazelcast.dataset.CompiledPredicate;
 import com.hazelcast.dataset.CompiledProjection;
+import com.hazelcast.dataset.DataSet;
 import com.hazelcast.dataset.ProjectionRecipe;
-import com.hazelcast.dataset.impl.query.CompilePredicateOperationFactory;
-import com.hazelcast.dataset.impl.projection.CompileProjectionOperationFactory;
+import com.hazelcast.dataset.impl.aggregation.CompileAggregationOperationFactory;
 import com.hazelcast.dataset.impl.operations.SetOperation;
 import com.hazelcast.dataset.impl.operations.SizeOperationFactory;
+import com.hazelcast.dataset.impl.operations.UsedMemoryOperationFactory;
+import com.hazelcast.dataset.impl.projection.CompileProjectionOperationFactory;
+import com.hazelcast.dataset.impl.query.CompilePredicateOperationFactory;
+import com.hazelcast.nio.serialization.Data;
+import com.hazelcast.query.Predicate;
 import com.hazelcast.spi.AbstractDistributedObject;
 import com.hazelcast.spi.InternalCompletableFuture;
 import com.hazelcast.spi.NodeEngine;
@@ -81,7 +82,7 @@ public class DataSetProxy<K, V> extends AbstractDistributedObject<DataSetService
 
         try {
             Map<Integer, Object> result = operationService.invokeOnAllPartitions(
-                   DataSetService.SERVICE_NAME, new CompileProjectionOperationFactory(name, compileId, projectionRecipe));
+                    DataSetService.SERVICE_NAME, new CompileProjectionOperationFactory(name, compileId, projectionRecipe));
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -110,6 +111,22 @@ public class DataSetProxy<K, V> extends AbstractDistributedObject<DataSetService
         try {
             Map<Integer, Object> result = operationService.invokeOnAllPartitions(
                     DataSetService.SERVICE_NAME, new SizeOperationFactory(name));
+
+            long size = 0;
+            for (Object value : result.values()) {
+                size += ((Long) value);
+            }
+            return size;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public long memoryConsumption() {
+        try {
+            Map<Integer, Object> result = operationService.invokeOnAllPartitions(
+                    DataSetService.SERVICE_NAME, new UsedMemoryOperationFactory(name));
 
             long size = 0;
             for (Object value : result.values()) {

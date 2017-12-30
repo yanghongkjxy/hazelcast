@@ -98,6 +98,9 @@ public class DataSetStore {
         return recordIndex;
     }
 
+    public long usedMemory() {
+        return recordIndex * recordMetadata.getRecordDataSize();
+    }
     public void projection(String compileId, Map<String, Object> bindings) {
         Class<Scan> fullTableScanClass = compiler.load("ProjectionScan_" + compileId);
         ProjectionScan scan;
@@ -148,4 +151,5 @@ public class DataSetStore {
         //System.out.println("compile:" + aggregationRecipe.getPredicate());
         //System.out.println(codeGenerator.getCode() + "\n");
     }
+
 }
