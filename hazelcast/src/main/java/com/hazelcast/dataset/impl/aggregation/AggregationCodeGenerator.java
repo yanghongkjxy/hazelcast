@@ -73,7 +73,7 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
     private void generateRunMethod() {
         append("    public void run(){\n");
 
-        int unrollCount = 4;
+        int unrollCount = 1;
 
         for (int unrollIndex = 0; unrollIndex < unrollCount; unrollIndex++) {
             if (aggregator instanceof CountAggregator) {
@@ -119,7 +119,7 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
                 append(";\n");
                 append("               if(value_%d<result_%d) result_%d=value_%d;\n", unrollIndex, unrollIndex, unrollIndex, unrollIndex);
             } else if (aggregator instanceof MaxAggregator) {
-                append("               long value=");
+                append("               long value_%d=", unrollIndex);
                 generateGetField(field().getName(), unrollIndex);
                 append(";\n");
                 append("               if(value_%d>result_%d) result_%d=value_%d;\n", unrollIndex, unrollIndex, unrollIndex, unrollIndex);

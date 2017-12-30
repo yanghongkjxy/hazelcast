@@ -1,6 +1,7 @@
 package com.hazelcast.dataset;
 
 import com.hazelcast.aggregation.Aggregator;
+import com.hazelcast.aggregation.impl.DoubleSumAggregator;
 import com.hazelcast.aggregation.impl.LongAverageAggregator;
 import com.hazelcast.aggregation.impl.LongSumAggregator;
 import com.hazelcast.aggregation.impl.MaxAggregator;
@@ -18,6 +19,8 @@ import org.junit.Test;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+
+import static org.junit.Assert.assertEquals;
 
 public class DataSetTest {
 
@@ -103,7 +106,7 @@ public class DataSetTest {
     }
 
     @Test
-    public void compileAggregation() {
+    public void compileMaxAgeAggregation() {
         Config config = new Config();
         config.setProperty(GroupProperty.PARTITION_COUNT.getName(), "10");
         config.addDataSetConfig(new DataSetConfig("foo").setKeyClass(Long.class).setValueClass(Employee.class));
@@ -112,15 +115,15 @@ public class DataSetTest {
         HazelcastInstance hz2 = Hazelcast.newHazelcastInstance(config);
 
         DataSet<Long, Employee> dataSet = hz1.getDataSet("foo");
-        long maxAge = Long.MAX_VALUE;
+        long maxAge = Long.MIN_VALUE;
         Random random = new Random();
         for (int k = 0; k < 1000; k++) {
             int age = random.nextInt(100000);
-            maxAge = Math.min(maxAge, age);
+            maxAge = Math.max(maxAge, age);
             dataSet.set((long) k, new Employee(age, k, k));
         }
 
-        Aggregator aggregator = new MinAggregator();
+        Aggregator aggregator = new MaxAggregator();
 
         CompiledAggregation compiledAggregation = dataSet.compile(
                 new AggregationRecipe<Long, Age>(Age.class, aggregator, new SqlPredicate("true")));
@@ -128,13 +131,14 @@ public class DataSetTest {
        // bindings.put("age", 200);
         //bindings.put("iq", 100l);
         System.out.println("max inserted age:"+maxAge);
-        System.out.println(compiledAggregation.execute(bindings));
+        Object result = compiledAggregation.execute(bindings);
+        assertEquals(maxAge, result);
     }
 
     @Test
     public void compileAggregationAverage() {
         Config config = new Config();
-        config.setProperty(GroupProperty.PARTITION_COUNT.getName(), "10");
+        config.setProperty(GroupProperty.PARTITION_COUNT.getName(), "1");
         config.addDataSetConfig(new DataSetConfig("foo").setKeyClass(Long.class).setValueClass(Employee.class));
 
         HazelcastInstance hz1 = Hazelcast.newHazelcastInstance(config);
@@ -156,10 +160,10 @@ public class DataSetTest {
         CompiledAggregation compiledAggregation = dataSet.compile(
                 new AggregationRecipe<Long, Age>(Age.class, aggregator, new SqlPredicate("true")));
         Map<String, Object> bindings = new HashMap<String, Object>();
-        // bindings.put("age", 200);
-        //bindings.put("iq", 100l);
-        System.out.println("average age:"+(totalAge/count));
-        System.out.println(compiledAggregation.execute(bindings));
+
+        Double result = (Double)compiledAggregation.execute(bindings);
+
+        assertEquals(totalAge/count,(double)result, 0.1);
     }
 
 }

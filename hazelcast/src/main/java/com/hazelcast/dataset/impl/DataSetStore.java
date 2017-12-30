@@ -60,8 +60,8 @@ public class DataSetStore {
 
         compiler.compile(codeGenerator.className(), codeGenerator.getCode());
 
-        System.out.println("compile:" + predicate);
-        System.out.println(codeGenerator.getCode() + "\n");
+        //System.out.println("compile:" + predicate);
+        //System.out.println(codeGenerator.getCode() + "\n");
     }
 
     public void fullTableScan(String compileId, Map<String, Object> bindings) {
@@ -90,8 +90,8 @@ public class DataSetStore {
 
         compiler.compile(codeGenerator.className(), codeGenerator.getCode());
 
-        System.out.println("compile:" + extraction.getPredicate());
-        System.out.println(codeGenerator.getCode() + "\n");
+        //System.out.println("compile:" + extraction.getPredicate());
+        //System.out.println(codeGenerator.getCode() + "\n");
     }
 
     public long size() {
@@ -145,7 +145,7 @@ public class DataSetStore {
 
         compiler.compile(codeGenerator.className(), codeGenerator.getCode());
 
-        System.out.println("compile:" + aggregationRecipe.getPredicate());
-        System.out.println(codeGenerator.getCode() + "\n");
+        //System.out.println("compile:" + aggregationRecipe.getPredicate());
+        //System.out.println(codeGenerator.getCode() + "\n");
     }
 }
