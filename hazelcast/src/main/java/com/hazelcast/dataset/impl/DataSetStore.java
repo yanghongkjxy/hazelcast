@@ -16,6 +16,7 @@ import com.hazelcast.dataset.ProjectionRecipe;
 import com.hazelcast.spi.serialization.SerializationService;
 import sun.misc.Unsafe;
 
+import java.util.List;
 import java.util.Map;
 
 import static java.lang.String.format;
@@ -39,9 +40,9 @@ public class DataSetStore {
 
     public void set(Data keyData, Data valueData) {
         Object record = serializationService.toObject(valueData);
-        if (record.getClass() != recordMetadata.getValueClass()) {
+        if (record.getClass() != recordMetadata.getRecordlass()) {
             throw new RuntimeException(format("Expected value of class '%s', but found '%s' ",
-                    record.getClass().getName(), recordMetadata.getValueClass().getClass().getName()));
+                    record.getClass().getName(), recordMetadata.getRecordlass().getClass().getName()));
         }
 
         unsafe.copyMemory(
@@ -64,7 +65,7 @@ public class DataSetStore {
         //System.out.println(codeGenerator.getCode() + "\n");
     }
 
-    public void fullTableScan(String compileId, Map<String, Object> bindings) {
+    public List query(String compileId, Map<String, Object> bindings) {
         Class<Scan> clazz = compiler.load("QueryScan_" + compileId);
         QueryScan scan;
         try {
@@ -80,7 +81,7 @@ public class DataSetStore {
         scan.recordIndex = recordIndex;
         scan.slabPointer = slabPointer;
         scan.bind(bindings);
-        scan.run();
+        return scan.run();
     }
 
     public void compileProjection(String compileId, ProjectionRecipe extraction) {

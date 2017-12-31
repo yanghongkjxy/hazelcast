@@ -4,6 +4,8 @@ import com.hazelcast.dataset.impl.RecordMetadata;
 import com.hazelcast.dataset.impl.ScanCodeGenerator;
 import com.hazelcast.query.Predicate;
 
+import java.lang.reflect.Field;
+
 public class QueryScanCodeGenerator extends ScanCodeGenerator {
 
     public QueryScanCodeGenerator(String compilationId, Predicate predicate, RecordMetadata recordMetadata) {
@@ -27,18 +29,24 @@ public class QueryScanCodeGenerator extends ScanCodeGenerator {
     }
 
     private void generateRunMethod() {
-        append("    public void run(){\n");
+        append("    public List run(){\n");
+        append("       List result = new LinkedList();\n");
         append("       long offset=slabPointer;\n");
         append("       for(long l=0;l<recordIndex;l++){\n");
         append("           if(");
         toCode(predicate, 0);
         append("){\n");
-        append("                count++;\n");
+        append("               " + recordMetadata.getRecordClassName() + " record = new " + recordMetadata.getRecordClassName() + "();\n");
+        for (String fieldName : recordMetadata.getFields().keySet()) {
+            append("               record." + fieldName + "=");
+            generateGetField(fieldName, 0);
+            append(";\n");
+        }
+        append("               result.add(record);\n");
         append("           }\n");
         append("           offset += recordDataSize;\n");
         append("        }\n");
-
-        append("        if(count>0) System.out.println(\"count=\"+count);\n");
+        append("        return result;\n");
         append("    }\n\n");
     }
 }

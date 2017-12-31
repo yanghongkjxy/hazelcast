@@ -4,6 +4,8 @@ import com.hazelcast.dataset.impl.DataSetService;
 import com.hazelcast.dataset.impl.query.QueryOperationFactory;
 import com.hazelcast.spi.OperationService;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -19,11 +21,16 @@ public class CompiledPredicate<V> {
         this.compileId = compileId;
     }
 
-    public Set<V> execute(Map<String, Object> bindings) {
+    public List<V> execute(Map<String, Object> bindings) {
         try {
-            operationService.invokeOnAllPartitions(
+            List<V> result = new LinkedList<V>();
+            Map<Integer, Object> r = operationService.invokeOnAllPartitions(
                     DataSetService.SERVICE_NAME, new QueryOperationFactory(name, compileId, bindings));
-            return null;
+
+            for(Object v: r.values()){
+                result.addAll((List)v);
+            }
+            return result;
         } catch (Exception e) {
             throw new RuntimeException();
         }

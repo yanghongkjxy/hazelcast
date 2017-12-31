@@ -27,13 +27,18 @@ public class RecordMetadata {
 
     public RecordMetadata(DataSetConfig dataSetConfig) {
         this.config = dataSetConfig;
+
+
+
         initRecordData(config.getValueClass());
         //System.out.println("record size:" + recordDataSize);
     }
 
-    public Class getValueClass() {
+    public Class getRecordlass() {
         return config.getValueClass();
     }
+
+    public String getRecordClassName(){return getRecordlass().getName();}
 
     public Map<String, Field> getFields() {
         return fields;

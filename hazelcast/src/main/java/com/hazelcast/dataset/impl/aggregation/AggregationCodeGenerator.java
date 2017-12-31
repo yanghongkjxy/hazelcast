@@ -164,13 +164,13 @@ public class AggregationCodeGenerator extends ScanCodeGenerator {
             if (recordField == null) {
                 throw new RuntimeException(
                         "Field '" + projectionClass.getName() + '.' + f.getName()
-                                + "' is not found on value-class '" + recordMetadata.getValueClass() + "'");
+                                + "' is not found on value-class '" + recordMetadata.getRecordlass() + "'");
             }
 
             if (!recordField.getType().equals(f.getType())) {
                 throw new RuntimeException(
                         "Field '" + projectionClass.getName() + '.' + f.getName()
-                                + "' has a different type compared to '" + recordMetadata.getValueClass() + "'");
+                                + "' has a different type compared to '" + recordMetadata.getRecordlass() + "'");
             }
 
             fields.add(f);

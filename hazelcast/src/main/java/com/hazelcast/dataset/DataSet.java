@@ -8,18 +8,11 @@ import com.hazelcast.query.Predicate;
 /**
  * todo:
  * - queries are not returning a result.
- *
  * - projection isn't returning a result.
- *
- *
- *
- * Todo:
  * - string fields
  * - enum fields
  * - primary index
  * - secondary index
- * - projections
- * - aggregations
  * - offloading
  * - regular predicates using the domain object
  * - entry processors
@@ -28,12 +21,15 @@ import com.hazelcast.query.Predicate;
  * - primitive wrappers (so nullable fields)
  *      - there could be a set of bytes added to each record where a bit is allocated per nullable field. So 8 nullable fields,
  *      can share 1 byte. 9 nullable fields, require 2 bytes.
- *
- * in progress
  * - between predicate
+ * - analyzing compilation so multiple members can share the same compilation
+ * - growing of the data-set
+ * - aggregation/queries can return a new dataset that isn't retrieved but stored remotely.
  *
  * done:
  * - char fields
+ * - projection
+ * - aggregation
  *
  * <h1>String</h1>
  * a string can be fixed max length. So if it is defined as 20 chars, then 20 chars storage is allocated. If only 5 chars are used,

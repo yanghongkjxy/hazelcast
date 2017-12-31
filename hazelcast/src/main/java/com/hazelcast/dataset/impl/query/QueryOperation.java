@@ -1,19 +1,21 @@
 package com.hazelcast.dataset.impl.query;
 
+import com.hazelcast.dataset.impl.DataSetDataSerializerHook;
+import com.hazelcast.dataset.impl.DataSetStore;
 import com.hazelcast.dataset.impl.operations.DataSetOperation;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
-import com.hazelcast.dataset.impl.DataSetDataSerializerHook;
-import com.hazelcast.dataset.impl.DataSetStore;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class QueryOperation extends DataSetOperation {
 
     private Map<String, Object> bindings;
     private String compileId;
+    private List result;
 
     public QueryOperation() {
     }
@@ -27,7 +29,12 @@ public class QueryOperation extends DataSetOperation {
     @Override
     public void run() throws Exception {
         DataSetStore recordStore = container.getRecordStore(getPartitionId());
-        recordStore.fullTableScan(compileId, bindings);
+        result = recordStore.query(compileId, bindings);
+    }
+
+    @Override
+    public Object getResponse() {
+        return result;
     }
 
     @Override
@@ -41,7 +48,7 @@ public class QueryOperation extends DataSetOperation {
 
         out.writeUTF(compileId);
         out.writeInt(bindings.size());
-        for(Map.Entry<String,Object> entry: bindings.entrySet()){
+        for (Map.Entry<String, Object> entry : bindings.entrySet()) {
             out.writeUTF(entry.getKey());
             out.writeObject(entry.getValue());
         }
@@ -54,7 +61,7 @@ public class QueryOperation extends DataSetOperation {
         compileId = in.readUTF();
         int size = in.readInt();
         bindings = new HashMap<String, Object>();
-        for(int k=0;k<size;k++){
+        for (int k = 0; k < size; k++) {
             bindings.put(in.readUTF(), in.readObject());
         }
     }
