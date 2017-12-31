@@ -1,10 +1,18 @@
 package com.hazelcast.dataset;
 
 
+import com.hazelcast.core.DistributedObject;
 import com.hazelcast.core.ICompletableFuture;
 import com.hazelcast.query.Predicate;
 
 /**
+ * todo:
+ * - queries are not returning a result.
+ *
+ * - projection isn't returning a result.
+ *
+ *
+ *
  * Todo:
  * - string fields
  * - enum fields
@@ -51,7 +59,7 @@ import com.hazelcast.query.Predicate;
  * @param <K>
  * @param <V>
  */
-public interface DataSet<K, V> {
+public interface DataSet<K, V> extends DistributedObject {
 
     void set(K key, V value);
 
@@ -63,7 +71,17 @@ public interface DataSet<K, V> {
 
     <T,E> CompiledAggregation<E> compile(AggregationRecipe<T,E> aggregationRecipe);
 
+    /**
+     * Returns the number of items in this set.
+     *
+     * @return number of items in this set.
+     */
     long size();
 
-    long memoryConsumption();
+    /**
+     * Returns the consumed memory in bytes. This contains the actual consumed memory, not the allocated memory.
+     *
+     * @return the amount of consumed memory
+     */
+    long consumedMemory();
 }

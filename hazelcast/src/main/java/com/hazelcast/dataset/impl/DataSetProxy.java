@@ -123,7 +123,7 @@ public class DataSetProxy<K, V> extends AbstractDistributedObject<DataSetService
     }
 
     @Override
-    public long memoryConsumption() {
+    public long consumedMemory() {
         try {
             Map<Integer, Object> result = operationService.invokeOnAllPartitions(
                     DataSetService.SERVICE_NAME, new UsedMemoryOperationFactory(name));

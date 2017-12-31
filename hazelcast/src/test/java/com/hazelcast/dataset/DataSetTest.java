@@ -1,18 +1,13 @@
 package com.hazelcast.dataset;
 
 import com.hazelcast.aggregation.Aggregator;
-import com.hazelcast.aggregation.impl.DoubleSumAggregator;
 import com.hazelcast.aggregation.impl.LongAverageAggregator;
-import com.hazelcast.aggregation.impl.LongSumAggregator;
 import com.hazelcast.aggregation.impl.MaxAggregator;
-import com.hazelcast.aggregation.impl.MinAggregator;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.DataSetConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.mapreduce.aggregation.impl.CountAggregation;
 import com.hazelcast.query.SqlPredicate;
-import com.hazelcast.query.TruePredicate;
 import com.hazelcast.spi.properties.GroupProperty;
 import org.junit.Test;
 
@@ -65,7 +60,7 @@ public class DataSetTest {
             dataSet.set((long) k, new Employee(k, k, k));
         }
 
-        assertEquals(20*5, dataSet.memoryConsumption());
+        assertEquals(20*5, dataSet.consumedMemory());
     }
 
 
