@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ import static org.junit.Assert.fail;
 @Category({QuickTest.class, ParallelTest.class})
 public class ScheduledExecutorServiceBasicTest extends ScheduledExecutorServiceTestSupport {
 
+
     @Rule
     public ExpectedException expected = ExpectedException.none();
 
@@ -96,6 +97,29 @@ public class ScheduledExecutorServiceBasicTest extends ScheduledExecutorServiceT
                 .getOrCreateContainer(schedulerName).getDurability());
         assertEquals(1, dses.getPartition(future.getHandler().getPartitionId())
                 .getOrCreateContainer("other").getDurability());
+    }
+
+    @Test
+    public void exception_suppressesFutureExecutions()
+            throws ExecutionException, InterruptedException {
+        HazelcastInstance[] instances = createClusterWithCount(2);
+        IScheduledExecutorService service = instances[0].getScheduledExecutorService("test");
+
+        final IScheduledFuture f = service.scheduleAtFixedRate(
+                new ErroneousRunnableTask(), 1, 1, TimeUnit.SECONDS);
+
+        assertTrueEventually(new AssertTask() {
+            @Override
+            public void run() {
+                assertTrue(f.isDone());
+            }
+        });
+
+        assertEquals(1L, f.getStats().getTotalRuns());
+        expected.expect(ExecutionException.class);
+        expected.expectCause(new RootCauseMatcher(IllegalStateException.class, "Erroneous task"));
+
+        f.get();
     }
 
     @Test
@@ -757,7 +781,7 @@ public class ScheduledExecutorServiceBasicTest extends ScheduledExecutorServiceT
 
         IScheduledFuture future = s.scheduleAtFixedRate(new ICountdownLatchRunnableTask("latch"), 0, 1, SECONDS);
 
-        latch.await(10, SECONDS);
+        latch.await(20, SECONDS);
         future.cancel(false);
 
         assertEquals(0, latch.getCount());

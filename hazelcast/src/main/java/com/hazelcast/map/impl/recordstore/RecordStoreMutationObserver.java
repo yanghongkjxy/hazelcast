@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,6 +72,14 @@ public interface RecordStoreMutationObserver<R extends Record> {
      * @param record The record
      */
     void onEvictRecord(Data key, R record);
+
+    /**
+     * Called when a record is loaded into the observed {@link RecordStore}
+     *
+     * @param key      The key of the record
+     * @param record   The record
+     */
+    void onLoadRecord(Data key, R record);
 
     /**
      * Called when the observed {@link RecordStore} is being destroyed.

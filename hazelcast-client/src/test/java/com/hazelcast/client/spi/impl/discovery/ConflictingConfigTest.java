@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.hazelcast.client.spi.impl.discovery;
 
-import com.hazelcast.client.config.ClientAwsConfig;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.spi.properties.ClientProperty;
 import com.hazelcast.client.test.TestHazelcastFactory;
@@ -46,16 +45,6 @@ public class ConflictingConfigTest {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void testAws_and_DiscoverySPIEnabled() {
-        ClientConfig config = new ClientConfig();
-        ClientAwsConfig awsConfig = new ClientAwsConfig();
-        awsConfig.setEnabled(true);
-        config.getNetworkConfig().setAwsConfig(awsConfig);
-        config.setProperty(ClientProperty.DISCOVERY_SPI_ENABLED.getName(), "true");
-        hazelcastFactory.newHazelcastClient(config);
-    }
-
-    @Test(expected = IllegalStateException.class)
     public void testHazelcastCloud_and_DiscoverySPIEnabled() {
         ClientConfig config = new ClientConfig();
         config.getNetworkConfig().getCloudConfig().setEnabled(true);
@@ -64,31 +53,10 @@ public class ConflictingConfigTest {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void testAws_and_HazelcastCloudEnabled() {
-        ClientConfig config = new ClientConfig();
-        config.getNetworkConfig().getCloudConfig().setEnabled(true);
-        ClientAwsConfig awsConfig = new ClientAwsConfig();
-        awsConfig.setEnabled(true);
-        config.getNetworkConfig().setAwsConfig(awsConfig);
-        hazelcastFactory.newHazelcastClient(config);
-    }
-
-
-    @Test(expected = IllegalStateException.class)
     public void testHazelcastCloudViaProperty_and_DiscoverySPIEnabled() {
         ClientConfig config = new ClientConfig();
         config.setProperty(ClientProperty.DISCOVERY_SPI_ENABLED.getName(), "true");
         config.setProperty(ClientProperty.HAZELCAST_CLOUD_DISCOVERY_TOKEN.getName(), "TOKEN");
-        hazelcastFactory.newHazelcastClient(config);
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void testAws_and_HazelcastCloudViaPropertyEnabled() {
-        ClientConfig config = new ClientConfig();
-        config.setProperty(ClientProperty.HAZELCAST_CLOUD_DISCOVERY_TOKEN.getName(), "TOKEN");
-        ClientAwsConfig awsConfig = new ClientAwsConfig();
-        awsConfig.setEnabled(true);
-        config.getNetworkConfig().setAwsConfig(awsConfig);
         hazelcastFactory.newHazelcastClient(config);
     }
 
@@ -100,22 +68,11 @@ public class ConflictingConfigTest {
         hazelcastFactory.newHazelcastClient(config);
     }
 
-
     @Test(expected = IllegalStateException.class)
     public void testClusterMembersGiven_and_DiscoverySPIEnabled() {
         ClientConfig config = new ClientConfig();
         config.getNetworkConfig().addAddress("127.0.0.1");
         config.setProperty(ClientProperty.DISCOVERY_SPI_ENABLED.getName(), "true");
-        hazelcastFactory.newHazelcastClient(config);
-    }
-
-    @Test(expected = IllegalStateException.class)
-    public void testClusterMembersGiven_and_AwsEnabled() {
-        ClientConfig config = new ClientConfig();
-        config.getNetworkConfig().addAddress("127.0.0.1");
-        ClientAwsConfig awsConfig = new ClientAwsConfig();
-        awsConfig.setEnabled(true);
-        config.getNetworkConfig().setAwsConfig(awsConfig);
         hazelcastFactory.newHazelcastClient(config);
     }
 
@@ -127,7 +84,6 @@ public class ConflictingConfigTest {
         hazelcastFactory.newHazelcastClient(config);
     }
 
-
     @Test(expected = IllegalStateException.class)
     public void testClusterMembersGiven_and_HazelcastCloudViaProperty() {
         ClientConfig config = new ClientConfig();
@@ -136,4 +92,11 @@ public class ConflictingConfigTest {
         hazelcastFactory.newHazelcastClient(config);
     }
 
+    @Test(expected = IllegalStateException.class)
+    public void testAwsEnabled_and_DiscoverySPIEnabled() {
+        ClientConfig config = new ClientConfig();
+        config.getNetworkConfig().getAwsConfig().setEnabled(true).setProperty("access-key", "12345").setSecretKey("56789");
+        config.setProperty(ClientProperty.DISCOVERY_SPI_ENABLED.getName(), "true");
+        hazelcastFactory.newHazelcastClient(config);
+    }
 }

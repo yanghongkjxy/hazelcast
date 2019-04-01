@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ public class NearCacheTest extends NearCacheTestSupport {
     protected NearCache<Integer, String> createNearCache(String name, NearCacheConfig nearCacheConfig,
                                                          ManagedNearCacheRecordStore nearCacheRecordStore) {
         return new DefaultNearCache<Integer, String>(name, nearCacheConfig, nearCacheRecordStore, ss,
-                executionService.getGlobalTaskScheduler(), null);
+                executionService.getGlobalTaskScheduler(), null, properties);
     }
 
     @Test
@@ -80,11 +80,6 @@ public class NearCacheTest extends NearCacheTestSupport {
     @Test
     public void getNearCacheStatsFromNearCache() {
         doGetNearCacheStatsFromNearCache();
-    }
-
-    @Test
-    public void selectToSaveFromNearCache() {
-        doSelectToSaveFromNearCache();
     }
 
     @Test

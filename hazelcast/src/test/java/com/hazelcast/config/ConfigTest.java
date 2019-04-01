@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.hazelcast.config;
 
 import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.instance.EndpointQualifier;
 import com.hazelcast.test.HazelcastParallelClassRunner;
 import com.hazelcast.test.HazelcastTestSupport;
 import com.hazelcast.test.annotation.ParallelTest;
@@ -26,10 +27,11 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 
+import static com.hazelcast.instance.ProtocolType.WAN;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertEquals;
 
 
 @RunWith(HazelcastParallelClassRunner.class)
@@ -109,5 +111,18 @@ public class ConfigTest extends HazelcastTestSupport {
     @Test(expected = IllegalArgumentException.class)
     public void testConfigThrow_whenConfigPatternMatcherIsNull() {
         config.setConfigPatternMatcher(null);
+    }
+
+    @Test
+    public void testEndpointConfig() {
+        String name = randomName();
+        EndpointQualifier qualifier = EndpointQualifier.resolve(WAN, name);
+        ServerSocketEndpointConfig endpointConfig = new ServerSocketEndpointConfig();
+        endpointConfig.setName(name);
+        endpointConfig.setProtocolType(WAN);
+        config.getAdvancedNetworkConfig().addWanEndpointConfig(endpointConfig);
+
+        assertEquals(endpointConfig,
+                config.getAdvancedNetworkConfig().getEndpointConfigs().get(qualifier));
     }
 }

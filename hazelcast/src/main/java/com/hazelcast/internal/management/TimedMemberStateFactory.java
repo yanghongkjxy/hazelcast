@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,12 @@ import com.hazelcast.collection.impl.queue.QueueService;
 import com.hazelcast.config.CacheConfig;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.GroupConfig;
+import com.hazelcast.config.ManagementCenterConfig;
 import com.hazelcast.config.SSLConfig;
 import com.hazelcast.config.SocketInterceptorConfig;
 import com.hazelcast.core.Client;
 import com.hazelcast.core.Member;
+import com.hazelcast.cp.CPMember;
 import com.hazelcast.crdt.pncounter.PNCounterService;
 import com.hazelcast.executor.impl.DistributedExecutorService;
 import com.hazelcast.flakeidgen.impl.FlakeIdGeneratorService;
@@ -76,6 +78,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import static com.hazelcast.config.ConfigAccessor.getActiveMemberNetworkConfig;
 import static com.hazelcast.util.SetUtil.createHashSet;
 
 /**
@@ -124,23 +127,25 @@ public class TimedMemberStateFactory {
         createMemberState(memberState, services);
         timedMemberState.setMaster(instance.node.isMaster());
         timedMemberState.setMemberList(new ArrayList<String>());
-        if (timedMemberState.isMaster()) {
-            Set<Member> memberSet = instance.getCluster().getMembers();
-            for (Member member : memberSet) {
-                MemberImpl memberImpl = (MemberImpl) member;
-                Address address = memberImpl.getAddress();
-                timedMemberState.getMemberList().add(address.getHost() + ":" + address.getPort());
-            }
+        Set<Member> memberSet = instance.getCluster().getMembers();
+        for (Member member : memberSet) {
+            MemberImpl memberImpl = (MemberImpl) member;
+            Address address = memberImpl.getAddress();
+            timedMemberState.getMemberList().add(address.getHost() + ":" + address.getPort());
         }
         timedMemberState.setMemberState(memberState);
         GroupConfig groupConfig = instance.getConfig().getGroupConfig();
         timedMemberState.setClusterName(groupConfig.getName());
-        SSLConfig sslConfig = instance.getConfig().getNetworkConfig().getSSLConfig();
+        SSLConfig sslConfig = getActiveMemberNetworkConfig(instance.getConfig()).getSSLConfig();
         timedMemberState.setSslEnabled(sslConfig != null && sslConfig.isEnabled());
         timedMemberState.setLite(instance.node.isLiteMember());
 
-        SocketInterceptorConfig interceptorConfig = instance.getConfig().getNetworkConfig().getSocketInterceptorConfig();
+        SocketInterceptorConfig interceptorConfig = getActiveMemberNetworkConfig(instance.getConfig())
+                .getSocketInterceptorConfig();
         timedMemberState.setSocketInterceptorEnabled(interceptorConfig != null && interceptorConfig.isEnabled());
+
+        ManagementCenterConfig managementCenterConfig = instance.node.getConfig().getManagementCenterConfig();
+        timedMemberState.setScriptingEnabled(managementCenterConfig.isScriptingEnabled());
 
         return timedMemberState;
     }
@@ -164,8 +169,17 @@ public class TimedMemberStateFactory {
         }
         memberState.setClients(serializableClientEndPoints);
 
+        memberState.setUuid(node.getThisUuid());
+        if (instance.getConfig().getCPSubsystemConfig().getCPMemberCount() == 0) {
+            memberState.setCpMemberUuid(null);
+        } else {
+            CPMember localCPMember = instance.getCPSubsystem().getLocalCPMember();
+            memberState.setCpMemberUuid(localCPMember != null ? localCPMember.getUuid() : null);
+        }
+
         Address thisAddress = node.getThisAddress();
         memberState.setAddress(thisAddress.getHost() + ":" + thisAddress.getPort());
+        memberState.setEndpoints(node.getLocalMember().getAddressMap());
         TimedMemberStateFactoryHelper.registerJMXBeans(instance, memberState);
 
         MemberPartitionStateImpl memberPartitionState = (MemberPartitionStateImpl) memberState.getMemberPartitionState();

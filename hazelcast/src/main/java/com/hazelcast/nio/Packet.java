@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -310,11 +310,11 @@ public final class Packet extends HeapData implements OutboundFrame {
          */
         BIND,
         /**
-         * Unused packet type. Available for future use.
+         * The type of Extended Bind packet, since Hazelcast 3.12.
          * <p>
          * {@code ordinal = 5}
          */
-        UNDEFINED5,
+        EXTENDED_BIND,
         /**
          * Unused packet type. Available for future use.
          * <p>

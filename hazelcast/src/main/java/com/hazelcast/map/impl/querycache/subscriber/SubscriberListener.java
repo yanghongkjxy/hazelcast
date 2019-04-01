@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import java.util.Collection;
 /**
  * Subscriber side listener per {@code QueryCache} which listens events sent by publisher-sides.
  */
-class SubscriberListener implements ListenerAdapter<IMapEvent> {
+public class SubscriberListener implements ListenerAdapter<IMapEvent> {
 
     private final AccumulatorInfo info;
     private final Accumulator accumulator;

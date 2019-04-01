@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import com.hazelcast.config.Config;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.MemberLeftException;
 import com.hazelcast.instance.MemberImpl;
-import com.hazelcast.internal.cluster.impl.MembershipUpdateTest.StaticMemberNodeContext;
+import com.hazelcast.instance.StaticMemberNodeContext;
 import com.hazelcast.spi.Operation;
 import com.hazelcast.spi.properties.GroupProperty;
 import com.hazelcast.test.AssertTask;

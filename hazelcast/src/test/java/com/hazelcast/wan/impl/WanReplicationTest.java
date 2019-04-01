@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -105,11 +105,11 @@ public class WanReplicationTest extends HazelcastTestSupport {
     }
 
     @Test
-    public void mapSetTTLTest() {
-        initInstancesAndMap("wan-replication-test-setTTL");
+    public void mapSetTtlTest() {
+        initInstancesAndMap("wan-replication-test-setTtl");
         for (int i = 0; i < 10; i++) {
             map.put(i, i);
-            map.setTTL(i, 1, TimeUnit.MINUTES);
+            map.setTtl(i, 1, TimeUnit.MINUTES);
             map.remove(i);
         }
 

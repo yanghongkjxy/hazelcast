@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -239,6 +239,25 @@ public class MembershipListenerTest extends HazelcastTestSupport {
         hazelcastFactory.newHazelcastInstance();
 
         ClientConfig clientConfig = new ClientConfig();
+        HazelcastInstance client = hazelcastFactory.newHazelcastClient(clientConfig);
+
+        final InitialMemberShipEventLogger listener = new InitialMemberShipEventLogger();
+        client.getCluster().addMembershipListener(listener);
+
+        EventObject eventObject = listener.events.poll(ASSERT_TRUE_EVENTUALLY_TIMEOUT, TimeUnit.SECONDS);
+        assertInstanceOf(InitialMembershipEvent.class, eventObject);
+        InitialMembershipEvent event = (InitialMembershipEvent) eventObject;
+        assertEquals(2, event.getMembers().size());
+        assertEquals(0, listener.events.size());
+    }
+
+    @Test
+    public void initialMemberEvents_whenAddedAfterClientStartedAsync() throws InterruptedException {
+        hazelcastFactory.newHazelcastInstance();
+        hazelcastFactory.newHazelcastInstance();
+
+        ClientConfig clientConfig = new ClientConfig();
+        clientConfig.getConnectionStrategyConfig().setAsyncStart(true);
         HazelcastInstance client = hazelcastFactory.newHazelcastClient(clientConfig);
 
         final InitialMemberShipEventLogger listener = new InitialMemberShipEventLogger();

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.hazelcast.config;
 
-import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
@@ -40,7 +39,7 @@ import static com.hazelcast.util.Preconditions.checkNotNull;
  * @param <T> Type of Collection such as List, Set
  */
 public abstract class CollectionConfig<T extends CollectionConfig>
-        implements SplitBrainMergeTypeProvider, IdentifiedDataSerializable, Versioned {
+        implements SplitBrainMergeTypeProvider, IdentifiedDataSerializable, Versioned, NamedConfig {
 
     /**
      * Default maximum size for the Configuration.
@@ -286,11 +285,8 @@ public abstract class CollectionConfig<T extends CollectionConfig>
         out.writeInt(asyncBackupCount);
         out.writeInt(maxSize);
         out.writeBoolean(statisticsEnabled);
-        // RU_COMPAT_3_9
-        if (out.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            out.writeUTF(quorumName);
-            out.writeObject(mergePolicyConfig);
-        }
+        out.writeUTF(quorumName);
+        out.writeObject(mergePolicyConfig);
     }
 
     @Override
@@ -301,11 +297,8 @@ public abstract class CollectionConfig<T extends CollectionConfig>
         asyncBackupCount = in.readInt();
         maxSize = in.readInt();
         statisticsEnabled = in.readBoolean();
-        // RU_COMPAT_3_9
-        if (in.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            quorumName = in.readUTF();
-            mergePolicyConfig = in.readObject();
-        }
+        quorumName = in.readUTF();
+        mergePolicyConfig = in.readObject();
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,11 @@ import com.hazelcast.logging.ILogger;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
-import com.hazelcast.spi.ExecutionService;
 import com.hazelcast.spi.impl.NodeEngineImpl;
 
 import java.io.IOException;
+
+import static com.hazelcast.internal.cluster.impl.ClusterServiceImpl.SPLIT_BRAIN_HANDLER_EXECUTOR_NAME;
 
 public class MergeClustersOp extends AbstractClusterOperation {
 
@@ -57,7 +58,7 @@ public class MergeClustersOp extends AbstractClusterOperation {
         logger.warning(node.getThisAddress() + " is merging to " + newTargetAddress
                 + ", because: instructed by master " + masterAddress);
 
-        nodeEngine.getExecutionService().execute(ExecutionService.SYSTEM_EXECUTOR, new Runnable() {
+        nodeEngine.getExecutionService().execute(SPLIT_BRAIN_HANDLER_EXECUTOR_NAME, new Runnable() {
             @Override
             public void run() {
                 clusterService.merge(newTargetAddress);

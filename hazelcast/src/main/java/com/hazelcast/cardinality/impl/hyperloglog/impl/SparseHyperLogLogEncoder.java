@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,6 @@ import com.hazelcast.nio.serialization.impl.Versioned;
 
 import java.io.IOException;
 import java.util.Arrays;
-
-import static com.hazelcast.internal.cluster.Versions.V3_10;
 
 /**
  * 1. http://static.googleusercontent.com/media/research.google.com/en//pubs/archive/40671.pdf
@@ -108,10 +106,6 @@ public class SparseHyperLogLogEncoder
     public void writeData(ObjectDataOutput out) throws IOException {
         mergeAndResetTmp();
         out.writeInt(p);
-        // RU_COMPAT_3_9
-        if (out.getVersion().isLessThan(V3_10)) {
-            out.writeInt(P_PRIME);
-        }
         out.writeInt(register.total);
         out.writeInt(register.mark);
         out.writeInt(register.prev);
@@ -121,10 +115,6 @@ public class SparseHyperLogLogEncoder
     @Override
     public void readData(ObjectDataInput in) throws IOException {
         int p = in.readInt();
-        // RU_COMPAT_3_9
-        if (in.getVersion().isUnknownOrLessThan(V3_10)) {
-            in.readInt();
-        }
         int total = in.readInt();
         int mark = in.readInt();
         int prev = in.readInt();

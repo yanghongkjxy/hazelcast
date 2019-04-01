@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.hazelcast.multimap.impl.operations;
 
-import com.hazelcast.core.EntryEventType;
 import com.hazelcast.multimap.impl.MultiMapContainer;
 import com.hazelcast.multimap.impl.MultiMapDataSerializerHook;
 import com.hazelcast.multimap.impl.MultiMapMergeContainer;
@@ -75,7 +74,6 @@ public class MergeOperation extends AbstractMultiMapOperation implements BackupA
             MultiMapValue result = container.merge(mergeContainer, mergePolicy);
             if (result != null) {
                 resultMap.put(key, result.getCollection(false));
-                publishEvent(EntryEventType.MERGED, key, result, null);
             }
         }
         response = !resultMap.isEmpty();

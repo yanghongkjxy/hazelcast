@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,8 +38,8 @@ import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Properties;
 
-import static com.hazelcast.config.AbstractXmlConfigHelper.childElements;
-import static com.hazelcast.config.AbstractXmlConfigHelper.cleanNodeName;
+import static com.hazelcast.config.DomConfigHelper.childElements;
+import static com.hazelcast.config.DomConfigHelper.cleanNodeName;
 import static com.hazelcast.nio.IOUtil.closeResource;
 import static com.hazelcast.util.ExceptionUtil.rethrow;
 import static com.hazelcast.util.Preconditions.checkFalse;

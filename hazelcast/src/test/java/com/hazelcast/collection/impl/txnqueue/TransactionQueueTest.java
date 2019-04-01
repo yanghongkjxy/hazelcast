@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,6 +58,24 @@ import static org.junit.Assert.fail;
 @RunWith(HazelcastSerialClassRunner.class)
 @Category({QuickTest.class, ParallelTest.class})
 public class TransactionQueueTest extends HazelcastTestSupport {
+
+    @Test
+    public void testPromotionFromBackup() {
+        TestHazelcastInstanceFactory factory = createHazelcastInstanceFactory(2);
+        HazelcastInstance owner = factory.newHazelcastInstance();
+        HazelcastInstance backup = factory.newHazelcastInstance();
+        String name = generateKeyOwnedBy(owner);
+
+        TransactionContext context = backup.newTransactionContext();
+        context.beginTransaction();
+
+        TransactionalQueue<Integer> queue = context.getQueue(name);
+        queue.offer(1);
+        owner.getLifecycleService().terminate();
+        queue.offer(2);
+
+        context.commitTransaction();
+    }
 
     @Test
     public void testSingleQueueAtomicity() throws ExecutionException, InterruptedException {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import static com.hazelcast.map.impl.recordstore.RecordStore.DEFAULT_TTL;
 
 public abstract class BasePutOperation extends LockAwareOperation implements BackupAwareOperation {
 
-    protected transient Data dataOldValue;
+    protected transient Object oldValue;
     protected transient Data dataMergingValue;
     protected transient EntryEventType eventType;
     protected transient boolean putTransient;
@@ -51,7 +51,7 @@ public abstract class BasePutOperation extends LockAwareOperation implements Bac
         Record record = recordStore.getRecord(dataKey);
         Object value = isPostProcessing(recordStore) ? record.getValue() : dataValue;
         mapEventPublisher.publishEvent(getCallerAddress(), name, getEventType(),
-                dataKey, dataOldValue, value, dataMergingValue);
+                dataKey, oldValue, value, dataMergingValue);
         invalidateNearCache(dataKey);
         publishWanUpdate(dataKey, value);
         evict(dataKey);
@@ -59,7 +59,7 @@ public abstract class BasePutOperation extends LockAwareOperation implements Bac
 
     private EntryEventType getEventType() {
         if (eventType == null) {
-            eventType = dataOldValue == null ? EntryEventType.ADDED : EntryEventType.UPDATED;
+            eventType = oldValue == null ? EntryEventType.ADDED : EntryEventType.UPDATED;
         }
         return eventType;
     }
@@ -72,12 +72,17 @@ public abstract class BasePutOperation extends LockAwareOperation implements Bac
 
     @Override
     public Operation getBackupOperation() {
-        final Record record = recordStore.getRecord(dataKey);
-        final RecordInfo replicationInfo = buildRecordInfo(record);
+        Record record = recordStore.getRecord(dataKey);
+        RecordInfo replicationInfo = buildRecordInfo(record);
         if (isPostProcessing(recordStore)) {
             dataValue = mapServiceContext.toData(record.getValue());
         }
-        return new PutBackupOperation(name, dataKey, dataValue, replicationInfo, putTransient);
+        return new PutBackupOperation(name, dataKey, dataValue, replicationInfo, shouldUnlockKeyOnBackup(),
+                putTransient, !canThisOpGenerateWANEvent());
+    }
+
+    protected boolean shouldUnlockKeyOnBackup() {
+        return false;
     }
 
     @Override

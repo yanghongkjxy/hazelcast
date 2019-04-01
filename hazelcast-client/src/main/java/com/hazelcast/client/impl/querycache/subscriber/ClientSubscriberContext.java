@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package com.hazelcast.client.impl.querycache.subscriber;
 
 import com.hazelcast.map.impl.querycache.QueryCacheContext;
 import com.hazelcast.map.impl.querycache.subscriber.AbstractSubscriberContext;
+import com.hazelcast.map.impl.querycache.subscriber.QueryCacheEndToEndConstructor;
+import com.hazelcast.map.impl.querycache.subscriber.QueryCacheRequest;
 import com.hazelcast.map.impl.querycache.subscriber.SubscriberContextSupport;
 
 /**
@@ -37,5 +39,10 @@ public class ClientSubscriberContext extends AbstractSubscriberContext {
     @Override
     public SubscriberContextSupport getSubscriberContextSupport() {
         return clientSubscriberContextSupport;
+    }
+
+    @Override
+    public QueryCacheEndToEndConstructor newEndToEndConstructor(QueryCacheRequest request) {
+        return new ClientQueryCacheEndToEndConstructor(request);
     }
 }

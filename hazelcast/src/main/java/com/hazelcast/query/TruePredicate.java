@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -76,10 +76,7 @@ public class TruePredicate<K, V> implements IdentifiedDataSerializable, Predicat
 
     @Override
     public boolean equals(Object o) {
-        if (o == null || !(o instanceof TruePredicate)) {
-            return false;
-        }
-        return true;
+        return o instanceof TruePredicate;
     }
 
     @Override

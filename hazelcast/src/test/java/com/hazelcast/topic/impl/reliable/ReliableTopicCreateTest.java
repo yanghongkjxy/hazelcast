@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -206,7 +206,7 @@ public class ReliableTopicCreateTest extends HazelcastTestSupport {
         assertEquals(1, proxy.runnersMap.size());
 
         // check that the listener is of the right class.
-        ReliableMessageListenerRunner runner = (ReliableMessageListenerRunner) proxy.runnersMap.values().iterator().next();
+        MessageRunner runner = (MessageRunner) proxy.runnersMap.values().iterator().next();
         assertInstanceOf(ReliableMessageListenerMock.class, runner.listener);
     }
 
@@ -252,7 +252,7 @@ public class ReliableTopicCreateTest extends HazelcastTestSupport {
         assertEquals(1, proxy.runnersMap.size());
 
         // check that the listener is of the right class.
-        ReliableMessageListenerRunner runner = (ReliableMessageListenerRunner) proxy.runnersMap.values().iterator().next();
+        MessageRunner runner = (MessageRunner) proxy.runnersMap.values().iterator().next();
         InstanceAwareReliableMessageListenerMock mock
                 = assertInstanceOf(InstanceAwareReliableMessageListenerMock.class, runner.listener);
         assertNotNull(mock.hz);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,8 @@ import com.hazelcast.nio.ConnectionListener;
 
 public class NonSmartClientListenerService extends AbstractClientListenerService implements ConnectionListener {
 
-    public NonSmartClientListenerService(HazelcastClientInstanceImpl client,
-                                         int eventThreadCount, int eventQueueCapacity) {
-        super(client, eventThreadCount, eventQueueCapacity);
+    public NonSmartClientListenerService(HazelcastClientInstanceImpl client) {
+        super(client);
     }
 
     boolean registersLocalOnly() {

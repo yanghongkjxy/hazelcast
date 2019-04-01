@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.hazelcast.multimap.impl.txn;
 
-import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.multimap.impl.MultiMapContainer;
 import com.hazelcast.multimap.impl.MultiMapDataSerializerHook;
 import com.hazelcast.multimap.impl.operations.AbstractKeyBasedMultiMapOperation;
@@ -57,20 +56,12 @@ public class TxnPrepareBackupOperation extends AbstractKeyBasedMultiMapOperation
     protected void writeInternal(ObjectDataOutput out) throws IOException {
         super.writeInternal(out);
         out.writeUTF(caller);
-        // RU_COMPAT_3_9
-        if (out.getVersion().isUnknownOrLessThan(Versions.V3_10)) {
-            out.writeLong(0);
-        }
     }
 
     @Override
     protected void readInternal(ObjectDataInput in) throws IOException {
         super.readInternal(in);
         caller = in.readUTF();
-        // RU_COMPAT_3_9
-        if (in.getVersion().isUnknownOrLessThan(Versions.V3_10)) {
-            in.readLong();
-        }
     }
 
     @Override

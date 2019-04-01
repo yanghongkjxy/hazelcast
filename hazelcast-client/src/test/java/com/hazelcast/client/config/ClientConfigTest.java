@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,11 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 
+import java.io.IOException;
+import java.net.URL;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import static org.junit.Assert.assertEquals;
 
@@ -43,6 +47,21 @@ public class ClientConfigTest {
     @After
     public void tearDown() {
         hazelcastFactory.terminateAll();
+    }
+
+    @Test
+    public void testCopyConstructor_withFullyConfiguredClientConfig() throws IOException {
+        URL schemaResource = ClientConfigTest.class.getClassLoader().getResource("hazelcast-client-full.xml");
+        ClientConfig expected = new XmlClientConfigBuilder(schemaResource).build();
+        ClientConfig actual = new ClientConfig(expected);
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testCopyConstructor_withDefaultClientConfig() {
+        ClientConfig expected = new ClientConfig();
+        ClientConfig actual = new ClientConfig(expected);
+        assertEquals(expected, actual);
     }
 
     @Test
@@ -71,5 +90,40 @@ public class ClientConfigTest {
         Map<Integer, com.hazelcast.nio.serialization.PortableFactory> factories = serializationConfig.getPortableFactories();
         assertEquals(1, factories.size());
         assertEquals(factories.get(PortableFactory.FACTORY_ID).create(Employee.CLASS_ID).getClassId(), Employee.CLASS_ID);
+    }
+
+    @Test
+    public void testUserContext_passContext() {
+        hazelcastFactory.newHazelcastInstance();
+
+        ClientConfig clientConfig = new ClientConfig();
+        ConcurrentMap<String, Object> context = new ConcurrentHashMap<String, Object>();
+        context.put("key1", "value1");
+        Object value2 = new Object();
+        context.put("key2", value2);
+
+        // check set setter returns ClientConfig instance
+        clientConfig = clientConfig.setUserContext(context);
+        HazelcastInstance client = hazelcastFactory.newHazelcastClient(clientConfig);
+
+        ConcurrentMap<String, Object> returnedContext = client.getUserContext();
+        assertEquals(context, returnedContext);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testUserContext_throwExceptionWhenContextNull() {
+        ClientConfig clientConfig = new ClientConfig();
+        clientConfig.setUserContext(null);
+    }
+
+    @Test
+    public void testReliableTopic() {
+        ClientConfig clientConfig = new ClientConfig();
+        ClientReliableTopicConfig defaultReliableTopicConfig = new ClientReliableTopicConfig("default");
+        defaultReliableTopicConfig.setReadBatchSize(100);
+        clientConfig.addReliableTopicConfig(defaultReliableTopicConfig);
+        ClientReliableTopicConfig newConfig = clientConfig.getReliableTopicConfig("newConfig");
+
+        assertEquals(100, newConfig.getReadBatchSize());
     }
 }

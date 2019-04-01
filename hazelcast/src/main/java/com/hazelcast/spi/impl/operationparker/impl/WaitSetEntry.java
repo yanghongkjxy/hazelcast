@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -142,10 +142,9 @@ class WaitSetEntry extends AbstractLocalOperation implements Delayed, PartitionA
 
         valid = false;
         if (expired) {
-            blockingOperation.onWaitExpire();
+            onExpire();
         } else {
-            OperationResponseHandler responseHandler = op.getOperationResponseHandler();
-            responseHandler.sendResponse(op, cancelResponse);
+            onCancel();
         }
     }
 
@@ -192,6 +191,11 @@ class WaitSetEntry extends AbstractLocalOperation implements Delayed, PartitionA
 
     public void onExpire() {
         blockingOperation.onWaitExpire();
+    }
+
+    public void onCancel() {
+        OperationResponseHandler responseHandler = op.getOperationResponseHandler();
+        responseHandler.sendResponse(op, cancelResponse);
     }
 
     public void cancel(Object error) {

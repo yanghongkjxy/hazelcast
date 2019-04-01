@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,12 @@ import java.util.concurrent.TimeUnit;
  * Internal service for interacting with hot restart related functionalities (e.g. force and partial start)
  */
 public interface InternalHotRestartService {
+
+    /**
+     * Returns whether hot-restart is enabled or not.
+     */
+    boolean isEnabled();
+
     /**
      * Forces node to start by skipping hot-restart completely and removing all hot-restart data
      * even if node is still on validation phase or loading hot-restart data.
@@ -83,10 +89,19 @@ public interface InternalHotRestartService {
     ClusterHotRestartStatusDTO getCurrentClusterHotRestartStatus();
 
     /**
-     * Resets local hot restart data and gets a new UUID, if the local node hasn't completed the start process and
-     * it is excluded in cluster start.
+     * Resets local service data, removes hot restart directories and recreates them.
+     *
+     * @param isAfterJoin true if this is called after node joins the cluster, false otherwise
      */
-    void resetHotRestartData();
+    void resetService(boolean isAfterJoin);
+
+    /**
+     * Executes force-start process, resets local hot restart data and member gets a new UUID.
+     * <p>
+     * If the local node has already completed the start process or it isn't excluded in cluster start,
+     * this method fails with an exception.
+     */
+    void forceStartBeforeJoin();
 
     /**
      * Waits until partition replicas (primaries and backups) get in sync.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.hazelcast.client.impl.protocol.task.queue;
 import com.hazelcast.client.impl.protocol.ClientMessage;
 import com.hazelcast.client.impl.protocol.codec.QueueAddListenerCodec;
 import com.hazelcast.client.impl.protocol.task.AbstractCallableMessageTask;
+import com.hazelcast.client.impl.protocol.task.ListenerMessageTask;
 import com.hazelcast.collection.impl.common.DataAwareItemEvent;
 import com.hazelcast.collection.impl.queue.QueueService;
 import com.hazelcast.core.ItemEvent;
@@ -36,7 +37,7 @@ import java.security.Permission;
  * {@link com.hazelcast.client.impl.protocol.codec.QueueMessageType#QUEUE_ADDLISTENER}
  */
 public class QueueAddListenerMessageTask
-        extends AbstractCallableMessageTask<QueueAddListenerCodec.RequestParameters> {
+        extends AbstractCallableMessageTask<QueueAddListenerCodec.RequestParameters> implements ListenerMessageTask {
 
     public QueueAddListenerMessageTask(ClientMessage clientMessage, Node node, Connection connection) {
         super(clientMessage, node, connection);

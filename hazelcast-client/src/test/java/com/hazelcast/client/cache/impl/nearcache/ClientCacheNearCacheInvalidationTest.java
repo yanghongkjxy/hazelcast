@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,6 +63,7 @@ import static com.hazelcast.cache.CacheUtil.getPrefixedCacheName;
 import static com.hazelcast.client.cache.impl.nearcache.ClientCacheInvalidationListener.createInvalidationEventHandler;
 import static com.hazelcast.client.cache.impl.nearcache.ClientNearCacheTestSupport.generateValueFromKey;
 import static com.hazelcast.internal.nearcache.NearCacheTestUtils.getBaseConfig;
+import static com.hazelcast.internal.nearcache.impl.invalidation.RepairingTask.RECONCILIATION_INTERVAL_SECONDS;
 import static com.hazelcast.spi.properties.GroupProperty.CACHE_INVALIDATION_MESSAGE_BATCH_ENABLED;
 import static com.hazelcast.spi.properties.GroupProperty.CACHE_INVALIDATION_MESSAGE_BATCH_FREQUENCY_SECONDS;
 import static com.hazelcast.spi.properties.GroupProperty.CACHE_INVALIDATION_MESSAGE_BATCH_SIZE;
@@ -394,7 +395,10 @@ public class ClientCacheNearCacheInvalidationTest extends HazelcastTestSupport {
     }
 
     protected ClientConfig getClientConfig() {
-        return new ClientConfig();
+        ClientConfig clientConfig = new ClientConfig();
+        clientConfig.setProperty(NearCache.PROP_EXPIRATION_TASK_INITIAL_DELAY_SECONDS, "0");
+        clientConfig.setProperty(NearCache.PROP_EXPIRATION_TASK_PERIOD_SECONDS, "1");
+        return clientConfig;
     }
 
     protected NearCacheConfig getNearCacheConfig(InMemoryFormat inMemoryFormat) {
@@ -414,6 +418,8 @@ public class ClientCacheNearCacheInvalidationTest extends HazelcastTestSupport {
                                                                                   NearCacheConfig nearCacheConfig,
                                                                                   CacheConfig<K, V> cacheConfig) {
         ClientConfig clientConfig = getClientConfig()
+                // disable reconciliation, without reconciliation tests should pass
+                .setProperty(RECONCILIATION_INTERVAL_SECONDS.getName(), "0")
                 .addNearCacheConfig(nearCacheConfig);
 
         HazelcastClientProxy client = (HazelcastClientProxy) hazelcastFactory.newHazelcastClient(clientConfig);
@@ -442,13 +448,6 @@ public class ClientCacheNearCacheInvalidationTest extends HazelcastTestSupport {
         return new NearCacheConfig()
                 .setInMemoryFormat(inMemoryFormat)
                 .setName(DEFAULT_CACHE_NAME);
-    }
-
-    protected <K, V> CacheConfig<K, V> createCacheConfig(InMemoryFormat inMemoryFormat) {
-        return new CacheConfig<K, V>()
-                .setName(DEFAULT_CACHE_NAME)
-                .setInMemoryFormat(inMemoryFormat)
-                .setBackupCount(1);
     }
 
     private void populateMemberCache() {
@@ -512,7 +511,7 @@ public class ClientCacheNearCacheInvalidationTest extends HazelcastTestSupport {
 
     @SuppressWarnings("unchecked")
     private static <K, V, NK, NV> NV getFromNearCache(NearCacheTestContext<K, V, NK, NV> nearCacheTestContext, Object key) {
-        if (nearCacheTestContext.nearCache.getInMemoryFormat() == InMemoryFormat.NATIVE) {
+        if (nearCacheTestContext.nearCacheConfig.getInMemoryFormat() == InMemoryFormat.NATIVE) {
             key = nearCacheTestContext.serializationService.toData(key);
         }
         return nearCacheTestContext.nearCache.get((NK) key);

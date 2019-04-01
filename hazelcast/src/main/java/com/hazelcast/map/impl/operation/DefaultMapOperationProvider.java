@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -81,8 +81,8 @@ public class DefaultMapOperationProvider implements MapOperationProvider {
     }
 
     @Override
-    public MapOperation createSetTTLOperation(String name, Data key, long ttl) {
-        return new SetTTLOperation(name, key, ttl);
+    public MapOperation createSetTtlOperation(String name, Data key, long ttl) {
+        return new SetTtlOperation(name, key, ttl);
     }
 
     @Override

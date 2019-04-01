@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ import com.hazelcast.spi.ExecutionService;
 import com.hazelcast.spi.NodeEngine;
 import com.hazelcast.spi.Operation;
 import com.hazelcast.spi.OperationResponseHandler;
-import com.hazelcast.spi.impl.AbstractCompletableFuture;
 import com.hazelcast.spi.properties.GroupProperty;
 import com.hazelcast.util.executor.CompletedFuture;
 import com.hazelcast.util.executor.ManagedExecutorService;
@@ -188,18 +187,6 @@ public final class InvocationUtil {
                     }
                 });
             }
-        }
-    }
-
-    private static class SimpleCompletableFuture<T> extends AbstractCompletableFuture<T> {
-
-        SimpleCompletableFuture(NodeEngine nodeEngine) {
-            super(nodeEngine, nodeEngine.getLogger(InvocationUtil.class));
-        }
-
-        @Override
-        public void setResult(Object result) {
-            super.setResult(result);
         }
     }
 

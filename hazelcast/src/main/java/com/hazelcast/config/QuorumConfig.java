@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ import static com.hazelcast.quorum.QuorumType.READ_WRITE;
  * @see com.hazelcast.quorum.impl.ProbabilisticQuorumFunction
  * @see com.hazelcast.quorum.impl.RecentlyActiveQuorumFunction
  */
-public class QuorumConfig implements IdentifiedDataSerializable {
+public class QuorumConfig implements IdentifiedDataSerializable, NamedConfig {
 
     private String name;
     private boolean enabled;

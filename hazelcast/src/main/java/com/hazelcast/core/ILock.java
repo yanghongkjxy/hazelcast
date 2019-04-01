@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,11 @@ import java.util.concurrent.locks.Lock;
  * completely eliminate it.
  *
  * @see Lock
+ * @see com.hazelcast.cp.lock.FencedLock
+ * @deprecated Please use {@link com.hazelcast.cp.lock.FencedLock} instead.
+ * This interface will be removed in Hazelcast 4.0.
  */
+@Deprecated
 public interface ILock extends Lock, DistributedObject {
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ import com.hazelcast.monitor.impl.NearCacheStatsImpl;
 import com.hazelcast.query.TruePredicate;
 import com.hazelcast.test.AssertTask;
 import com.hazelcast.test.HazelcastTestSupport;
+import com.hazelcast.test.annotation.ConfigureParallelRunnerWith;
+import com.hazelcast.test.annotation.HeavilyMultiThreadedTestLimiter;
 import org.junit.Test;
 
 import javax.cache.expiry.ExpiryPolicy;
@@ -85,6 +87,7 @@ import static org.junit.Assert.assertTrue;
  * @param <NK> key type of the tested Near Cache
  * @param <NV> value type of the tested Near Cache
  */
+@ConfigureParallelRunnerWith(HeavilyMultiThreadedTestLimiter.class)
 @SuppressWarnings("WeakerAccess")
 public abstract class AbstractNearCacheBasicTest<NK, NV> extends HazelcastTestSupport {
 
@@ -469,12 +472,23 @@ public abstract class AbstractNearCacheBasicTest<NK, NV> extends HazelcastTestSu
 
     @Test
     public void whenSetExpiryPolicyIsUsed_thenNearCacheShouldBeInvalidated_onDataAdapter() {
-        whenEntryIsChanged_thenNearCacheShouldBeInvalidated(true, DataStructureMethods.SET_EXPIRY_POLICY);
+        whenEntryIsChanged_thenNearCacheShouldBeInvalidated(true, DataStructureMethods.SET_EXPIRY_POLICY_MULTI_KEY);
     }
 
 
     @Test
     public void whenSetExpiryPolicyIsUsed_thenNearCacheShouldBeInvalidated_onNearCacheAdapter() {
+        whenEntryIsChanged_thenNearCacheShouldBeInvalidated(false, DataStructureMethods.SET_EXPIRY_POLICY_MULTI_KEY);
+    }
+
+    @Test
+    public void whenSetExpiryPolicyOnSingleKeyIsUsed_thenNearCacheShouldBeInvalidated_onDataAdapter() {
+        whenEntryIsChanged_thenNearCacheShouldBeInvalidated(true, DataStructureMethods.SET_EXPIRY_POLICY);
+    }
+
+
+    @Test
+    public void whenSetExpiryPolicyOnSingleKeyIsUsed_thenNearCacheShouldBeInvalidated_onNearCacheAdapter() {
         whenEntryIsChanged_thenNearCacheShouldBeInvalidated(false, DataStructureMethods.SET_EXPIRY_POLICY);
     }
 
@@ -852,17 +866,20 @@ public abstract class AbstractNearCacheBasicTest<NK, NV> extends HazelcastTestSu
                 case EXECUTE_ON_KEY:
                     assertEquals(newValue, adapter.executeOnKey(i, mapEntryProcessor));
                     break;
+                case SET_EXPIRY_POLICY:
+                    assertTrue(adapter.setExpiryPolicy(i, expiryPolicy));
+                    break;
                 case EXECUTE_ON_KEYS:
                 case PUT_ALL:
                 case INVOKE_ALL:
-                case SET_EXPIRY_POLICY:
+                case SET_EXPIRY_POLICY_MULTI_KEY:
                     invalidationMap.put(i, newValue);
                     break;
                 case EXECUTE_ON_ENTRIES:
                 case EXECUTE_ON_ENTRIES_WITH_PREDICATE:
                     break;
                 case SET_TTL:
-                    adapter.setTTL(i, 1, TimeUnit.DAYS);
+                    adapter.setTtl(i, 1, TimeUnit.DAYS);
                     break;
                 default:
                     throw new IllegalArgumentException("Unexpected method: " + method);
@@ -887,7 +904,7 @@ public abstract class AbstractNearCacheBasicTest<NK, NV> extends HazelcastTestSu
             for (int i = 0; i < DEFAULT_RECORD_COUNT; i++) {
                 assertEquals("newValue-" + i, resultMap.get(i).get());
             }
-        } else if (method == DataStructureMethods.SET_EXPIRY_POLICY) {
+        } else if (method == DataStructureMethods.SET_EXPIRY_POLICY_MULTI_KEY) {
             adapter.setExpiryPolicy(invalidationMap.keySet(), expiryPolicy);
             newValuePrefix = "value-";
         }
@@ -895,7 +912,7 @@ public abstract class AbstractNearCacheBasicTest<NK, NV> extends HazelcastTestSu
         assertNearCacheInvalidations(context, DEFAULT_RECORD_COUNT);
         String message = format("Invalidation is not working on %s()", method.getMethodName());
         assertNearCacheSizeEventually(context, 0, message);
-        if (method == DataStructureMethods.SET_TTL) {
+        if (method == DataStructureMethods.SET_TTL || method == DataStructureMethods.SET_EXPIRY_POLICY) {
             newValuePrefix = "value-";
         }
         for (int i = 0; i < DEFAULT_RECORD_COUNT; i++) {
@@ -1383,7 +1400,9 @@ public abstract class AbstractNearCacheBasicTest<NK, NV> extends HazelcastTestSu
                 // but we need to call this on every assert, since the Near Cache has a cooldown for TTL cleanups
                 context.nearCacheAdapter.get(0);
 
-                assertNearCacheSize(context, 1, "Expected the Near Cache to contain just the trigger entry");
+                long nearCacheSize = context.nearCache.size();
+                assertTrue(format("Expected the Near Cache to contain either only the trigger entry or no entry."
+                        + "Near Cache size is %d (%s)", nearCacheSize, context.stats), nearCacheSize <= 1);
                 assertEquals("Expected no Near Cache evictions", 0, context.stats.getEvictions());
                 assertTrue(format("Expected at least %d entries to be expired from the Near Cache", DEFAULT_RECORD_COUNT),
                         context.stats.getExpirations() >= DEFAULT_RECORD_COUNT);
@@ -1560,7 +1579,7 @@ public abstract class AbstractNearCacheBasicTest<NK, NV> extends HazelcastTestSu
         populateNearCache(secondContext);
 
         for (int i = 0; i < DEFAULT_RECORD_COUNT; i++) {
-            firstContext.nearCacheAdapter.setTTL(i, 0, TimeUnit.DAYS);
+            firstContext.nearCacheAdapter.setTtl(i, 0, TimeUnit.DAYS);
         }
 
         assertNearCacheSizeEventually(secondContext, 0);

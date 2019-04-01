@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ public class InvocationRegistryTest extends HazelcastTestSupport {
 
     private Invocation newInvocation(Operation op) {
         Invocation.Context context = new Context(null, null, null, null, null,
-                1000, invocationRegistry, null, logger, null, null, null, null, null, null, null, null, null);
+                1000, invocationRegistry, null, logger, null, null, null, null, null, null, null, null, null, null);
         return new PartitionInvocation(context, op, 0, 0, 0, false, false);
     }
 
@@ -113,7 +113,6 @@ public class InvocationRegistryTest extends HazelcastTestSupport {
     public void deregister_whenSkipped() {
         Operation op = new DummyOperation();
         Invocation invocation = newInvocation(op);
-        invocation.remote = false;
 
         invocationRegistry.register(invocation);
         invocationRegistry.deregister(invocation);

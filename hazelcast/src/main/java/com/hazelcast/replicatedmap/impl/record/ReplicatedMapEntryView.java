@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
 import com.hazelcast.nio.serialization.impl.Versioned;
 import com.hazelcast.replicatedmap.impl.operation.ReplicatedMapDataSerializerHook;
+import com.hazelcast.spi.serialization.SerializationService;
 
 import java.io.IOException;
 
@@ -33,8 +34,8 @@ public class ReplicatedMapEntryView<K, V>
 
     private static final int NOT_AVAILABLE = -1;
 
-    private K key;
-    private V value;
+    private Object key;
+    private Object value;
     private long creationTime;
     private long hits;
     private long lastAccessTime;
@@ -42,12 +43,22 @@ public class ReplicatedMapEntryView<K, V>
     private long ttl;
     private long maxIdle;
 
+    private SerializationService serializationService;
+
     public ReplicatedMapEntryView() {
+    }
+
+    public ReplicatedMapEntryView(SerializationService serializationService) {
+        this.serializationService = serializationService;
     }
 
     @Override
     public K getKey() {
-        return key;
+        // Null serializationService means, use raw type without any conversion
+        if (serializationService != null) {
+            key = serializationService.toObject(key);
+        }
+        return (K) key;
     }
 
     public ReplicatedMapEntryView<K, V> setKey(K key) {
@@ -57,7 +68,11 @@ public class ReplicatedMapEntryView<K, V>
 
     @Override
     public V getValue() {
-        return value;
+        // Null serializationService means, use raw type without any conversion
+        if (serializationService != null) {
+            value = serializationService.toObject(value);
+        }
+        return (V) value;
     }
 
     public ReplicatedMapEntryView<K, V> setValue(V value) {
@@ -131,7 +146,7 @@ public class ReplicatedMapEntryView<K, V>
     }
 
     @Override
-    public long getMaxIdle() {
+    public Long getMaxIdle() {
         return maxIdle;
     }
 
@@ -142,8 +157,8 @@ public class ReplicatedMapEntryView<K, V>
 
     @Override
     public void writeData(ObjectDataOutput out) throws IOException {
-        IOUtil.writeObject(out, key);
-        IOUtil.writeObject(out, value);
+        IOUtil.writeObject(out, getKey());
+        IOUtil.writeObject(out, getValue());
         out.writeLong(creationTime);
         out.writeLong(hits);
         out.writeLong(lastAccessTime);
@@ -183,8 +198,8 @@ public class ReplicatedMapEntryView<K, V>
     @Override
     public String toString() {
         return "ReplicatedMapEntryView{"
-                + "key=" + key
-                + ", value=" + value
+                + "key=" + getKey()
+                + ", value=" + getValue()
                 + ", creationTime=" + creationTime
                 + ", hits=" + hits
                 + ", lastAccessTime=" + lastAccessTime

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,7 +82,6 @@ public final class LifecycleServiceImpl implements LifecycleService {
             }
         }
         buildInfo = BuildInfoProvider.getBuildInfo();
-        fireLifecycleEvent(STARTING);
     }
 
     private ILogger getLogger() {
@@ -131,11 +130,6 @@ public final class LifecycleServiceImpl implements LifecycleService {
         });
     }
 
-    public void setStarted() {
-        active.set(true);
-        fireLifecycleEvent(STARTED);
-    }
-
     @Override
     public boolean isRunning() {
         return active.get();
@@ -143,21 +137,31 @@ public final class LifecycleServiceImpl implements LifecycleService {
 
     @Override
     public void shutdown() {
+        doShutdown(true);
+    }
+
+    @Override
+    public void terminate() {
+        doShutdown(false);
+    }
+
+    public void start() {
+        fireLifecycleEvent(STARTING);
+        active.set(true);
+        fireLifecycleEvent(STARTED);
+    }
+
+    private void doShutdown(boolean isGraceful) {
         if (!active.compareAndSet(true, false)) {
             return;
         }
 
         fireLifecycleEvent(SHUTTING_DOWN);
         HazelcastClient.shutdown(client.getName());
-        client.doShutdown();
+        client.doShutdown(isGraceful);
         fireLifecycleEvent(SHUTDOWN);
 
         shutdownExecutor();
-    }
-
-    @Override
-    public void terminate() {
-        shutdown();
     }
 
     private void shutdownExecutor() {

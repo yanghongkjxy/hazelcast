@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package com.hazelcast.config;
 
 import com.hazelcast.durableexecutor.DurableExecutorService;
-import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
@@ -31,7 +30,7 @@ import static com.hazelcast.util.Preconditions.checkPositive;
 /**
  * Contains the configuration for an {@link DurableExecutorService}.
  */
-public class DurableExecutorConfig implements IdentifiedDataSerializable, Versioned {
+public class DurableExecutorConfig implements IdentifiedDataSerializable, Versioned, NamedConfig {
 
     /**
      * The number of executor threads per Member for the Executor based on this configuration.
@@ -218,10 +217,7 @@ public class DurableExecutorConfig implements IdentifiedDataSerializable, Versio
         out.writeInt(poolSize);
         out.writeInt(durability);
         out.writeInt(capacity);
-        // RU_COMPAT_3_9
-        if (out.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            out.writeUTF(quorumName);
-        }
+        out.writeUTF(quorumName);
     }
 
     @Override
@@ -230,10 +226,7 @@ public class DurableExecutorConfig implements IdentifiedDataSerializable, Versio
         poolSize = in.readInt();
         durability = in.readInt();
         capacity = in.readInt();
-        // RU_COMPAT_3_9
-        if (in.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            quorumName = in.readUTF();
-        }
+        quorumName = in.readUTF();
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -904,6 +904,13 @@ public class QueueContainer implements IdentifiedDataSerializable {
                 }
                 backupMap.clear();
                 backupMap = null;
+            }
+            if (!txMap.isEmpty()) {
+                long maxItemId = Long.MIN_VALUE;
+                for (TxQueueItem item : txMap.values()) {
+                    maxItemId = Math.max(maxItemId, item.itemId);
+                }
+                setId(maxItemId + ID_PROMOTION_OFFSET);
             }
         }
         return itemQueue;

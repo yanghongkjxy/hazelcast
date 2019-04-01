@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.hazelcast.internal.partition.impl;
 
 import com.hazelcast.instance.Node;
 import com.hazelcast.instance.NodeState;
+import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.internal.partition.InternalPartitionService;
 import com.hazelcast.logging.ILogger;
 
@@ -39,7 +40,7 @@ class PublishPartitionRuntimeStateTask implements Runnable {
     public void run() {
         if (node.isMaster()) {
             MigrationManager migrationManager = partitionService.getMigrationManager();
-            boolean migrationAllowed = migrationManager.isMigrationAllowed()
+            boolean migrationAllowed = migrationManager.areMigrationTasksAllowed()
                     && !partitionService.isFetchMostRecentPartitionTableTaskRequired();
             if (!migrationAllowed) {
                 logger.fine("Not publishing partition runtime state since migration is not allowed.");
@@ -47,11 +48,15 @@ class PublishPartitionRuntimeStateTask implements Runnable {
             }
 
             if (migrationManager.hasOnGoingMigration()) {
-                logger.info("Remaining migration tasks in queue => " + partitionService.getMigrationQueueSize());
-            }
-
-            if (node.getState() == NodeState.ACTIVE) {
-                partitionService.publishPartitionRuntimeState();
+                logger.info("Remaining migration tasks in queue => " + partitionService.getMigrationQueueSize()
+                    + ". (" + migrationManager.getStats().formatToString(logger.isFineEnabled()) + ")");
+            } else if (node.getState() == NodeState.ACTIVE) {
+                if (node.getClusterService().getClusterVersion().isGreaterOrEqual(Versions.V3_12)) {
+                    partitionService.checkClusterPartitionRuntimeStates();
+                } else {
+                    // RU_COMPAT_3_11
+                    partitionService.publishPartitionRuntimeState();
+                }
             }
         }
     }

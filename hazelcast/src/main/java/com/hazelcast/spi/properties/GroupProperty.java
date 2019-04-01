@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -114,12 +114,26 @@ public final class GroupProperty {
      * partition-specific operation thread, but there are also requests that can't be executed on a partition-specific operation
      * thread, such as {@code multimap.containsValue(value)}, because they need to access all partitions on a given
      * member.
+     *
+     * When not set it is set as core-size
      */
     public static final HazelcastProperty CLIENT_ENGINE_THREAD_COUNT
             = new HazelcastProperty("hazelcast.clientengine.thread.count", -1);
 
+    /**
+     * The number of threads that the client engine has available for processing requests that are related to transactions
+     * When not set it is set as core-size.
+     */
     public static final HazelcastProperty CLIENT_ENGINE_QUERY_THREAD_COUNT
             = new HazelcastProperty("hazelcast.clientengine.query.thread.count", -1);
+
+    /**
+     * The number of threads that the client engine has available for processing requests that are blocking
+     * (example: related to transactions)
+     * When not set it is set as core-size * 20.
+     */
+    public static final HazelcastProperty CLIENT_ENGINE_BLOCKING_THREAD_COUNT
+            = new HazelcastProperty("hazelcast.clientengine.blocking.thread.count", -1);
 
     /**
      * Time after which client connection is removed or owner node of a client is removed from the cluster.
@@ -229,11 +243,24 @@ public final class GroupProperty {
     public static final HazelcastProperty CONNECT_ALL_WAIT_SECONDS
             = new HazelcastProperty("hazelcast.connect.all.wait.seconds", 120, SECONDS);
 
+    /**
+     * @deprecated Use {@link com.hazelcast.config.MemcacheProtocolConfig} instead.
+     */
+    @Deprecated
     public static final HazelcastProperty MEMCACHE_ENABLED
             = new HazelcastProperty("hazelcast.memcache.enabled", false);
+    /**
+     * @deprecated Use {@link com.hazelcast.config.RestEndpointGroup RestEndpointGroups} in
+     *             {@link com.hazelcast.config.RestApiConfig} instead.
+     */
+    @Deprecated
     public static final HazelcastProperty REST_ENABLED
             = new HazelcastProperty("hazelcast.rest.enabled", false);
-
+    /**
+     * @deprecated Enable or disable the {@link com.hazelcast.config.RestEndpointGroup#HEALTH_CHECK} group in
+     *             {@link com.hazelcast.config.RestApiConfig} instead.
+     */
+    @Deprecated
     public static final HazelcastProperty HTTP_HEALTHCHECK_ENABLED
             = new HazelcastProperty("hazelcast.http.healthcheck.enabled", false);
 
@@ -344,9 +371,9 @@ public final class GroupProperty {
             = new HazelcastProperty("hazelcast.socket.client.buffer.direct", false);
 
     public static final HazelcastProperty SOCKET_LINGER_SECONDS
-            = new HazelcastProperty("hazelcast.socket.linger.seconds", 0, SECONDS);
+            = new HazelcastProperty("hazelcast.socket.linger.seconds", -1, SECONDS);
     public static final HazelcastProperty SOCKET_CONNECT_TIMEOUT_SECONDS
-            = new HazelcastProperty("hazelcast.socket.connect.timeout.seconds", 0, SECONDS);
+            = new HazelcastProperty("hazelcast.socket.connect.timeout.seconds", 10, SECONDS);
     public static final HazelcastProperty SOCKET_KEEP_ALIVE
             = new HazelcastProperty("hazelcast.socket.keep.alive", true);
     public static final HazelcastProperty SOCKET_NO_DELAY
@@ -570,8 +597,8 @@ public final class GroupProperty {
      *
      * @since 3.11
      */
-    public static final HazelcastProperty MAP_LOAD_ALL_PUBLISHES_ADD_EVENT
-            = new HazelcastProperty("hazelcast.map.loadAll.publishes.add.event", false);
+    public static final HazelcastProperty MAP_LOAD_ALL_PUBLISHES_ADDED_EVENT
+            = new HazelcastProperty("hazelcast.map.loadAll.publishes.added.event", false);
 
     public static final HazelcastProperty LOGGING_TYPE
             = new HazelcastProperty("hazelcast.logging.type", "jdk");
@@ -583,6 +610,11 @@ public final class GroupProperty {
 
     public static final HazelcastProperty MC_MAX_VISIBLE_SLOW_OPERATION_COUNT
             = new HazelcastProperty("hazelcast.mc.max.visible.slow.operations.count", 10);
+    /**
+     * @deprecated Enable or disable the {@link com.hazelcast.config.RestEndpointGroup#CLUSTER_WRITE} group in
+     *             {@link com.hazelcast.config.RestApiConfig} instead.
+     */
+    @Deprecated
     public static final HazelcastProperty MC_URL_CHANGE_ENABLED
             = new HazelcastProperty("hazelcast.mc.url.change.enabled", true);
 

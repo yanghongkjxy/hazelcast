@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package com.hazelcast.client.cache;
 
 import com.hazelcast.cache.CacheReadWriteThroughTest;
 import com.hazelcast.cache.impl.HazelcastServerCachingProvider;
-import com.hazelcast.client.HazelcastClientManager;
+import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.cache.impl.HazelcastClientCachingProvider;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.test.TestHazelcastFactory;
@@ -86,7 +86,7 @@ public class ClientCacheReadWriteThroughTest extends CacheReadWriteThroughTest {
     @Override
     protected void onTearDown() {
         serverCachingProvider.close();
-        HazelcastClientManager.shutdownAll();
+        HazelcastClient.shutdownAll();
     }
 
     // https://github.com/hazelcast/hazelcast/issues/6676

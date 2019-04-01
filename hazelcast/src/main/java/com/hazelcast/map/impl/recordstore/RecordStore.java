@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import com.hazelcast.core.EntryView;
 import com.hazelcast.core.IMap;
 import com.hazelcast.internal.eviction.ExpiredKey;
 import com.hazelcast.internal.nearcache.impl.invalidation.InvalidationQueue;
+import com.hazelcast.internal.util.comparators.ValueComparator;
 import com.hazelcast.map.impl.MapContainer;
 import com.hazelcast.map.impl.MapEntries;
 import com.hazelcast.map.impl.iterator.MapEntriesWithCursor;
@@ -115,7 +116,7 @@ public interface RecordStore<R extends Record> {
 
     boolean remove(Data dataKey, Object testValue);
 
-    void setTTL(Data key, long ttl);
+    boolean setTtl(Data key, long ttl);
 
     /**
      * Similar to {@link RecordStore##remove(Data, CallerProvenance)}
@@ -161,7 +162,7 @@ public interface RecordStore<R extends Record> {
 
     /**
      * Sets the value to the given updated value
-     * if {@link com.hazelcast.map.impl.record.RecordComparator#isEqual} comparison
+     * if {@link ValueComparator#isEqual} comparison
      * of current value and expected value is {@code true}.
      *
      * @param dataKey key which's value is requested to be replaced.
@@ -352,13 +353,12 @@ public interface RecordStore<R extends Record> {
      * Does post eviction operations like sending events
      *
      * @param record record to process
-     * @param backup <code>true</code> if a backup partition, otherwise <code>false</code>.
      */
-    void doPostEvictionOperations(Record record, boolean backup);
+    void doPostEvictionOperations(Record record);
 
     MapDataStore<Data, Object> getMapDataStore();
 
-    InvalidationQueue<ExpiredKey> getExpiredKeys();
+    InvalidationQueue<ExpiredKey> getExpiredKeysQueue();
 
     /**
      * Returns the partition id this RecordStore belongs to.
@@ -392,7 +392,7 @@ public interface RecordStore<R extends Record> {
 
     Storage createStorage(RecordFactory<R> recordFactory, InMemoryFormat memoryFormat);
 
-    Record createRecord(Object value, long ttlMillis, long maxIdle, long now);
+    Record createRecord(Data key, Object value, long ttlMillis, long maxIdle, long now);
 
     Record loadRecordOrNull(Data key, boolean backup, Address callerAddress);
 
@@ -407,6 +407,8 @@ public interface RecordStore<R extends Record> {
     void init();
 
     Storage getStorage();
+
+    void sampleAndForceRemoveEntries(int entryCountToRemove);
 
     /**
      * Starts the map loader if there is a configured and enabled
@@ -473,7 +475,8 @@ public interface RecordStore<R extends Record> {
      * @param replaceExistingValues if the existing entries for the keys should
      *                              be replaced with the loaded values
      */
-    void loadAllFromStore(List<Data> keys, boolean replaceExistingValues);
+    void loadAllFromStore(List<Data> keys,
+                          boolean replaceExistingValues);
 
     /**
      * Advances the state of the map key loader for this partition and sets the key
@@ -504,7 +507,8 @@ public interface RecordStore<R extends Record> {
      * @param onRecordStoreDestroy true if record-store will be destroyed,
      *                             otherwise false.
      */
-    void clearPartition(boolean onShutdown, boolean onRecordStoreDestroy);
+    void clearPartition(boolean onShutdown,
+                        boolean onRecordStoreDestroy);
 
     /**
      * Called by {@link IMap#clear()}.
@@ -530,10 +534,4 @@ public interface RecordStore<R extends Record> {
      * Destroys data in this record store.
      */
     void destroy();
-
-    /**
-     * Like {@link #destroy()} but does not touch state on other services
-     * like lock service or event journal service.
-     */
-    void destroyInternals();
 }

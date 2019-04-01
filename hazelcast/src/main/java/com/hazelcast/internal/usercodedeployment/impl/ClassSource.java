@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,6 +70,11 @@ public final class ClassSource extends ClassLoader {
         return classDefinitions.get(name);
     }
 
+    // for testing purposes
+    void addClassDefinition(String name, byte[] bytes) {
+        classDefinitions.put(name, bytes);
+    }
+
     Class getClazz(String name) {
         return classes.get(name);
     }
@@ -78,6 +83,11 @@ public final class ClassSource extends ClassLoader {
         ClassData classData = new ClassData();
         HashMap<String, byte[]> innerClassDefinitions = new HashMap<String, byte[]>(this.classDefinitions);
         byte[] mainClassDefinition = innerClassDefinitions.remove(className);
+        if (mainClassDefinition == null) {
+            // sometimes an inner class may be cached within its main class.
+            // However it does not mean another inner class within the same main class is cached too.
+            return null;
+        }
         classData.setInnerClassDefinitions(innerClassDefinitions);
         classData.setMainClassDefinition(mainClassDefinition);
         return classData;

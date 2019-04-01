@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.hazelcast.config;
 
-import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
@@ -33,7 +32,8 @@ import static com.hazelcast.util.Preconditions.checkPositive;
 /**
  * Configuration options for the {@link com.hazelcast.scheduledexecutor.IScheduledExecutorService}.
  */
-public class ScheduledExecutorConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSerializable, Versioned {
+public class ScheduledExecutorConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSerializable,
+        Versioned, NamedConfig {
 
     /**
      * The number of executor threads per Member for the Executor based on this configuration.
@@ -197,19 +197,19 @@ public class ScheduledExecutorConfig implements SplitBrainMergeTypeProvider, Ide
 
 
     /**
-    * Gets the {@link MergePolicyConfig} for the scheduler.
-    *
-    * @return the {@link MergePolicyConfig} for the scheduler
-    */
+     * Gets the {@link MergePolicyConfig} for the scheduler.
+     *
+     * @return the {@link MergePolicyConfig} for the scheduler
+     */
     public MergePolicyConfig getMergePolicyConfig() {
         return mergePolicyConfig;
     }
 
     /**
-    * Sets the {@link MergePolicyConfig} for the scheduler.
-    *
-    * @return this executor config instance
-    */
+     * Sets the {@link MergePolicyConfig} for the scheduler.
+     *
+     * @return this executor config instance
+     */
     public ScheduledExecutorConfig setMergePolicyConfig(MergePolicyConfig mergePolicyConfig) {
         this.mergePolicyConfig = checkNotNull(mergePolicyConfig, "mergePolicyConfig cannot be null");
         return this;
@@ -255,11 +255,8 @@ public class ScheduledExecutorConfig implements SplitBrainMergeTypeProvider, Ide
         out.writeInt(durability);
         out.writeInt(capacity);
         out.writeInt(poolSize);
-        // RU_COMPAT_3_9
-        if (out.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            out.writeUTF(quorumName);
-            out.writeObject(mergePolicyConfig);
-        }
+        out.writeUTF(quorumName);
+        out.writeObject(mergePolicyConfig);
     }
 
     @Override
@@ -268,11 +265,8 @@ public class ScheduledExecutorConfig implements SplitBrainMergeTypeProvider, Ide
         durability = in.readInt();
         capacity = in.readInt();
         poolSize = in.readInt();
-        // RU_COMPAT_3_9
-        if (in.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            quorumName = in.readUTF();
-            mergePolicyConfig = in.readObject();
-        }
+        quorumName = in.readUTF();
+        mergePolicyConfig = in.readObject();
     }
 
     @SuppressWarnings({"checkstyle:npathcomplexity"})

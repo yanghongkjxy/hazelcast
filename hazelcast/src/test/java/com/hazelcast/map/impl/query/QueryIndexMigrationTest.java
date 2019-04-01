@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -107,7 +107,7 @@ public class QueryIndexMigrationTest extends HazelcastTestSupport {
     }
 
     @Test(timeout = MINUTE)
-    public void testQueryDuringAndAfterMigration() throws Exception {
+    public void testQueryDuringAndAfterMigration() {
         HazelcastInstance instance = nodeFactory.newHazelcastInstance(getTestConfig());
         int count = 500;
         IMap<String, Employee> map = instance.getMap("employees");
@@ -131,7 +131,7 @@ public class QueryIndexMigrationTest extends HazelcastTestSupport {
     }
 
     @Test
-    public void testQueryDuringAndAfterMigrationWithIndex() throws Exception {
+    public void testQueryDuringAndAfterMigrationWithIndex() {
         Config config = getTestConfig();
         HazelcastInstance instance = nodeFactory.newHazelcastInstance(config);
 
@@ -160,7 +160,7 @@ public class QueryIndexMigrationTest extends HazelcastTestSupport {
     }
 
     @Test
-    public void testQueryWithIndexesWhileMigrating() throws Exception {
+    public void testQueryWithIndexesWhileMigrating() {
         HazelcastInstance instance = nodeFactory.newHazelcastInstance(getTestConfig());
         IMap<String, Employee> map = instance.getMap("employees");
         map.addIndex("age", true);

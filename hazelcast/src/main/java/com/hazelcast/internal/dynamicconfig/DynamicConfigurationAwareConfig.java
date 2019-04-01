@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,7 @@
 
 package com.hazelcast.internal.dynamicconfig;
 
-import static com.hazelcast.internal.dynamicconfig.AggregatingMap.aggregate;
-import static com.hazelcast.internal.dynamicconfig.search.ConfigSearch.supplierFor;
-import static com.hazelcast.spi.properties.GroupProperty.SEARCH_DYNAMIC_CONFIG_FIRST;
-
+import com.hazelcast.config.AdvancedNetworkConfig;
 import com.hazelcast.config.AtomicLongConfig;
 import com.hazelcast.config.AtomicReferenceConfig;
 import com.hazelcast.config.CRDTReplicationConfig;
@@ -62,6 +59,7 @@ import com.hazelcast.config.SetConfig;
 import com.hazelcast.config.TopicConfig;
 import com.hazelcast.config.UserCodeDeploymentConfig;
 import com.hazelcast.config.WanReplicationConfig;
+import com.hazelcast.config.cp.CPSubsystemConfig;
 import com.hazelcast.core.ManagedContext;
 import com.hazelcast.internal.dynamicconfig.search.ConfigSearch;
 import com.hazelcast.internal.dynamicconfig.search.ConfigSupplier;
@@ -69,6 +67,8 @@ import com.hazelcast.internal.dynamicconfig.search.Searcher;
 import com.hazelcast.security.SecurityService;
 import com.hazelcast.spi.properties.HazelcastProperties;
 import com.hazelcast.util.StringUtil;
+
+import javax.annotation.Nonnull;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
@@ -77,7 +77,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentMap;
-import javax.annotation.Nonnull;
+
+import static com.hazelcast.internal.dynamicconfig.AggregatingMap.aggregate;
+import static com.hazelcast.internal.dynamicconfig.search.ConfigSearch.supplierFor;
+import static com.hazelcast.spi.properties.GroupProperty.SEARCH_DYNAMIC_CONFIG_FIRST;
 
 @SuppressWarnings({"unchecked", "checkstyle:methodcount", "checkstyle:classfanoutcomplexity"})
 public class DynamicConfigurationAwareConfig extends Config {
@@ -159,6 +162,7 @@ public class DynamicConfigurationAwareConfig extends Config {
     private final Config staticConfig;
     private final ConfigPatternMatcher configPatternMatcher;
     private final boolean isStaticFirst;
+    private final DynamicCPSubsystemConfig dynamicCPSubsystemConfig;
 
     private volatile ConfigurationService configurationService = new EmptyConfigurationService();
     private volatile DynamicSecurityConfig dynamicSecurityConfig;
@@ -170,6 +174,7 @@ public class DynamicConfigurationAwareConfig extends Config {
         this.configPatternMatcher = staticConfig.getConfigPatternMatcher();
         this.isStaticFirst = !properties.getBoolean(SEARCH_DYNAMIC_CONFIG_FIRST);
         this.dynamicSecurityConfig = new DynamicSecurityConfig(staticConfig.getSecurityConfig(), null);
+        this.dynamicCPSubsystemConfig = new DynamicCPSubsystemConfig(staticConfig.getCPSubsystemConfig());
         this.configSearcher = initConfigSearcher();
     }
 
@@ -251,6 +256,16 @@ public class DynamicConfigurationAwareConfig extends Config {
     @Override
     public Config setNetworkConfig(NetworkConfig networkConfig) {
         return staticConfig.setNetworkConfig(networkConfig);
+    }
+
+    @Override
+    public AdvancedNetworkConfig getAdvancedNetworkConfig() {
+        return staticConfig.getAdvancedNetworkConfig();
+    }
+
+    @Override
+    public Config setAdvancedNetworkConfig(AdvancedNetworkConfig advancedNetworkConfig) {
+        return staticConfig.setAdvancedNetworkConfig(advancedNetworkConfig);
     }
 
     @Override
@@ -1440,5 +1455,15 @@ public class DynamicConfigurationAwareConfig extends Config {
 
     private Searcher initConfigSearcher() {
         return ConfigSearch.searcherFor(staticConfig, configurationService, configPatternMatcher, isStaticFirst);
+    }
+
+    @Override
+    public CPSubsystemConfig getCPSubsystemConfig() {
+        return dynamicCPSubsystemConfig;
+    }
+
+    @Override
+    public Config setCPSubsystemConfig(CPSubsystemConfig cpSubsystemConfig) {
+        throw new UnsupportedOperationException("Unsupported operation");
     }
 }

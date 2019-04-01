@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package com.hazelcast.internal.journal;
 
 import com.hazelcast.core.ICompletableFuture;
-import com.hazelcast.projection.Projection;
 import com.hazelcast.ringbuffer.ReadResultSet;
 
 /**
@@ -68,6 +67,6 @@ public interface EventJournalReader<E> {
             int maxSize,
             int partitionId,
             com.hazelcast.util.function.Predicate<? super E> predicate,
-            Projection<? super E, ? extends T> projection
+            com.hazelcast.util.function.Function<? super E, ? extends T> projection
     );
 }

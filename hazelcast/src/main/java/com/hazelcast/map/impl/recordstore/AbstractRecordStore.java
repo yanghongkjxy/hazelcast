@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.hazelcast.map.impl.recordstore;
 import com.hazelcast.concurrent.lock.LockService;
 import com.hazelcast.concurrent.lock.LockStore;
 import com.hazelcast.config.InMemoryFormat;
+import com.hazelcast.internal.util.comparators.ValueComparator;
 import com.hazelcast.map.impl.EntryCostEstimator;
 import com.hazelcast.map.impl.MapContainer;
 import com.hazelcast.map.impl.MapService;
@@ -26,7 +27,6 @@ import com.hazelcast.map.impl.MapServiceContext;
 import com.hazelcast.map.impl.mapstore.MapDataStore;
 import com.hazelcast.map.impl.mapstore.MapStoreContext;
 import com.hazelcast.map.impl.record.Record;
-import com.hazelcast.map.impl.record.RecordComparator;
 import com.hazelcast.map.impl.record.RecordFactory;
 import com.hazelcast.map.impl.record.Records;
 import com.hazelcast.monitor.LocalRecordStoreStats;
@@ -45,7 +45,6 @@ import java.util.Collection;
 
 import static com.hazelcast.map.impl.ExpirationTimeSetter.setExpirationTimes;
 
-
 /**
  * Contains record store common parts.
  */
@@ -58,7 +57,7 @@ abstract class AbstractRecordStore implements RecordStore<Record> {
     protected final RecordFactory recordFactory;
     protected final InMemoryFormat inMemoryFormat;
     protected final MapStoreContext mapStoreContext;
-    protected final RecordComparator recordComparator;
+    protected final ValueComparator valueComparator;
     protected final MapServiceContext mapServiceContext;
     protected final SerializationService serializationService;
     protected final MapDataStore<Data, Object> mapDataStore;
@@ -76,7 +75,7 @@ abstract class AbstractRecordStore implements RecordStore<Record> {
         this.serializationService = nodeEngine.getSerializationService();
         this.inMemoryFormat = mapContainer.getMapConfig().getInMemoryFormat();
         this.recordFactory = mapContainer.getRecordFactoryConstructor().createNew(null);
-        this.recordComparator = mapServiceContext.getRecordComparator(inMemoryFormat);
+        this.valueComparator = mapServiceContext.getValueComparatorOf(inMemoryFormat);
         this.mapStoreContext = mapContainer.getMapStoreContext();
         this.mapDataStore = mapStoreContext.getMapStoreManager().getMapDataStore(name, partitionId);
         this.lockStore = createLockStore();
@@ -107,8 +106,8 @@ abstract class AbstractRecordStore implements RecordStore<Record> {
     }
 
     @Override
-    public Record createRecord(Object value, long ttlMillis, long maxIdle, long now) {
-        Record record = recordFactory.newRecord(value);
+    public Record createRecord(Data key, Object value, long ttlMillis, long maxIdle, long now) {
+        Record record = recordFactory.newRecord(key, value);
         record.setCreationTime(now);
         record.setLastUpdateTime(now);
 
@@ -159,26 +158,26 @@ abstract class AbstractRecordStore implements RecordStore<Record> {
     protected void saveIndex(Record record, Object oldValue) {
         Data dataKey = record.getKey();
         Indexes indexes = mapContainer.getIndexes(partitionId);
-        if (indexes.hasIndex()) {
+        if (indexes.haveAtLeastOneIndex()) {
             Object value = Records.getValueOrCachedValue(record, serializationService);
             QueryableEntry queryableEntry = mapContainer.newQueryEntry(dataKey, value);
-            indexes.saveEntryIndex(queryableEntry, oldValue, Index.OperationSource.USER);
+            queryableEntry.setMetadata(record.getMetadata());
+            indexes.putEntry(queryableEntry, oldValue, Index.OperationSource.USER);
         }
     }
 
-
     protected void removeIndex(Record record) {
         Indexes indexes = mapContainer.getIndexes(partitionId);
-        if (indexes.hasIndex()) {
+        if (indexes.haveAtLeastOneIndex()) {
             Data key = record.getKey();
             Object value = Records.getValueOrCachedValue(record, serializationService);
-            indexes.removeEntryIndex(key, value, Index.OperationSource.USER);
+            indexes.removeEntry(key, value, Index.OperationSource.USER);
         }
     }
 
     protected void removeIndex(Collection<Record> records) {
         Indexes indexes = mapContainer.getIndexes(partitionId);
-        if (!indexes.hasIndex()) {
+        if (!indexes.haveAtLeastOneIndex()) {
             return;
         }
 

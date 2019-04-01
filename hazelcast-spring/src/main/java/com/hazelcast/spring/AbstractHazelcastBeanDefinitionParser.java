@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,11 @@
 package com.hazelcast.spring;
 
 import com.hazelcast.config.AbstractXmlConfigHelper;
+import com.hazelcast.config.AliasedDiscoveryConfig;
 import com.hazelcast.config.ClassFilter;
 import com.hazelcast.config.DiscoveryConfig;
 import com.hazelcast.config.DiscoveryStrategyConfig;
+import com.hazelcast.config.DomConfigHelper;
 import com.hazelcast.config.EvictionConfig;
 import com.hazelcast.config.EvictionPolicy;
 import com.hazelcast.config.GlobalSerializerConfig;
@@ -46,6 +48,9 @@ import org.w3c.dom.Node;
 import java.util.Collection;
 import java.util.HashSet;
 
+import static com.hazelcast.config.DomConfigHelper.childElements;
+import static com.hazelcast.config.DomConfigHelper.cleanNodeName;
+import static com.hazelcast.config.DomConfigHelper.getBooleanValue;
 import static com.hazelcast.internal.config.ConfigValidator.checkEvictionConfig;
 import static com.hazelcast.util.StringUtil.upperCaseInternal;
 import static java.lang.Integer.parseInt;
@@ -68,7 +73,7 @@ public abstract class AbstractHazelcastBeanDefinitionParser extends AbstractBean
     /**
      * Base Helper class for Spring Xml Builder
      */
-    public abstract class SpringXmlBuilderHelper extends AbstractXmlConfigHelper {
+    public abstract static class SpringXmlBuilderHelper extends AbstractXmlConfigHelper {
 
         protected BeanDefinitionBuilder configBuilder;
 
@@ -99,6 +104,14 @@ public abstract class AbstractHazelcastBeanDefinitionParser extends AbstractBean
                     }
                 }
             }
+        }
+
+        protected String getTextContent(Node node) {
+            return DomConfigHelper.getTextContent(node, domLevel3);
+        }
+
+        protected String getAttribute(Node node, String attName) {
+            return DomConfigHelper.getAttribute(node, attName, domLevel3);
         }
 
         protected BeanDefinitionBuilder createBeanBuilder(Class clazz) {
@@ -164,6 +177,19 @@ public abstract class AbstractHazelcastBeanDefinitionParser extends AbstractBean
                     builder.addPropertyValue(name, value);
                 }
             }
+        }
+
+        protected void fillAttributesForAliasedDiscoveryStrategy(AliasedDiscoveryConfig config, Node node,
+                                                                 BeanDefinitionBuilder builder, String name) {
+            NamedNodeMap attributes = node.getAttributes();
+            if (attributes != null) {
+                for (int i = 0; i < attributes.getLength(); i++) {
+                    Node attribute = attributes.item(i);
+                    config.setProperty(attribute.getNodeName(), attribute.getNodeValue());
+                }
+            }
+            String propertyName = String.format("%sConfig", name);
+            builder.addPropertyValue(propertyName, config);
         }
 
         protected ManagedList parseListeners(Node node, Class listenerConfigClass) {

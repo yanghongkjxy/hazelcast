@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,15 @@ public class ClientConnectionStrategyConfig {
     private boolean asyncStart;
     private ReconnectMode reconnectMode = ReconnectMode.ON;
     private ConnectionRetryConfig connectionRetryConfig = new ConnectionRetryConfig();
+
+    public ClientConnectionStrategyConfig() {
+    }
+
+    public ClientConnectionStrategyConfig(ClientConnectionStrategyConfig config) {
+        asyncStart = config.asyncStart;
+        reconnectMode = config.reconnectMode;
+        connectionRetryConfig = new ConnectionRetryConfig(config.connectionRetryConfig);
+    }
 
     /**
      * Client instance creation won't block on {@link HazelcastClient#newHazelcastClient()} if this value is true
@@ -111,5 +120,34 @@ public class ClientConnectionStrategyConfig {
     public ClientConnectionStrategyConfig setConnectionRetryConfig(ConnectionRetryConfig connectionRetryConfig) {
         this.connectionRetryConfig = connectionRetryConfig;
         return this;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        ClientConnectionStrategyConfig that = (ClientConnectionStrategyConfig) o;
+
+        if (asyncStart != that.asyncStart) {
+            return false;
+        }
+        if (reconnectMode != that.reconnectMode) {
+            return false;
+        }
+        return connectionRetryConfig != null
+                ? connectionRetryConfig.equals(that.connectionRetryConfig) : that.connectionRetryConfig == null;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = (asyncStart ? 1 : 0);
+        result = 31 * result + (reconnectMode != null ? reconnectMode.hashCode() : 0);
+        result = 31 * result + (connectionRetryConfig != null ? connectionRetryConfig.hashCode() : 0);
+        return result;
     }
 }

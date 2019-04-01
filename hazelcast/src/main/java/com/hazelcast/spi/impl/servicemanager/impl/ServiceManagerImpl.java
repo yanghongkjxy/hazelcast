@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,8 +58,8 @@ import com.hazelcast.spi.SharedService;
 import com.hazelcast.spi.impl.NodeEngineImpl;
 import com.hazelcast.spi.impl.eventservice.impl.EventServiceImpl;
 import com.hazelcast.spi.impl.proxyservice.impl.ProxyServiceImpl;
-import com.hazelcast.spi.impl.servicemanager.RemoteServiceDescriptor;
-import com.hazelcast.spi.impl.servicemanager.RemoteServiceDescriptorProvider;
+import com.hazelcast.spi.impl.servicemanager.ServiceDescriptor;
+import com.hazelcast.spi.impl.servicemanager.ServiceDescriptorProvider;
 import com.hazelcast.spi.impl.servicemanager.ServiceInfo;
 import com.hazelcast.spi.impl.servicemanager.ServiceManager;
 import com.hazelcast.topic.impl.TopicService;
@@ -87,7 +87,7 @@ import static com.hazelcast.util.ExceptionUtil.rethrow;
 @SuppressWarnings({"checkstyle:classdataabstractioncoupling", "checkstyle:classfanoutcomplexity"})
 public final class ServiceManagerImpl implements ServiceManager {
 
-    private static final String PROVIDER_ID = "com.hazelcast.spi.impl.servicemanager.RemoteServiceDescriptorProvider";
+    private static final String PROVIDER_ID = ServiceDescriptorProvider.class.getName();
 
     private final NodeEngineImpl nodeEngine;
     private final ILogger logger;
@@ -180,16 +180,16 @@ public final class ServiceManagerImpl implements ServiceManager {
 
         try {
             ClassLoader classLoader = node.getConfigClassLoader();
-            Iterator<Class<RemoteServiceDescriptorProvider>> iterator
-                    = ServiceLoader.classIterator(RemoteServiceDescriptorProvider.class, PROVIDER_ID, classLoader);
+            Iterator<Class<ServiceDescriptorProvider>> iterator
+                    = ServiceLoader.classIterator(ServiceDescriptorProvider.class, PROVIDER_ID, classLoader);
 
             while (iterator.hasNext()) {
-                Class<RemoteServiceDescriptorProvider> clazz = iterator.next();
-                Constructor<RemoteServiceDescriptorProvider> constructor = clazz.getDeclaredConstructor();
-                RemoteServiceDescriptorProvider provider = constructor.newInstance();
-                RemoteServiceDescriptor[] services = provider.createRemoteServiceDescriptors();
+                Class<ServiceDescriptorProvider> clazz = iterator.next();
+                Constructor<ServiceDescriptorProvider> constructor = clazz.getDeclaredConstructor();
+                ServiceDescriptorProvider provider = constructor.newInstance();
+                ServiceDescriptor[] services = provider.createServiceDescriptors();
 
-                for (RemoteServiceDescriptor serviceDescriptor : services) {
+                for (ServiceDescriptor serviceDescriptor : services) {
                     registerService(serviceDescriptor.getServiceName(), serviceDescriptor.getService(nodeEngine));
                 }
             }
@@ -286,7 +286,11 @@ public final class ServiceManagerImpl implements ServiceManager {
             } catch (NoSuchMethodException ignored) {
                 ignore(ignored);
             }
-            return ClassLoaderUtil.newInstance(serviceClass, classLoader, className);
+            final Constructor constructor = serviceClass.getDeclaredConstructor();
+            if (!constructor.isAccessible()) {
+                constructor.setAccessible(true);
+            }
+            return constructor.newInstance();
         } catch (Exception e) {
             logger.severe(e);
         }

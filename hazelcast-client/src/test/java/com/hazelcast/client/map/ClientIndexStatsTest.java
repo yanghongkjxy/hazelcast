@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,19 +27,24 @@ import com.hazelcast.monitor.LocalIndexStats;
 import com.hazelcast.monitor.LocalMapStats;
 import com.hazelcast.monitor.impl.LocalIndexStatsImpl;
 import com.hazelcast.monitor.impl.LocalMapStatsImpl;
+import com.hazelcast.monitor.impl.PerIndexStats;
 import com.hazelcast.query.PartitionPredicate;
 import com.hazelcast.query.Predicates;
+import com.hazelcast.query.impl.Indexes;
 import com.hazelcast.test.HazelcastParallelParametersRunnerFactory;
 import com.hazelcast.test.annotation.ParallelTest;
 import com.hazelcast.test.annotation.QuickTest;
 import org.junit.After;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Arrays.asList;
@@ -103,21 +108,31 @@ public class ClientIndexStatsTest extends LocalIndexStatsTest {
         assertEquals(0, map2.getLocalMapStats().getIndexStats().get("this").getQueryCount());
     }
 
+    @Test
+    @Ignore
+    @Override
+    public void testAverageQuerySelectivityCalculation_WhenSomePartitionsAreEmpty() {
+        // do nothing
+    }
+
     @Override
     protected LocalMapStats stats() {
-        LocalMapStats stats1 = map1.getLocalMapStats();
-        LocalMapStats stats2 = map2.getLocalMapStats();
-        return combineStats(stats1, stats2);
+        return combineStats(map1, map2);
     }
 
     @Override
     protected LocalMapStats noStats() {
-        LocalMapStats stats1 = noStatsMap1.getLocalMapStats();
-        LocalMapStats stats2 = noStatsMap2.getLocalMapStats();
-        return combineStats(stats1, stats2);
+        return combineStats(noStatsMap1, noStatsMap2);
     }
 
-    private static LocalMapStats combineStats(LocalMapStats stats1, LocalMapStats stats2) {
+    private static LocalMapStats combineStats(IMap map1, IMap map2) {
+        LocalMapStats stats1 = map1.getLocalMapStats();
+        LocalMapStats stats2 = map2.getLocalMapStats();
+
+        List<Indexes> allIndexes = new ArrayList<Indexes>();
+        allIndexes.addAll(getAllIndexes(map1));
+        allIndexes.addAll(getAllIndexes(map2));
+
         LocalMapStatsImpl combinedStats = new LocalMapStatsImpl();
 
         assertEquals(stats1.getQueryCount(), stats2.getQueryCount());
@@ -138,10 +153,18 @@ public class ClientIndexStatsTest extends LocalIndexStatsTest {
 
             assertEquals(indexStats1.getQueryCount(), indexStats2.getQueryCount());
             combinedIndexStats.setQueryCount(indexStats1.getQueryCount());
-            combinedIndexStats.setAverageHitSelectivity(
-                    (indexStats1.getAverageHitSelectivity() + indexStats2.getAverageHitSelectivity()) / 2.0);
             combinedIndexStats
                     .setAverageHitLatency((indexStats1.getAverageHitLatency() + indexStats2.getAverageHitLatency()) / 2);
+
+            long totalHitCount = 0;
+            double totalNormalizedHitCardinality = 0.0;
+            for (Indexes indexes : allIndexes) {
+                PerIndexStats perIndexStats = indexes.getIndex(indexEntry.getKey()).getPerIndexStats();
+                totalHitCount += perIndexStats.getHitCount();
+                totalNormalizedHitCardinality += perIndexStats.getTotalNormalizedHitCardinality();
+            }
+            combinedIndexStats
+                    .setAverageHitSelectivity(totalHitCount == 0 ? 0.0 : 1.0 - totalNormalizedHitCardinality / totalHitCount);
 
             combinedIndexStats.setInsertCount(indexStats1.getInsertCount() + indexStats2.getInsertCount());
             combinedIndexStats.setTotalInsertLatency(indexStats1.getTotalInsertLatency() + indexStats2.getTotalInsertLatency());

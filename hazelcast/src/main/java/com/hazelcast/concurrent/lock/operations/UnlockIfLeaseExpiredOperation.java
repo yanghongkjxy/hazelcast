@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,12 +25,13 @@ import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.spi.NodeEngine;
 import com.hazelcast.spi.ObjectNamespace;
+import com.hazelcast.spi.impl.QuorumCheckAwareOperation;
 import com.hazelcast.spi.partition.IPartition;
 import com.hazelcast.spi.partition.IPartitionService;
 
 import java.io.IOException;
 
-public final class UnlockIfLeaseExpiredOperation extends UnlockOperation {
+public final class UnlockIfLeaseExpiredOperation extends UnlockOperation implements QuorumCheckAwareOperation {
 
     private int version;
 
@@ -43,7 +44,7 @@ public final class UnlockIfLeaseExpiredOperation extends UnlockOperation {
     }
 
     @Override
-    public void run() throws Exception {
+    public void run() {
         LockStoreImpl lockStore = getLockStore();
         int lockVersion = lockStore.getVersion(key);
         ILogger logger = getLogger();
@@ -93,5 +94,10 @@ public final class UnlockIfLeaseExpiredOperation extends UnlockOperation {
     @Override
     public int getId() {
         return LockDataSerializerHook.UNLOCK_IF_LEASE_EXPIRED;
+    }
+
+    @Override
+    public boolean shouldCheckQuorum() {
+        return false;
     }
 }

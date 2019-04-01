@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,13 +31,17 @@ public abstract class AbstractIndexAwarePredicate<K, V> extends AbstractPredicat
         super(attributeName);
     }
 
+    protected Index getIndex(QueryContext queryContext) {
+        return matchIndex(queryContext, QueryContext.IndexMatchHint.NONE);
+    }
+
+    protected Index matchIndex(QueryContext queryContext, QueryContext.IndexMatchHint matchHint) {
+        return queryContext.matchIndex(attributeName, matchHint);
+    }
+
     @Override
     public boolean isIndexed(QueryContext queryContext) {
         return getIndex(queryContext) != null;
-    }
-
-    protected Index getIndex(QueryContext queryContext) {
-        return queryContext.getIndex(attributeName);
     }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package com.hazelcast.ringbuffer.impl;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.HazelcastInstanceAware;
 import com.hazelcast.core.IFunction;
-import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.Data;
@@ -213,10 +212,7 @@ public class ReadResultSetImpl<O, E> extends AbstractList<E>
             out.writeData(items[k]);
         }
         out.writeLongArray(seqs);
-        // RU_COMPAT_3_9
-        if (out.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            out.writeLong(nextSeq);
-        }
+        out.writeLong(nextSeq);
     }
 
     @Override
@@ -228,11 +224,6 @@ public class ReadResultSetImpl<O, E> extends AbstractList<E>
             items[k] = in.readData();
         }
         seqs = in.readLongArray();
-        // RU_COMPAT_3_9
-        if (in.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            nextSeq = in.readLong();
-        } else {
-            nextSeq = ReadResultSet.SEQUENCE_UNAVAILABLE;
-        }
+        nextSeq = in.readLong();
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import com.hazelcast.core.HazelcastInstanceAware;
 import com.hazelcast.instance.Node;
 import com.hazelcast.nio.serialization.DataSerializable;
 import com.hazelcast.spi.NodeAware;
-import com.hazelcast.spi.annotation.Beta;
 
 /**
  * Policy for merging data structure values after a split-brain has been healed.
@@ -51,7 +50,6 @@ import com.hazelcast.spi.annotation.Beta;
  *            or a composition like {@code MergingEntry<String, V> & MergingHits<V> & MergingLastAccessTime<V>}
  * @since 3.10
  */
-@Beta
 public interface SplitBrainMergePolicy<V, T extends MergingValue<V>> extends DataSerializable {
 
     /**

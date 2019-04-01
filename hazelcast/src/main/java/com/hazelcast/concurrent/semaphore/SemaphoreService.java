@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package com.hazelcast.concurrent.semaphore;
 import com.hazelcast.concurrent.semaphore.operations.SemaphoreDetachMemberOperation;
 import com.hazelcast.concurrent.semaphore.operations.SemaphoreReplicationOperation;
 import com.hazelcast.config.SemaphoreConfig;
-import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.spi.ClientAwareService;
 import com.hazelcast.spi.ManagedService;
 import com.hazelcast.spi.MemberAttributeServiceEvent;
@@ -213,10 +212,6 @@ public class SemaphoreService implements ManagedService, MigrationAwareService, 
 
     @Override
     public String getQuorumName(final String name) {
-        // RU_COMPAT_3_9
-        if (nodeEngine.getClusterService().getClusterVersion().isLessThan(Versions.V3_10)) {
-            return null;
-        }
         Object quorumName = getOrPutSynchronized(quorumConfigCache, name, quorumConfigCacheMutexFactory, quorumConfigConstructor);
         return quorumName == NULL_OBJECT ? null : (String) quorumName;
     }

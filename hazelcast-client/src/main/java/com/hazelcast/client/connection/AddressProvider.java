@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,6 @@
 
 package com.hazelcast.client.connection;
 
-import com.hazelcast.nio.Address;
-
-import java.util.Collection;
 
 /**
  * Provides initial addresses for client to find and connect to a node
@@ -28,6 +25,6 @@ public interface AddressProvider {
     /**
      * @return The possible member addresses to connect to.
      */
-    Collection<Address> loadAddresses();
+    Addresses loadAddresses();
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ public class ClientServiceTest extends ClientTestSupport {
     public void testNumberOfClients_afterUnAuthenticatedClient() {
         final HazelcastInstance instance = hazelcastFactory.newHazelcastInstance();
         final ClientConfig clientConfig = new ClientConfig();
-        clientConfig.getGroupConfig().setPassword("wrongPassword");
+        clientConfig.getGroupConfig().setName("wrongName");
 
         try {
             hazelcastFactory.newHazelcastClient(clientConfig);
@@ -127,7 +127,7 @@ public class ClientServiceTest extends ClientTestSupport {
         final HazelcastInstance instance1 = hazelcastFactory.newHazelcastInstance();
         final HazelcastInstance instance2 = hazelcastFactory.newHazelcastInstance();
         final ClientConfig clientConfig = new ClientConfig();
-        clientConfig.getGroupConfig().setPassword("wrongPassword");
+        clientConfig.getGroupConfig().setName("wrongName");
 
         try {
             hazelcastFactory.newHazelcastClient(clientConfig);
@@ -146,7 +146,7 @@ public class ClientServiceTest extends ClientTestSupport {
         final HazelcastInstance instance1 = hazelcastFactory.newHazelcastInstance();
         final HazelcastInstance instance2 = hazelcastFactory.newHazelcastInstance();
         final ClientConfig clientConfig = new ClientConfig();
-        clientConfig.getGroupConfig().setPassword("wrongPassword");
+        clientConfig.getGroupConfig().setName("wrongName");
 
         try {
             hazelcastFactory.newHazelcastClient(clientConfig);

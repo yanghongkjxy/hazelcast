@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,9 @@
 package com.hazelcast.client.spi.impl.discovery;
 
 import com.hazelcast.client.connection.AddressProvider;
+import com.hazelcast.client.connection.Addresses;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.LoggingService;
-import com.hazelcast.nio.Address;
-
-import java.util.Collection;
-import java.util.Collections;
 
 public class HazelcastCloudAddressProvider implements AddressProvider {
 
@@ -39,14 +36,12 @@ public class HazelcastCloudAddressProvider implements AddressProvider {
     }
 
     @Override
-    public Collection<Address> loadAddresses() {
+    public Addresses loadAddresses() {
         try {
-            return cloudDiscovery.discoverNodes().keySet();
+            return new Addresses(cloudDiscovery.discoverNodes().keySet());
         } catch (Exception e) {
             logger.warning("Failed to load addresses from hazelcast.cloud : " + e.getMessage());
         }
-        return Collections.emptyList();
+        return new Addresses();
     }
-
-
 }

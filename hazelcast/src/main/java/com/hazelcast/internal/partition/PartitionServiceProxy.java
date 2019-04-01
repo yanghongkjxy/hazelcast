@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -229,8 +229,10 @@ public class PartitionServiceProxy implements PartitionService {
         @Override
         public int compareTo(Object o) {
             PartitionProxy partition = (PartitionProxy) o;
-            Integer id = partitionId;
-            return (id.compareTo(partition.getPartitionId()));
+            int otherPartitionId = partition.partitionId;
+            return (partitionId < otherPartitionId)
+                    ? -1
+                    : ((partitionId == otherPartitionId) ? 0 : 1);
         }
 
         @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -85,6 +85,18 @@ public interface MerkleTree extends MerkleTreeView {
      * @param consumer  The action which is called for each key
      */
     void forEachKeyOfNode(int nodeOrder, Consumer<Object> consumer);
+
+    /**
+     * Returns the number of the keys under the specified node.
+     * <p>
+     * The node referenced by {@code nodeOrder} can be either a leaf or a
+     * non-leaf node. In the latter case the method returns with the sum
+     * of the key counts of the subtree under the specified node
+     *
+     * @param nodeOrder The node for which the key count is queried
+     * @return the number of the keys under the specified node
+     */
+    int getNodeKeyCount(int nodeOrder);
 
     /**
      * Returns the memory footprint of Merkle Tree in bytes

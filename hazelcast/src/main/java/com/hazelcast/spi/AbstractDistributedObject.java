@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -174,52 +174,52 @@ public abstract class AbstractDistributedObject<S extends RemoteService> impleme
     }
 
     protected boolean isClusterVersionLessThan(Version version) {
-        Version clusterVersion = nodeEngine.getClusterService().getClusterVersion();
+        Version clusterVersion = getNodeEngine().getClusterService().getClusterVersion();
         return clusterVersion.isLessThan(version);
     }
 
     protected boolean isClusterVersionUnknownOrLessThan(Version version) {
-        Version clusterVersion = nodeEngine.getClusterService().getClusterVersion();
+        Version clusterVersion = getNodeEngine().getClusterService().getClusterVersion();
         return clusterVersion.isUnknownOrLessThan(version);
     }
 
     protected boolean isClusterVersionLessOrEqual(Version version) {
-        Version clusterVersion = nodeEngine.getClusterService().getClusterVersion();
+        Version clusterVersion = getNodeEngine().getClusterService().getClusterVersion();
         return clusterVersion.isLessOrEqual(version);
     }
 
     protected boolean isClusterVersionUnknownOrLessOrEqual(Version version) {
-        Version clusterVersion = nodeEngine.getClusterService().getClusterVersion();
+        Version clusterVersion = getNodeEngine().getClusterService().getClusterVersion();
         return clusterVersion.isUnknownOrLessOrEqual(version);
     }
 
     protected boolean isClusterVersionGreaterThan(Version version) {
-        Version clusterVersion = nodeEngine.getClusterService().getClusterVersion();
+        Version clusterVersion = getNodeEngine().getClusterService().getClusterVersion();
         return clusterVersion.isGreaterThan(version);
     }
 
     protected boolean isClusterVersionUnknownOrGreaterThan(Version version) {
-        Version clusterVersion = nodeEngine.getClusterService().getClusterVersion();
+        Version clusterVersion = getNodeEngine().getClusterService().getClusterVersion();
         return clusterVersion.isUnknownOrGreaterThan(version);
     }
 
     protected boolean isClusterVersionGreaterOrEqual(Version version) {
-        Version clusterVersion = nodeEngine.getClusterService().getClusterVersion();
+        Version clusterVersion = getNodeEngine().getClusterService().getClusterVersion();
         return clusterVersion.isGreaterOrEqual(version);
     }
 
     protected boolean isClusterVersionUnknownOrGreaterOrEqual(Version version) {
-        Version clusterVersion = nodeEngine.getClusterService().getClusterVersion();
+        Version clusterVersion = getNodeEngine().getClusterService().getClusterVersion();
         return clusterVersion.isUnknownOrGreaterOrEqual(version);
     }
 
     protected boolean isClusterVersionEqualTo(Version version) {
-        Version clusterVersion = nodeEngine.getClusterService().getClusterVersion();
+        Version clusterVersion = getNodeEngine().getClusterService().getClusterVersion();
         return clusterVersion.isEqualTo(version);
     }
 
     protected boolean isClusterVersionUnknown() {
-        Version clusterVersion = nodeEngine.getClusterService().getClusterVersion();
+        Version clusterVersion = getNodeEngine().getClusterService().getClusterVersion();
         return clusterVersion.isUnknown();
     }
 }

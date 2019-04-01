@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 
 package com.hazelcast.config;
 
-import com.hazelcast.spi.annotation.Beta;
-
 /**
  * Configures the replication mechanism for all
  * {@link com.hazelcast.crdt.CRDT} implementations.
@@ -25,7 +23,6 @@ import com.hazelcast.spi.annotation.Beta;
  * and in each round the state is replicated up to the configured number
  * of members.
  */
-@Beta
 public class CRDTReplicationConfig {
     /**
      * The default period between two CRDT replication rounds.

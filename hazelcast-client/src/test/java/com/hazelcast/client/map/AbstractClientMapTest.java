@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,10 @@ public abstract class AbstractClientMapTest extends HazelcastTestSupport {
         MapConfig mapConfig = new MapConfig("mapWithTTL");
         mapConfig.setTimeToLiveSeconds(1);
         config.addMapConfig(mapConfig);
+
+        MapConfig mapConfig1 = new MapConfig("mapWithMaxIdle");
+        mapConfig1.setMaxIdleSeconds(11);
+        config.addMapConfig(mapConfig1);
         ClientConfig clientConfig = getClientConfig();
 
         member1 = hazelcastFactory.newHazelcastInstance(config);

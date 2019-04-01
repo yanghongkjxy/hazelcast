@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,14 @@ import com.hazelcast.cache.CacheEntryView;
 import com.hazelcast.cache.CacheMergePolicy;
 import com.hazelcast.cache.impl.record.CacheRecord;
 import com.hazelcast.config.CacheConfig;
+import com.hazelcast.internal.eviction.ExpiredKey;
 import com.hazelcast.internal.nearcache.impl.invalidation.InvalidationQueue;
 import com.hazelcast.map.impl.MapEntries;
-import com.hazelcast.wan.impl.CallerProvenance;
-import com.hazelcast.internal.eviction.ExpiredKey;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.spi.ObjectNamespace;
 import com.hazelcast.spi.merge.SplitBrainMergePolicy;
 import com.hazelcast.spi.merge.SplitBrainMergeTypes.CacheMergeTypes;
+import com.hazelcast.wan.impl.CallerProvenance;
 
 import javax.cache.expiry.ExpiryPolicy;
 import javax.cache.processor.EntryProcessor;
@@ -182,7 +182,6 @@ public interface ICacheRecordStore {
     boolean remove(Data key, String caller, String origin, int completionId);
 
 
-
     /**
      * Atomically removes the mapping for a key only if currently mapped to the
      * given value.
@@ -287,7 +286,7 @@ public interface ICacheRecordStore {
      * @param keys         keys for the entries
      * @param expiryPolicy custom expiry policy or null to use configured default value
      */
-    void setExpiryPolicy(Collection<Data> keys, Object expiryPolicy, String source);
+    boolean setExpiryPolicy(Collection<Data> keys, Object expiryPolicy, String source);
 
     Object getExpiryPolicy(Data key);
 
@@ -499,7 +498,7 @@ public interface ICacheRecordStore {
      */
     boolean evictIfRequired();
 
-    boolean evictOneEntry();
+    void sampleAndForceRemoveEntries(int count);
 
     /**
      * Determines whether wan replication is enabled or not for this record store.
@@ -518,8 +517,8 @@ public interface ICacheRecordStore {
     /**
      * Merges the given {@link CacheMergeTypes} via the given {@link SplitBrainMergePolicy}.
      *
-     * @param mergingEntry the {@link CacheMergeTypes} instance to merge
-     * @param mergePolicy  the {@link SplitBrainMergePolicy} instance to apply
+     * @param mergingEntry     the {@link CacheMergeTypes} instance to merge
+     * @param mergePolicy      the {@link SplitBrainMergePolicy} instance to apply
      * @param callerProvenance
      * @return the used {@link CacheRecord} if merge is applied, otherwise {@code null}
      */
@@ -529,12 +528,12 @@ public interface ICacheRecordStore {
     /**
      * Merges the given {@link CacheEntryView} via the given {@link CacheMergePolicy}.
      *
-     * @param cacheEntryView the {@link CacheEntryView} instance to merge
-     * @param mergePolicy    the {@link CacheMergePolicy} instance to apply
-     * @param caller         the UUID of the caller
-     * @param origin         source of the call
-     * @param completionId   User generated id which shall be received as a field of the cache event upon completion of
-     *                       the request in the cluster.
+     * @param cacheEntryView   the {@link CacheEntryView} instance to merge
+     * @param mergePolicy      the {@link CacheMergePolicy} instance to apply
+     * @param caller           the UUID of the caller
+     * @param origin           source of the call
+     * @param completionId     User generated id which shall be received as a field of the cache event upon completion of
+     *                         the request in the cluster.
      * @param callerProvenance
      * @return the used {@link CacheRecord} if merge is applied, otherwise {@code null}
      */
@@ -553,5 +552,7 @@ public interface ICacheRecordStore {
      */
     void evictExpiredEntries(int percentage);
 
-    InvalidationQueue<ExpiredKey> getExpiredKeys();
+    InvalidationQueue<ExpiredKey> getExpiredKeysQueue();
+
+    void disposeDeferredBlocks();
 }

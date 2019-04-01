@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,9 +29,13 @@ import com.hazelcast.core.IMap;
 import com.hazelcast.core.MapLoader;
 import com.hazelcast.core.MapStoreAdapter;
 import com.hazelcast.core.PostProcessingMapStore;
+import com.hazelcast.internal.json.Json;
+import com.hazelcast.internal.json.JsonValue;
+import com.hazelcast.core.HazelcastJsonValue;
 import com.hazelcast.map.impl.MapEntries;
 import com.hazelcast.map.impl.MapService;
 import com.hazelcast.map.impl.operation.MultipleEntryWithPredicateOperation;
+import com.hazelcast.map.impl.proxy.MapProxyImpl;
 import com.hazelcast.map.listener.EntryAddedListener;
 import com.hazelcast.map.listener.EntryRemovedListener;
 import com.hazelcast.map.listener.EntryUpdatedListener;
@@ -324,8 +328,8 @@ public class EntryProcessorTest extends HazelcastTestSupport {
         // the entry has been removed from the primary store but not the backup,
         // so let's kill the primary and execute the logging processor again
         HazelcastInstance newPrimary;
-        String aMemberUiid = instance1.getPartitionService().getPartition("a").getOwner().getUuid();
-        if (aMemberUiid.equals(instance1.getCluster().getLocalMember().getUuid())) {
+        String aMemberUuid = instance1.getPartitionService().getPartition("a").getOwner().getUuid();
+        if (aMemberUuid.equals(instance1.getCluster().getLocalMember().getUuid())) {
             instance1.shutdown();
             newPrimary = instance2;
         } else {
@@ -459,6 +463,72 @@ public class EntryProcessorTest extends HazelcastTestSupport {
         instance1.shutdown();
         for (Object key : keys) {
             assertEquals(expectedValue, map.get(key));
+        }
+    }
+
+    @Test
+    public void testEntryProcessorOnJsonStrings() {
+        Config cfg = getConfig();
+        TestHazelcastInstanceFactory factory = createHazelcastInstanceFactory(2);
+        HazelcastInstance instance1 = factory.newHazelcastInstance(cfg);
+        HazelcastInstance instance2 = factory.newHazelcastInstance(cfg);
+
+        IMap<String, HazelcastJsonValue> map = instance2.getMap(MAP_NAME);
+        Set<String> keys = new HashSet<String>();
+        for (int i = 0; i < 4; i++) {
+            final String key = generateKeyOwnedBy(instance1);
+            keys.add(key);
+        }
+
+        for (String key : keys) {
+            HazelcastJsonValue jsonString = new HazelcastJsonValue("{ \"value\": \"" + key + "\" }");
+            map.put(key, jsonString);
+        }
+
+        map.executeOnKeys(keys, new JsonStringPropAdder());
+
+        for (String key : keys) {
+            HazelcastJsonValue jsonObject = map.get(key);
+            assertNotNull(jsonObject);
+            assertTrue(Json.parse(jsonObject.toString()).asObject().get(JsonStringPropAdder.NEW_FIELD).asBoolean());
+        }
+
+        instance1.shutdown();
+        for (Object key : keys) {
+            HazelcastJsonValue jsonObject = map.get(key);
+            assertNotNull(jsonObject);
+            assertTrue(Json.parse(jsonObject.toString()).asObject().get(JsonStringPropAdder.NEW_FIELD).asBoolean());
+        }
+    }
+
+    @Test
+    public void testPutJsonFromEntryProcessor() {
+        Config cfg = getConfig();
+        TestHazelcastInstanceFactory factory = createHazelcastInstanceFactory(1);
+        HazelcastInstance instance = factory.newHazelcastInstance(cfg);
+        IMap<Integer, HazelcastJsonValue> map = instance.getMap(MAP_NAME);
+
+        map.executeOnKey(1, new JsonPutEntryProcessor());
+
+    }
+
+    public static class JsonPutEntryProcessor implements EntryProcessor<Integer, HazelcastJsonValue> {
+
+        @Override
+        public Object process(Map.Entry<Integer, HazelcastJsonValue> entry) {
+            HazelcastJsonValue jsonValue = new HazelcastJsonValue("{\"123\" : \"123\"}");
+            entry.setValue(jsonValue);
+            return "anyResult";
+        }
+
+        @Override
+        public EntryBackupProcessor<Integer, HazelcastJsonValue> getBackupProcessor() {
+            return new EntryBackupProcessor<Integer, HazelcastJsonValue>() {
+                @Override
+                public void processBackup(Map.Entry<Integer, HazelcastJsonValue> entry) {
+                    process(entry);
+                }
+            };
         }
     }
 
@@ -1209,7 +1279,16 @@ public class EntryProcessorTest extends HazelcastTestSupport {
     }
 
     @Test
-    public void testExecuteOnKeys() {
+    public void testExecuteOnKeys() throws Exception {
+        testExecuteOrSubmitOnKeys(false);
+    }
+
+    @Test
+    public void testSubmitToKeys() throws Exception {
+        testExecuteOrSubmitOnKeys(true);
+    }
+
+    private void testExecuteOrSubmitOnKeys(boolean sync) throws Exception {
         Config config = getConfig();
         TestHazelcastInstanceFactory nodeFactory = createHazelcastInstanceFactory(2);
         HazelcastInstance instance1 = nodeFactory.newHazelcastInstance(config);
@@ -1227,7 +1306,12 @@ public class EntryProcessorTest extends HazelcastTestSupport {
         keys.add(7);
         keys.add(9);
 
-        Map<Integer, Object> resultMap = map2.executeOnKeys(keys, new IncrementorEntryProcessor());
+        Map<Integer, Object> resultMap;
+        if (sync) {
+            resultMap = map2.executeOnKeys(keys, new IncrementorEntryProcessor());
+        } else {
+            resultMap = ((MapProxyImpl<Integer, Integer>) map2).submitToKeys(keys, new IncrementorEntryProcessor()).get();
+        }
         assertEquals(1, resultMap.get(1));
         assertEquals(1, resultMap.get(4));
         assertEquals(1, resultMap.get(7));
@@ -1241,6 +1325,28 @@ public class EntryProcessorTest extends HazelcastTestSupport {
         assertEquals(1, (int) map.get(7));
         assertEquals(0, (int) map.get(8));
         assertEquals(1, (int) map.get(9));
+    }
+
+    @Test
+    public void testExecuteOnKeys_nullKeyInSet() {
+        Config config = getConfig();
+        TestHazelcastInstanceFactory nodeFactory = createHazelcastInstanceFactory(2);
+        HazelcastInstance instance1 = nodeFactory.newHazelcastInstance(config);
+
+        IMap<Integer, Integer> map = instance1.getMap(MAP_NAME);
+        for (int i = 0; i < 10; i++) {
+            map.put(i, 0);
+        }
+
+        Set<Integer> keys = new HashSet<Integer>();
+        keys.add(1);
+        keys.add(null);
+
+        try {
+            map.executeOnKeys(keys, new IncrementorEntryProcessor());
+            fail("call didn't fail as documented in executeOnKeys' javadoc");
+        } catch (NullPointerException expected) {
+        }
     }
 
     /**
@@ -1729,6 +1835,20 @@ public class EntryProcessorTest extends HazelcastTestSupport {
         public Object process(final Map.Entry<String, SimpleValue> entry) {
             final SimpleValue value = entry.getValue();
             value.i++;
+            return null;
+        }
+    }
+
+    private static class JsonStringPropAdder extends AbstractEntryProcessor<String, HazelcastJsonValue> {
+
+        private static final String NEW_FIELD = "addedField";
+
+        @Override
+        public Object process(Map.Entry<String, HazelcastJsonValue> entry) {
+            HazelcastJsonValue value = entry.getValue();
+            JsonValue jsonValue = Json.parse(value.toString());
+            jsonValue.asObject().add(NEW_FIELD, true);
+            entry.setValue(new HazelcastJsonValue(jsonValue.toString()));
             return null;
         }
     }

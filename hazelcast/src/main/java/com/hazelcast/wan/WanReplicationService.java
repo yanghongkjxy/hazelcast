@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,10 +25,11 @@ import com.hazelcast.spi.StatisticsAwareService;
 import com.hazelcast.wan.impl.DistributedServiceWanEventCounters;
 
 /**
- * This is the WAN replications service API core interface. The WanReplicationService needs to
- * be capable of creating the actual {@link com.hazelcast.wan.WanReplicationPublisher} instances
- * to replicate values to other clusters over the wide area network, so it has to deal with long
- * delays, slow uploads and higher latencies.
+ * This is the WAN replications service API core interface. The
+ * WanReplicationService needs to be capable of creating the actual
+ * {@link com.hazelcast.wan.WanReplicationPublisher} instances to replicate
+ * values to other clusters over the wide area network, so it has to deal
+ * with long delays, slow uploads and higher latencies.
  */
 public interface WanReplicationService extends CoreService, StatisticsAwareService<LocalWanStats> {
 
@@ -91,8 +92,10 @@ public interface WanReplicationService extends CoreService, StatisticsAwareServi
      * @param targetGroupName    the group name on the target cluster
      * @param mapName            the map name
      * @throws UnsupportedOperationException if the operation is not supported (not EE)
-     * @throws InvalidConfigurationException if there is no WAN replication config for {@code wanReplicationName}
-     * @throws SyncFailedException           if there is a anti-entropy request in progress
+     * @throws InvalidConfigurationException if there is no WAN replication
+     *                                       config for {@code wanReplicationName}
+     * @throws SyncFailedException           if there is a anti-entropy request in
+     *                                       progress
      */
     void syncMap(String wanReplicationName, String targetGroupName, String mapName);
 
@@ -103,7 +106,8 @@ public interface WanReplicationService extends CoreService, StatisticsAwareServi
      * @param wanReplicationName the name of the wan replication config
      * @param targetGroupName    the group name on the target cluster
      * @throws UnsupportedOperationException if the operation is not supported (not EE)
-     * @throws InvalidConfigurationException if there is no WAN replication config for {@code wanReplicationName}
+     * @throws InvalidConfigurationException if there is no WAN replication config for
+     *                                       {@code wanReplicationName}
      * @throws SyncFailedException           if there is a anti-entropy request in progress
      */
     void syncAllMaps(String wanReplicationName, String targetGroupName);
@@ -128,17 +132,44 @@ public interface WanReplicationService extends CoreService, StatisticsAwareServi
      *
      * @param wanReplicationName the name of the wan replication config
      * @param targetGroupName    the target cluster group name
+     * @throws UnsupportedOperationException if invoked on OS
      */
     void clearQueues(String wanReplicationName, String targetGroupName);
 
     /**
-     * Adds a new {@link WanReplicationConfig} to this member and creates the {@link WanReplicationPublisher}s specified
-     * in the config.
+     * Adds a new {@link WanReplicationConfig} to this member and creates the
+     * {@link WanReplicationPublisher}s specified in the config.
+     * This method can also accept WAN configs with an existing WAN replication
+     * name. Such configs will be merged into the existing WAN replication
+     * config by adding publishers with publisher IDs which are not already part
+     * of the existing configuration.
+     *
+     * @throws UnsupportedOperationException if invoked on OS
      */
-    void addWanReplicationConfig(WanReplicationConfig wanConfig);
+    void addWanReplicationConfigLocally(WanReplicationConfig wanConfig);
 
     /**
-     * Returns current status of WAN sync operation
+     * Adds a new {@link WanReplicationConfig} to the cluster.
+     * This method can also accept WAN configs with an existing WAN replication
+     * name. Such configs will be merged into the existing WAN replication
+     * config by adding publishers with publisher IDs which are not already part
+     * of the existing configuration.
+     * The return value is a best-effort guess at the result of adding WAN
+     * replication config based on the existing local WAN replication config.
+     * An exact result is difficult to calculate since not all members might
+     * have the same existing configuration and there might be a concurrent
+     * request to add overlapping WAN replication config.
+     *
+     * @param wanConfig the WAN replication config to add
+     * @return a best-effort guess at the result of adding WAN replication config
+     * @throws UnsupportedOperationException if invoked on OS
+     * @see #addWanReplicationConfigLocally(WanReplicationConfig)
+     */
+    AddWanConfigResult addWanReplicationConfig(WanReplicationConfig wanConfig);
+
+    /**
+     * Returns current status of WAN sync operation or {@code null} when there
+     * is no status.
      */
     WanSyncState getWanSyncState();
 

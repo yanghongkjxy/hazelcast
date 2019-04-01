@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import com.hazelcast.client.spi.impl.ListenerMessageCodec;
  * Client service to add/remove remote listeners.
  *
  * For smart client, it registers local  listeners to all nodes in cluster.
- * For dummy client, it registers global listener to one node.
+ * For unisocket client, it registers global listener to one node.
  */
 public interface ClientListenerService {
 

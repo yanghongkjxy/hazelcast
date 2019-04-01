@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.hazelcast.map;
 
 import com.hazelcast.config.Config;
 import com.hazelcast.config.InMemoryFormat;
+import com.hazelcast.config.MapConfig;
 import com.hazelcast.core.EntryView;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
@@ -61,12 +62,12 @@ public class ExpirationTimeTest extends HazelcastTestSupport {
     public void testExpirationTime_withTTL_withShorterMaxIdle() {
         IMap<Integer, Integer> map = createMap();
 
-        map.put(1, 1, ONE_MINUTE_IN_MILLIS, MILLISECONDS, 3, SECONDS);
+        map.put(1, 1, ONE_MINUTE_IN_MILLIS, MILLISECONDS, 10, SECONDS);
 
         EntryView<Integer, Integer> entryView = map.getEntryView(1);
         long creationTime = entryView.getCreationTime();
 
-        long expectedExpirationTime = creationTime + SECONDS.toMillis(3);
+        long expectedExpirationTime = creationTime + SECONDS.toMillis(10);
         assertEquals(expectedExpirationTime, entryView.getExpirationTime());
     }
 
@@ -74,12 +75,12 @@ public class ExpirationTimeTest extends HazelcastTestSupport {
     public void testExpirationTime_withShorterTTL_andMaxIdle() {
         IMap<Integer, Integer> map = createMap();
 
-        map.put(1, 1, 2, SECONDS, 10, SECONDS);
+        map.put(1, 1, 10, SECONDS, 20, SECONDS);
 
         EntryView<Integer, Integer> entryView = map.getEntryView(1);
         long creationTime = entryView.getCreationTime();
 
-        long expectedExpirationTime = creationTime + SECONDS.toMillis(2);
+        long expectedExpirationTime = creationTime + SECONDS.toMillis(10);
         assertEquals(expectedExpirationTime, entryView.getExpirationTime());
     }
 
@@ -172,15 +173,15 @@ public class ExpirationTimeTest extends HazelcastTestSupport {
 
     @Test
     public void testExpirationTime_withMaxIdleTime_withEntryCustomMaxIdle() {
-        IMap<Integer, Integer> map = createMapWithMaxIdleSeconds(10);
+        IMap<Integer, Integer> map = createMapWithMaxIdleSeconds(20);
 
-        map.put(1, 1, -1, MILLISECONDS, 2, SECONDS);
+        map.put(1, 1, -1, MILLISECONDS, 10, SECONDS);
 
         EntryView<Integer, Integer> entryView = map.getEntryView(1);
         long creationTime = entryView.getCreationTime();
         long expirationTime = entryView.getExpirationTime();
 
-        long expectedExpirationTime = creationTime + TimeUnit.SECONDS.toMillis(2);
+        long expectedExpirationTime = creationTime + TimeUnit.SECONDS.toMillis(10);
         assertEquals(expectedExpirationTime, expirationTime);
     }
 
@@ -314,6 +315,36 @@ public class ExpirationTimeTest extends HazelcastTestSupport {
         assertEquals(expirationTimeAfterReplace, expirationTimeAfterPut);
     }
 
+    @Test
+    public void last_access_time_updated_on_primary_when_read_backup_data_enabled() {
+        String mapName = "test";
+
+        Config config = getConfig();
+        MapConfig mapConfig = config.getMapConfig(mapName);
+        mapConfig.setBackupCount(0);
+        mapConfig.setAsyncBackupCount(0);
+        mapConfig.setReadBackupData(true);
+        mapConfig.setMaxIdleSeconds(20);
+        mapConfig.setInMemoryFormat(inMemoryFormat());
+
+        IMap map = createHazelcastInstance(config).getMap(mapName);
+        map.put(1, 1);
+
+        long lastAccessTimeBefore = map.getEntryView(1).getLastAccessTime();
+
+        sleepAtLeastMillis(10);
+        map.get(1);
+        sleepAtLeastMillis(10);
+        map.get(1);
+
+        long lastAccessTimeAfter = map.getEntryView(1).getLastAccessTime();
+
+        String msg = String.format("lastAccessTimeBefore:%d,"
+                + " lastAccessTimeAfter:%d", lastAccessTimeBefore, lastAccessTimeAfter);
+
+        assertTrue(msg, lastAccessTimeAfter > lastAccessTimeBefore);
+    }
+
     protected InMemoryFormat inMemoryFormat() {
         return BINARY;
     }
@@ -332,8 +363,8 @@ public class ExpirationTimeTest extends HazelcastTestSupport {
 
         Config config = getConfig();
         config.getMapConfig(mapName)
-              .setMaxIdleSeconds(maxIdleSeconds)
-              .setInMemoryFormat(inMemoryFormat());
+                .setMaxIdleSeconds(maxIdleSeconds)
+                .setInMemoryFormat(inMemoryFormat());
 
         HazelcastInstance node = createHazelcastInstance(config);
         return node.getMap(mapName);
@@ -345,8 +376,8 @@ public class ExpirationTimeTest extends HazelcastTestSupport {
 
         Config config = getConfig();
         config.getMapConfig(mapName)
-              .setTimeToLiveSeconds(ttlSeconds)
-              .setInMemoryFormat(inMemoryFormat());
+                .setTimeToLiveSeconds(ttlSeconds)
+                .setInMemoryFormat(inMemoryFormat());
 
         HazelcastInstance node = createHazelcastInstance(config);
         return node.getMap(mapName);
@@ -355,7 +386,6 @@ public class ExpirationTimeTest extends HazelcastTestSupport {
     @SuppressWarnings("SameParameterValue")
     private static long getExpirationTime(IMap<Integer, Integer> map, int key) {
         EntryView<Integer, Integer> entryView = map.getEntryView(key);
-        System.out.println(entryView.toString());
         return entryView.getExpirationTime();
     }
 }

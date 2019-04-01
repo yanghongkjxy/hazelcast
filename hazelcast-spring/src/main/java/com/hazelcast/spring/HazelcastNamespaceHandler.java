@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ public class HazelcastNamespaceHandler extends NamespaceHandlerSupport {
         registerBeanDefinitionParser("config", new HazelcastConfigBeanDefinitionParser());
         registerBeanDefinitionParser("hazelcast", new HazelcastInstanceDefinitionParser());
         registerBeanDefinitionParser("client", new HazelcastClientBeanDefinitionParser());
+        registerBeanDefinitionParser("client-failover",
+                new HazelcastFailoverClientBeanDefinitionParser());
         registerBeanDefinitionParser("hibernate-region-factory", new RegionFactoryBeanDefinitionParser());
         registerBeanDefinitionParser("cache-manager", new CacheManagerBeanDefinitionParser());
         String[] types = {
@@ -53,7 +55,7 @@ public class HazelcastNamespaceHandler extends NamespaceHandlerSupport {
                 "lock",
                 "reliableTopic",
                 "PNCounter",
-                };
+        };
         for (String type : types) {
             registerBeanDefinitionParser(type, new HazelcastTypeBeanDefinitionParser(type));
         }

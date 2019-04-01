@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -189,7 +189,7 @@ public final class MerkleTreeUtil {
      * @param level The level
      * @return the number of the nodes on the given level
      */
-    static int getNodesOnLevel(int level) {
+    public static int getNodesOnLevel(int level) {
         return 1 << level;
     }
 

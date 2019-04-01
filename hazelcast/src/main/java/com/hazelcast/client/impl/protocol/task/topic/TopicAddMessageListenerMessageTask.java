@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.hazelcast.client.impl.protocol.task.topic;
 import com.hazelcast.client.impl.protocol.ClientMessage;
 import com.hazelcast.client.impl.protocol.codec.TopicAddMessageListenerCodec;
 import com.hazelcast.client.impl.protocol.task.AbstractCallableMessageTask;
+import com.hazelcast.client.impl.protocol.task.ListenerMessageTask;
 import com.hazelcast.core.Message;
 import com.hazelcast.core.MessageListener;
 import com.hazelcast.instance.Node;
@@ -36,7 +37,7 @@ import static com.hazelcast.util.HashUtil.hashToIndex;
 
 public class TopicAddMessageListenerMessageTask
         extends AbstractCallableMessageTask<TopicAddMessageListenerCodec.RequestParameters>
-        implements MessageListener {
+        implements MessageListener, ListenerMessageTask {
 
     private Data partitionKey;
     private Random rand = new Random();

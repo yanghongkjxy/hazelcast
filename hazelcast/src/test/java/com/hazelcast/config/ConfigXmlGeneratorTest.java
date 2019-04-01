@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,13 @@ package com.hazelcast.config;
 import com.hazelcast.config.CacheSimpleConfig.ExpiryPolicyFactoryConfig;
 import com.hazelcast.config.CacheSimpleConfig.ExpiryPolicyFactoryConfig.DurationConfig;
 import com.hazelcast.config.CacheSimpleConfig.ExpiryPolicyFactoryConfig.TimedExpiryPolicyFactoryConfig;
+import com.hazelcast.config.ConfigCompatibilityChecker.CPSubsystemConfigChecker;
 import com.hazelcast.config.ConfigCompatibilityChecker.EventJournalConfigChecker;
 import com.hazelcast.config.ConfigCompatibilityChecker.MapMerkleTreeConfigChecker;
+import com.hazelcast.config.ConfigCompatibilityChecker.QuorumConfigChecker;
+import com.hazelcast.config.cp.CPSemaphoreConfig;
+import com.hazelcast.config.cp.CPSubsystemConfig;
+import com.hazelcast.config.cp.FencedLockConfig;
 import com.hazelcast.memory.MemorySize;
 import com.hazelcast.memory.MemoryUnit;
 import com.hazelcast.quorum.QuorumType;
@@ -40,15 +45,18 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.nio.ByteOrder;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Properties;
 
 import static com.google.common.collect.Sets.newHashSet;
 import static com.hazelcast.config.CacheSimpleConfig.ExpiryPolicyFactoryConfig.TimedExpiryPolicyFactoryConfig.ExpiryPolicyType.ACCESSED;
+import static com.hazelcast.config.ConfigCompatibilityChecker.checkEndpointConfigCompatible;
 import static com.hazelcast.config.ConfigXmlGenerator.MASK_FOR_SENSITIVE_DATA;
+import static com.hazelcast.instance.ProtocolType.MEMBER;
+import static com.hazelcast.test.HazelcastTestSupport.randomName;
 import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -161,28 +169,14 @@ public class ConfigXmlGeneratorTest {
         Config newConfigViaXMLGenerator = getNewConfigViaXMLGenerator(cfg);
         IcmpFailureDetectorConfig actual = newConfigViaXMLGenerator.getNetworkConfig().getIcmpFailureDetectorConfig();
 
-        assertEquals(expected.isEnabled(), actual.isEnabled());
-        assertEquals(expected.getIntervalMilliseconds(), actual.getIntervalMilliseconds());
-        assertEquals(expected.getTimeoutMilliseconds(), actual.getTimeoutMilliseconds());
-        assertEquals(expected.getTtl(), actual.getTtl());
-        assertEquals(expected.getMaxAttempts(), actual.getMaxAttempts());
-        assertEquals(expected.isFailFastOnStartup(), actual.isFailFastOnStartup());
-        assertEquals(expected.isParallelMode(), actual.isParallelMode());
-        assertEquals(expected, actual);
+        assertFailureDetectorConfigEquals(expected, actual);
     }
 
     @Test
     public void testNetworkMulticastJoinConfig() {
         Config cfg = new Config();
 
-        MulticastConfig expectedConfig = new MulticastConfig()
-                .setEnabled(true)
-                .setMulticastTimeoutSeconds(10)
-                .setLoopbackModeEnabled(true)
-                .setMulticastGroup("224.2.2.3")
-                .setMulticastTimeToLive(42)
-                .setMulticastPort(4242)
-                .setTrustedInterfaces(newHashSet("*"));
+        MulticastConfig expectedConfig = multicastConfig();
 
         cfg.getNetworkConfig().getJoin().setMulticastConfig(expectedConfig);
 
@@ -195,11 +189,7 @@ public class ConfigXmlGeneratorTest {
     public void testNetworkTcpJoinConfig() {
         Config cfg = new Config();
 
-        TcpIpConfig expectedConfig = new TcpIpConfig()
-                .setEnabled(true)
-                .setConnectionTimeoutSeconds(10)
-                .addMember("10.11.12.1,10.11.12.2")
-                .setRequiredMember("10.11.11.2");
+        TcpIpConfig expectedConfig = tcpIpConfig();
 
         cfg.getNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
         cfg.getNetworkConfig().getJoin().setTcpIpConfig(expectedConfig);
@@ -258,7 +248,7 @@ public class ConfigXmlGeneratorTest {
     public void testListenerConfig() {
         Config expectedConfig = new Config();
 
-        expectedConfig.setListenerConfigs(asList(new ListenerConfig("Listener")));
+        expectedConfig.setListenerConfigs(singletonList(new ListenerConfig("Listener")));
 
         Config actualConfig = getNewConfigViaXMLGenerator(expectedConfig);
 
@@ -276,7 +266,7 @@ public class ConfigXmlGeneratorTest {
                 .setDataLoadTimeoutSeconds(130)
                 .setBaseDir(new File("nonExisting-base").getAbsoluteFile())
                 .setBackupDir(new File("nonExisting-backup").getAbsoluteFile())
-                .setParallelism(5);
+                .setParallelism(5).setAutoRemoveStaleData(false);
 
         HotRestartPersistenceConfig actualConfig = getNewConfigViaXMLGenerator(cfg).getHotRestartPersistenceConfig();
 
@@ -297,7 +287,7 @@ public class ConfigXmlGeneratorTest {
                 .setProperties(properties);
         ServicesConfig expectedConfig = cfg.getServicesConfig()
                 .setEnableDefaults(true)
-                .setServiceConfigs(asList(serviceConfig));
+                .setServiceConfigs(singletonList(serviceConfig));
 
         ServicesConfig actualConfig = getNewConfigViaXMLGenerator(cfg).getServicesConfig();
 
@@ -313,6 +303,7 @@ public class ConfigXmlGeneratorTest {
 
         SecurityConfig expectedConfig = new SecurityConfig();
         expectedConfig.setEnabled(true)
+          .setOnJoinPermissionOperation(OnJoinPermissionOperationName.NONE)
           .setClientBlockUnmappedActions(false)
           .setClientLoginModuleConfigs(Arrays.asList(
                   new LoginModuleConfig()
@@ -335,7 +326,7 @@ public class ConfigXmlGeneratorTest {
                           .setClassName("member.l.o.l")
                           .setUsage(LoginModuleConfig.LoginModuleUsage.REQUIRED)))
         .setMemberCredentialsConfig(new CredentialsFactoryConfig().setClassName("foo.bar").setProperties(dummyprops))
-        .setClientPermissionConfigs(new HashSet<PermissionConfig>(Arrays.asList(
+        .setClientPermissionConfigs(new HashSet<PermissionConfig>(singletonList(
                 new PermissionConfig()
                         .setActions(newHashSet("read", "remove"))
                         .setEndpoints(newHashSet("127.0.0.1", "127.0.0.2"))
@@ -406,7 +397,7 @@ public class ConfigXmlGeneratorTest {
         PartitionGroupConfig expectedConfig = new PartitionGroupConfig()
                 .setEnabled(true)
                 .setGroupType(PartitionGroupConfig.MemberGroupType.PER_MEMBER)
-                .setMemberGroupConfigs(asList(new MemberGroupConfig().addInterface("hostname")));
+                .setMemberGroupConfigs(singletonList(new MemberGroupConfig().addInterface("hostname")));
 
         cfg.setPartitionGroupConfig(expectedConfig);
 
@@ -419,6 +410,7 @@ public class ConfigXmlGeneratorTest {
     public void testManagementCenterConfigGenerator() {
         ManagementCenterConfig managementCenterConfig = new ManagementCenterConfig()
                 .setEnabled(true)
+                .setScriptingEnabled(false)
                 .setUpdateInterval(8)
                 .setUrl("http://foomybar.ber")
                 .setMutualAuthConfig(
@@ -437,6 +429,7 @@ public class ConfigXmlGeneratorTest {
 
         ManagementCenterConfig xmlManCenterConfig = xmlConfig.getManagementCenterConfig();
         assertEquals(managementCenterConfig.isEnabled(), xmlManCenterConfig.isEnabled());
+        assertEquals(managementCenterConfig.isScriptingEnabled(), xmlManCenterConfig.isScriptingEnabled());
         assertEquals(managementCenterConfig.getUpdateInterval(), xmlManCenterConfig.getUpdateInterval());
         assertEquals(managementCenterConfig.getUrl(), xmlManCenterConfig.getUrl());
         assertEquals(managementCenterConfig.getMutualAuthConfig().isEnabled(), xmlManCenterConfig.getMutualAuthConfig().isEnabled());
@@ -517,9 +510,10 @@ public class ConfigXmlGeneratorTest {
                 .setValueType("valueType")
                 .setReadThrough(true)
                 .setHotRestartConfig(hotRestartConfig())
-                .setCacheEntryListeners(asList(cacheSimpleEntryListenerConfig()))
+                .setCacheEntryListeners(singletonList(cacheSimpleEntryListenerConfig()))
                 .setWriteThrough(true)
-                .setPartitionLostListenerConfigs(asList(new CachePartitionLostListenerConfig("partitionLostListener")))
+                .setPartitionLostListenerConfigs(singletonList(
+                        new CachePartitionLostListenerConfig("partitionLostListener")))
                 .setQuorumName("testQuorum");
 
         expectedConfig.setMergePolicy("mergePolicy");
@@ -545,9 +539,10 @@ public class ConfigXmlGeneratorTest {
                 .setCacheLoaderFactory("cacheLoaderFactory")
                 .setCacheWriterFactory("cacheWriterFactory")
                 .setExpiryPolicyFactory("expiryPolicyFactory")
-                .setCacheEntryListeners(asList(cacheSimpleEntryListenerConfig()))
+                .setCacheEntryListeners(singletonList(cacheSimpleEntryListenerConfig()))
                 .setExpiryPolicyFactoryConfig(new ExpiryPolicyFactoryConfig(timedExpiryPolicyFactoryConfig))
-                .setPartitionLostListenerConfigs(asList(new CachePartitionLostListenerConfig("partitionLostListener")));
+                .setPartitionLostListenerConfigs(singletonList(
+                        new CachePartitionLostListenerConfig("partitionLostListener")));
 
         expectedConfig.setMergePolicy("mergePolicy");
         expectedConfig.setDisablePerEntryInvalidationEvents(true);
@@ -710,7 +705,7 @@ public class ConfigXmlGeneratorTest {
                 .setBinary(true)
                 .setStatisticsEnabled(true)
                 .setQuorumName("quorum")
-                .setEntryListenerConfigs(asList(new EntryListenerConfig("java.Listener", true, true)));
+                .setEntryListenerConfigs(singletonList(new EntryListenerConfig("java.Listener", true, true)));
 
         Config config = new Config()
                 .addMultiMapConfig(expectedConfig);
@@ -795,7 +790,7 @@ public class ConfigXmlGeneratorTest {
                 .setAsyncBackupCount(3)
                 .setQuorumName("quorum")
                 .setMergePolicyConfig(mergePolicyConfig)
-                .setItemListenerConfigs(asList(new ItemListenerConfig("java.Listener", true)));
+                .setItemListenerConfigs(singletonList(new ItemListenerConfig("java.Listener", true)));
 
         Config config = new Config()
                 .addListConfig(expectedConfig);
@@ -819,7 +814,7 @@ public class ConfigXmlGeneratorTest {
                 .setAsyncBackupCount(3)
                 .setQuorumName("quorum")
                 .setMergePolicyConfig(mergePolicyConfig)
-                .setItemListenerConfigs(asList(new ItemListenerConfig("java.Listener", true)));
+                .setItemListenerConfigs(singletonList(new ItemListenerConfig("java.Listener", true)));
 
         Config config = new Config()
                 .addSetConfig(expectedConfig);
@@ -864,7 +859,7 @@ public class ConfigXmlGeneratorTest {
                 .setEmptyQueueTtl(1000)
                 .setMergePolicyConfig(mergePolicyConfig)
                 .setQueueStoreConfig(queueStoreConfig)
-                .setItemListenerConfigs(asList(new ItemListenerConfig("java.Listener", true)));
+                .setItemListenerConfigs(singletonList(new ItemListenerConfig("java.Listener", true)));
 
         Config config = new Config()
                 .addQueueConfig(expectedConfig);
@@ -1005,6 +1000,7 @@ public class ConfigXmlGeneratorTest {
         MapConfig expectedConfig = new MapConfig()
                 .setName("carMap")
                 .setInMemoryFormat(InMemoryFormat.NATIVE)
+                .setMetadataPolicy(MetadataPolicy.CREATE_ON_UPDATE)
                 .setEvictionPolicy(EvictionPolicy.LRU)
                 .setMaxIdleSeconds(100)
                 .setTimeToLiveSeconds(1000)
@@ -1023,9 +1019,10 @@ public class ConfigXmlGeneratorTest {
                 .setHotRestartConfig(hotRestartConfig())
                 .setEvictionPolicy(EvictionPolicy.LRU)
                 .addEntryListenerConfig(listenerConfig)
-                .setMapIndexConfigs(asList(mapIndexConfig))
+                .setMapIndexConfigs(singletonList(mapIndexConfig))
                 .addMapAttributeConfig(attrConfig)
-                .setPartitionLostListenerConfigs(asList(new MapPartitionLostListenerConfig("partitionLostListener")));
+                .setPartitionLostListenerConfigs(singletonList(
+                        new MapPartitionLostListenerConfig("partitionLostListener")));
 
         expectedConfig.setQueryCacheConfigs(asList(queryCacheConfig1, queryCacheConfig2));
 
@@ -1120,6 +1117,7 @@ public class ConfigXmlGeneratorTest {
                 .setWanConsumerConfig(new WanConsumerConfig().setClassName("dummyClass").setProperties(props));
         WanPublisherConfig publisherConfig = new WanPublisherConfig()
                 .setGroupName("dummyGroup")
+                .setPublisherId("dummyPublisherId")
                 .setClassName("dummyClass")
                 .setAwsConfig(getDummyAwsConfig())
                 .setInitialPublisherState(WanPublisherState.STOPPED)
@@ -1133,7 +1131,7 @@ public class ConfigXmlGeneratorTest {
 
         wanConfig
                 .setWanConsumerConfig(wanConsumerConfig)
-                .setWanPublisherConfigs(Collections.singletonList(publisherConfig));
+                .setWanPublisherConfigs(singletonList(publisherConfig));
 
         Config config = new Config().addWanReplicationConfig(wanConfig);
         Config xmlConfig = getNewConfigViaXMLGenerator(config);
@@ -1223,7 +1221,7 @@ public class ConfigXmlGeneratorTest {
                 .setName("TestTopic")
                 .setGlobalOrderingEnabled(true)
                 .setStatisticsEnabled(true)
-                .setMessageListenerConfigs(asList(new ListenerConfig("foo.bar.Listener")));
+                .setMessageListenerConfigs(singletonList(new ListenerConfig("foo.bar.Listener")));
         cfg.addTopicConfig(expectedConfig);
 
         TopicConfig actualConfig = getNewConfigViaXMLGenerator(cfg).getTopicConfig("TestTopic");
@@ -1240,7 +1238,7 @@ public class ConfigXmlGeneratorTest {
                 .setName(testTopic)
                 .setMultiThreadingEnabled(true)
                 .setStatisticsEnabled(true)
-                .setMessageListenerConfigs(asList(new ListenerConfig("foo.bar.Listener")));
+                .setMessageListenerConfigs(singletonList(new ListenerConfig("foo.bar.Listener")));
         cfg.addTopicConfig(expectedConfig);
 
         TopicConfig actualConfig = getNewConfigViaXMLGenerator(cfg).getTopicConfig(testTopic);
@@ -1258,7 +1256,7 @@ public class ConfigXmlGeneratorTest {
                 .setReadBatchSize(10)
                 .setTopicOverloadPolicy(TopicOverloadPolicy.BLOCK)
                 .setStatisticsEnabled(true)
-                .setMessageListenerConfigs(asList(new ListenerConfig("foo.bar.Listener")));
+                .setMessageListenerConfigs(singletonList(new ListenerConfig("foo.bar.Listener")));
 
         cfg.addReliableTopicConfig(expectedConfig);
 
@@ -1318,7 +1316,7 @@ public class ConfigXmlGeneratorTest {
 
         QuorumConfig generatedConfig = getNewConfigViaXMLGenerator(config).getQuorumConfig("test-quorum");
         assertTrue(generatedConfig.toString() + " should be compatible with " + quorumConfig.toString(),
-                new ConfigCompatibilityChecker.QuorumConfigChecker().check(quorumConfig, generatedConfig));
+                new QuorumConfigChecker().check(quorumConfig, generatedConfig));
     }
 
     @Test
@@ -1332,7 +1330,7 @@ public class ConfigXmlGeneratorTest {
 
         QuorumConfig generatedConfig = getNewConfigViaXMLGenerator(config).getQuorumConfig("recently-active");
         assertTrue(generatedConfig.toString() + " should be compatible with " + quorumConfig.toString(),
-                new ConfigCompatibilityChecker.QuorumConfigChecker().check(quorumConfig, generatedConfig));
+                new QuorumConfigChecker().check(quorumConfig, generatedConfig));
     }
 
     @Test
@@ -1351,7 +1349,211 @@ public class ConfigXmlGeneratorTest {
 
         QuorumConfig generatedConfig = getNewConfigViaXMLGenerator(config).getQuorumConfig("probabilistic-quorum");
         assertTrue(generatedConfig.toString() + " should be compatible with " + quorumConfig.toString(),
-                new ConfigCompatibilityChecker.QuorumConfigChecker().check(quorumConfig, generatedConfig));
+                new QuorumConfigChecker().check(quorumConfig, generatedConfig));
+    }
+
+    @Test
+    public void testCPSubsystemConfig() {
+        Config config = new Config();
+
+        config.getCPSubsystemConfig()
+              .setCPMemberCount(10)
+              .setGroupSize(5)
+              .setSessionTimeToLiveSeconds(15)
+              .setSessionHeartbeatIntervalSeconds(3)
+              .setMissingCPMemberAutoRemovalSeconds(120)
+              .setFailOnIndeterminateOperationState(true);
+
+        config.getCPSubsystemConfig()
+              .getRaftAlgorithmConfig()
+              .setLeaderElectionTimeoutInMillis(500)
+              .setLeaderHeartbeatPeriodInMillis(100)
+              .setMaxMissedLeaderHeartbeatCount(10)
+              .setAppendRequestMaxEntryCount(25)
+              .setAppendRequestMaxEntryCount(250)
+              .setUncommittedEntryCountToRejectNewAppends(75)
+                .setAppendRequestBackoffTimeoutInMillis(50);
+
+        config.getCPSubsystemConfig()
+              .addSemaphoreConfig(new CPSemaphoreConfig("sem1", true))
+              .addSemaphoreConfig(new CPSemaphoreConfig("sem2", false));
+
+        config.getCPSubsystemConfig()
+              .addLockConfig(new FencedLockConfig("lock1", 1))
+              .addLockConfig(new FencedLockConfig("lock1", 2));
+
+
+        CPSubsystemConfig generatedConfig = getNewConfigViaXMLGenerator(config).getCPSubsystemConfig();
+        assertTrue(generatedConfig + " should be compatible with " + config.getCPSubsystemConfig(),
+                new CPSubsystemConfigChecker().check(config.getCPSubsystemConfig(), generatedConfig));
+    }
+
+    @Test
+    public void testMemcacheProtocolConfig() {
+        MemcacheProtocolConfig memcacheProtocolConfig = new MemcacheProtocolConfig().setEnabled(true);
+        Config config = new Config();
+        config.getNetworkConfig().setMemcacheProtocolConfig(memcacheProtocolConfig);
+        MemcacheProtocolConfig generatedConfig = getNewConfigViaXMLGenerator(config).getNetworkConfig().getMemcacheProtocolConfig();
+        assertTrue(generatedConfig.toString() + " should be compatible with " + memcacheProtocolConfig.toString(),
+                new ConfigCompatibilityChecker.MemcacheProtocolConfigChecker().check(memcacheProtocolConfig, generatedConfig));
+    }
+
+    @Test
+    public void testEmptyRestApiConfig() {
+        RestApiConfig restApiConfig = new RestApiConfig();
+        Config config = new Config();
+        config.getNetworkConfig().setRestApiConfig(restApiConfig);
+        RestApiConfig generatedConfig = getNewConfigViaXMLGenerator(config).getNetworkConfig().getRestApiConfig();
+        assertTrue(generatedConfig.toString() + " should be compatible with " + restApiConfig.toString(),
+                new ConfigCompatibilityChecker.RestApiConfigChecker().check(restApiConfig, generatedConfig));
+    }
+
+    @Test
+    public void testAllEnabledRestApiConfig() {
+        RestApiConfig restApiConfig = new RestApiConfig();
+        restApiConfig.setEnabled(true).enableAllGroups();
+        Config config = new Config();
+        config.getNetworkConfig().setRestApiConfig(restApiConfig);
+        RestApiConfig generatedConfig = getNewConfigViaXMLGenerator(config).getNetworkConfig().getRestApiConfig();
+        assertTrue(generatedConfig.toString() + " should be compatible with " + restApiConfig.toString(),
+                new ConfigCompatibilityChecker.RestApiConfigChecker().check(restApiConfig, generatedConfig));
+    }
+
+    @Test
+    public void testExplicitlyAssignedGroupsRestApiConfig() {
+        RestApiConfig restApiConfig = new RestApiConfig();
+        restApiConfig.setEnabled(true);
+        restApiConfig.enableGroups(RestEndpointGroup.CLUSTER_READ, RestEndpointGroup.HEALTH_CHECK, RestEndpointGroup.HOT_RESTART,
+                RestEndpointGroup.WAN);
+        restApiConfig.disableGroups(RestEndpointGroup.CLUSTER_WRITE, RestEndpointGroup.DATA);
+        Config config = new Config();
+        config.getNetworkConfig().setRestApiConfig(restApiConfig);
+        RestApiConfig generatedConfig = getNewConfigViaXMLGenerator(config).getNetworkConfig().getRestApiConfig();
+        assertTrue(generatedConfig.toString() + " should be compatible with " + restApiConfig.toString(),
+                new ConfigCompatibilityChecker.RestApiConfigChecker().check(restApiConfig, generatedConfig));
+    }
+
+    @Test
+    public void testAdvancedNetworkMulticastJoinConfig() {
+        Config cfg = new Config();
+        cfg.getAdvancedNetworkConfig().setEnabled(true);
+        MulticastConfig expectedConfig = multicastConfig();
+
+        cfg.getAdvancedNetworkConfig().getJoin().setMulticastConfig(expectedConfig);
+        cfg.getAdvancedNetworkConfig().setEnabled(true);
+
+        MulticastConfig actualConfig = getNewConfigViaXMLGenerator(cfg)
+                .getAdvancedNetworkConfig().getJoin().getMulticastConfig();
+
+        assertEquals(expectedConfig, actualConfig);
+    }
+
+    @Test
+    public void testAdvancedNetworkTcpJoinConfig() {
+        Config cfg = new Config();
+        cfg.getAdvancedNetworkConfig().setEnabled(true);
+        TcpIpConfig expectedConfig = tcpIpConfig();
+
+        cfg.getAdvancedNetworkConfig().getJoin().getMulticastConfig().setEnabled(false);
+        cfg.getAdvancedNetworkConfig().getJoin().setTcpIpConfig(expectedConfig);
+
+        TcpIpConfig actualConfig = getNewConfigViaXMLGenerator(cfg)
+                .getAdvancedNetworkConfig().getJoin().getTcpIpConfig();
+
+        assertEquals(expectedConfig, actualConfig);
+    }
+
+    @Test
+    public void testAdvancedNetworkFailureDetectorConfigGenerator() {
+        Config cfg = new Config();
+        IcmpFailureDetectorConfig expected = new IcmpFailureDetectorConfig();
+        expected.setEnabled(true)
+                .setIntervalMilliseconds(1001)
+                .setTimeoutMilliseconds(1002)
+                .setMaxAttempts(4)
+                .setTtl(300)
+                .setParallelMode(false) // Defaults to false
+                .setFailFastOnStartup(false); // Defaults to false
+
+        cfg.getAdvancedNetworkConfig().setEnabled(true);
+        cfg.getAdvancedNetworkConfig().setIcmpFailureDetectorConfig(expected);
+
+        Config newConfigViaXMLGenerator = getNewConfigViaXMLGenerator(cfg);
+        IcmpFailureDetectorConfig actual = newConfigViaXMLGenerator.getAdvancedNetworkConfig().getIcmpFailureDetectorConfig();
+
+        assertFailureDetectorConfigEquals(expected, actual);
+    }
+
+    @Test
+    public void testAdvancedNetworkMemberAddressProvider() {
+        Config cfg = new Config();
+        cfg.getAdvancedNetworkConfig().setEnabled(true);
+        MemberAddressProviderConfig expected = cfg.getAdvancedNetworkConfig()
+                                                  .getMemberAddressProviderConfig();
+        expected.setEnabled(true)
+                .setEnabled(true)
+                .setClassName("ClassName");
+        expected.getProperties().setProperty("p1", "v1");
+
+        Config newConfigViaXMLGenerator = getNewConfigViaXMLGenerator(cfg);
+        MemberAddressProviderConfig actual = newConfigViaXMLGenerator.getAdvancedNetworkConfig().getMemberAddressProviderConfig();
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void testEndpointConfig_completeConfiguration() {
+        Config cfg = new Config();
+
+        ServerSocketEndpointConfig expected = new ServerSocketEndpointConfig();
+        expected.setName(randomName());
+        expected.setPort(9393);
+        expected.setPortCount(22);
+        expected.setPortAutoIncrement(false);
+        expected.setPublicAddress("194.143.14.17");
+        expected.setReuseAddress(true);
+        expected.addOutboundPortDefinition("4242-4244")
+                .addOutboundPortDefinition("5252;5254");
+
+        SocketInterceptorConfig socketInterceptorConfig = new SocketInterceptorConfig()
+                .setEnabled(true)
+                .setClassName("socketInterceptor")
+                .setProperty("key", "value");
+        expected.setSocketInterceptorConfig(socketInterceptorConfig);
+
+        expected.getInterfaces().addInterface("127.0.0.*").setEnabled(true);
+
+        expected.setSocketConnectTimeoutSeconds(67);
+        expected.setSocketRcvBufferSizeKb(192);
+        expected.setSocketSendBufferSizeKb(384);
+        expected.setSocketLingerSeconds(3);
+        expected.setSocketKeepAlive(true);
+        expected.setSocketTcpNoDelay(true);
+        expected.setSocketBufferDirect(true);
+
+        cfg.getAdvancedNetworkConfig().setEnabled(true);
+        cfg.getAdvancedNetworkConfig().addWanEndpointConfig(expected);
+
+        EndpointConfig actual = getNewConfigViaXMLGenerator(cfg)
+                .getAdvancedNetworkConfig().getEndpointConfigs().get(expected.getQualifier());
+
+        checkEndpointConfigCompatible(expected, actual);
+    }
+
+    @Test
+    public void testEndpointConfig_defaultConfiguration() {
+        Config cfg = new Config();
+
+        ServerSocketEndpointConfig expected = new ServerSocketEndpointConfig();
+        expected.setProtocolType(MEMBER);
+
+        cfg.getAdvancedNetworkConfig().setEnabled(true);
+        cfg.getAdvancedNetworkConfig().setMemberEndpointConfig(expected);
+
+        EndpointConfig actual = getNewConfigViaXMLGenerator(cfg)
+                .getAdvancedNetworkConfig().getEndpointConfigs().get(expected.getQualifier());
+
+        checkEndpointConfigCompatible(expected, actual);
     }
 
     private DiscoveryConfig getDummyDiscoveryConfig() {
@@ -1387,7 +1589,7 @@ public class ConfigXmlGeneratorTest {
     private static Config getNewConfigViaXMLGenerator(Config config, boolean maskSensitiveFields) {
         ConfigXmlGenerator configXmlGenerator = new ConfigXmlGenerator(true, maskSensitiveFields);
         String xml = configXmlGenerator.generate(config);
-
+        System.err.println("XML: " + xml);
         ByteArrayInputStream bis = new ByteArrayInputStream(xml.getBytes());
         XmlConfigBuilder configBuilder = new XmlConfigBuilder(bis);
         return configBuilder.build();
@@ -1413,5 +1615,36 @@ public class ConfigXmlGeneratorTest {
                 .setComparatorClassName("comparatorClassName")
                 .setSize(10)
                 .setMaximumSizePolicy(EvictionConfig.MaxSizePolicy.FREE_NATIVE_MEMORY_SIZE);
+    }
+
+    private static TcpIpConfig tcpIpConfig() {
+        return new TcpIpConfig()
+                .setEnabled(true)
+                .setConnectionTimeoutSeconds(10)
+                .addMember("10.11.12.1,10.11.12.2")
+                .setRequiredMember("10.11.11.2");
+    }
+
+    private static MulticastConfig multicastConfig() {
+        return new MulticastConfig()
+                .setEnabled(true)
+                .setMulticastTimeoutSeconds(10)
+                .setLoopbackModeEnabled(true)
+                .setMulticastGroup("224.2.2.3")
+                .setMulticastTimeToLive(42)
+                .setMulticastPort(4242)
+                .setTrustedInterfaces(newHashSet("*"));
+    }
+
+    private static void assertFailureDetectorConfigEquals(IcmpFailureDetectorConfig expected,
+                                                          IcmpFailureDetectorConfig actual) {
+        assertEquals(expected.isEnabled(), actual.isEnabled());
+        assertEquals(expected.getIntervalMilliseconds(), actual.getIntervalMilliseconds());
+        assertEquals(expected.getTimeoutMilliseconds(), actual.getTimeoutMilliseconds());
+        assertEquals(expected.getTtl(), actual.getTtl());
+        assertEquals(expected.getMaxAttempts(), actual.getMaxAttempts());
+        assertEquals(expected.isFailFastOnStartup(), actual.isFailFastOnStartup());
+        assertEquals(expected.isParallelMode(), actual.isParallelMode());
+        assertEquals(expected, actual);
     }
 }

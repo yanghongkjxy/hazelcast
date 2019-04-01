@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -120,7 +120,7 @@ public class ClientMaxAllowedInvocationTest extends ClientTestSupport {
         testMaxAllowed(new RegisterCallback() {
             @Override
             public void call(ClientDelegatingFuture future, ExecutionCallback callback) {
-                future.andThenInternal(callback, false);
+                future.andThen(callback);
             }
         });
     }
@@ -177,7 +177,7 @@ public class ClientMaxAllowedInvocationTest extends ClientTestSupport {
         testMaxAllowed_withWaitingCallbacks(new RegisterCallback() {
             @Override
             public void call(ClientDelegatingFuture future, ExecutionCallback callback) {
-                future.andThenInternal(callback, false);
+                future.andThen(callback);
             }
         });
     }

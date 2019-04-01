@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,17 +43,18 @@ import com.hazelcast.core.LifecycleService;
 import com.hazelcast.core.MultiMap;
 import com.hazelcast.core.PartitionService;
 import com.hazelcast.core.ReplicatedMap;
+import com.hazelcast.cp.CPSubsystem;
 import com.hazelcast.crdt.pncounter.PNCounter;
 import com.hazelcast.durableexecutor.DurableExecutorService;
 import com.hazelcast.flakeidgen.FlakeIdGenerator;
 import com.hazelcast.instance.TerminatedLifecycleService;
+import com.hazelcast.internal.serialization.InternalSerializationService;
 import com.hazelcast.logging.LoggingService;
 import com.hazelcast.mapreduce.JobTracker;
 import com.hazelcast.quorum.QuorumService;
 import com.hazelcast.ringbuffer.Ringbuffer;
 import com.hazelcast.scheduledexecutor.IScheduledExecutorService;
 import com.hazelcast.spi.impl.SerializationServiceSupport;
-import com.hazelcast.spi.serialization.SerializationService;
 import com.hazelcast.transaction.HazelcastXAResource;
 import com.hazelcast.transaction.TransactionContext;
 import com.hazelcast.transaction.TransactionException;
@@ -279,6 +280,11 @@ public class HazelcastClientProxy implements HazelcastInstance, SerializationSer
     }
 
     @Override
+    public CPSubsystem getCPSubsystem() {
+        return getClient().getCPSubsystem();
+    }
+
+    @Override
     public ConcurrentMap<String, Object> getUserContext() {
         return getClient().getUserContext();
     }
@@ -298,7 +304,7 @@ public class HazelcastClientProxy implements HazelcastInstance, SerializationSer
     }
 
     @Override
-    public SerializationService getSerializationService() {
+    public InternalSerializationService getSerializationService() {
         return getClient().getSerializationService();
     }
 

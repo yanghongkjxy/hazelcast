@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,9 @@ import com.hazelcast.client.spi.impl.ClientInvocation;
 import com.hazelcast.client.spi.impl.ClientInvocationFuture;
 import com.hazelcast.client.util.ClientDelegatingFuture;
 import com.hazelcast.partition.strategy.StringPartitioningStrategy;
+import com.hazelcast.util.ExceptionUtil;
+
+import java.util.concurrent.Future;
 
 import static com.hazelcast.util.ExceptionUtil.rethrow;
 
@@ -59,6 +62,29 @@ abstract class PartitionSpecificClientProxy extends ClientProxy {
             return new ClientDelegatingFuture<T>(future, getSerializationService(), clientMessageDecoder);
         } catch (Exception e) {
             throw rethrow(e);
+        }
+    }
+
+    protected <T> T invokeOnPartition(ClientMessage clientMessage, long invocationTimeoutSeconds) {
+        try {
+            ClientInvocation clientInvocation = new ClientInvocation(getClient(), clientMessage, getName(), partitionId);
+            clientInvocation.setInvocationTimeoutMillis(invocationTimeoutSeconds);
+            final Future future = clientInvocation.invoke();
+            return (T) future.get();
+        } catch (Exception e) {
+            throw rethrow(e);
+        }
+    }
+
+    protected <T> T invokeOnPartitionInterruptibly(ClientMessage clientMessage,
+                                                 long invocationTimeoutSeconds) throws InterruptedException {
+        try {
+            ClientInvocation clientInvocation = new ClientInvocation(getClient(), clientMessage, getName(), partitionId);
+            clientInvocation.setInvocationTimeoutMillis(invocationTimeoutSeconds);
+            final Future future = clientInvocation.invoke();
+            return (T) future.get();
+        } catch (Exception e) {
+            throw ExceptionUtil.rethrowAllowInterrupted(e);
         }
     }
 }

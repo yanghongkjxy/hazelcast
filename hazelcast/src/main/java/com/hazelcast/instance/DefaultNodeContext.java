@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,110 +21,117 @@ import com.hazelcast.config.Config;
 import com.hazelcast.config.ConfigurationException;
 import com.hazelcast.config.MemberAddressProviderConfig;
 import com.hazelcast.internal.networking.ChannelErrorHandler;
-import com.hazelcast.internal.networking.ChannelInitializer;
 import com.hazelcast.internal.networking.Networking;
+import com.hazelcast.internal.networking.ServerSocketRegistry;
 import com.hazelcast.internal.networking.nio.NioNetworking;
+import com.hazelcast.internal.util.InstantiationUtils;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.LoggingServiceImpl;
 import com.hazelcast.nio.ClassLoaderUtil;
-import com.hazelcast.nio.ConnectionManager;
+import com.hazelcast.nio.NetworkingService;
 import com.hazelcast.nio.NodeIOService;
 import com.hazelcast.nio.tcp.TcpIpConnectionChannelErrorHandler;
-import com.hazelcast.nio.tcp.TcpIpConnectionManager;
+import com.hazelcast.nio.tcp.TcpIpNetworkingService;
 import com.hazelcast.spi.MemberAddressProvider;
 import com.hazelcast.spi.annotation.PrivateApi;
 import com.hazelcast.spi.properties.HazelcastProperties;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
-import java.nio.channels.ServerSocketChannel;
+import java.util.List;
 import java.util.Properties;
 
+import static com.hazelcast.config.ConfigAccessor.getActiveMemberNetworkConfig;
 import static com.hazelcast.spi.properties.GroupProperty.IO_BALANCER_INTERVAL_SECONDS;
 import static com.hazelcast.spi.properties.GroupProperty.IO_INPUT_THREAD_COUNT;
 import static com.hazelcast.spi.properties.GroupProperty.IO_OUTPUT_THREAD_COUNT;
+import static java.util.Arrays.asList;
+import static java.util.Collections.unmodifiableList;
 
 @PrivateApi
 public class DefaultNodeContext implements NodeContext {
 
+    public static final List<String> EXTENSION_PRIORITY_LIST = unmodifiableList(asList(
+            "com.hazelcast.instance.EnterpriseNodeExtension",
+            "com.hazelcast.instance.DefaultNodeExtension"
+    ));
+
     @Override
     public NodeExtension createNodeExtension(Node node) {
-        return NodeExtensionFactory.create(node);
+        return NodeExtensionFactory.create(node, EXTENSION_PRIORITY_LIST);
     }
 
     @Override
     public AddressPicker createAddressPicker(Node node) {
         Config config = node.getConfig();
-        MemberAddressProviderConfig memberAddressProviderConfig = config.getNetworkConfig().getMemberAddressProviderConfig();
+        MemberAddressProviderConfig memberAddressProviderConfig =
+                getActiveMemberNetworkConfig(config).getMemberAddressProviderConfig();
 
         final ILogger addressPickerLogger = node.getLogger(AddressPicker.class);
         if (!memberAddressProviderConfig.isEnabled()) {
-            return new DefaultAddressPicker(config, node.getProperties(), addressPickerLogger);
+            if (config.getAdvancedNetworkConfig().isEnabled()) {
+                return new AdvancedNetworkAddressPicker(config, addressPickerLogger);
+            }
+
+            return new DefaultAddressPicker(config, addressPickerLogger);
         }
 
         MemberAddressProvider implementation = memberAddressProviderConfig.getImplementation();
         if (implementation != null) {
-            return new DelegatingAddressPicker(implementation, config.getNetworkConfig(), addressPickerLogger);
+            return new DelegatingAddressPicker(implementation, config, addressPickerLogger);
         }
         ClassLoader classLoader = config.getClassLoader();
         String classname = memberAddressProviderConfig.getClassName();
-        Class<?> clazz = loadMemberAddressProviderClass(classLoader, classname);
+        Class<? extends MemberAddressProvider> clazz = loadMemberAddressProviderClass(classLoader, classname);
+        ILogger memberAddressProviderLogger = node.getLogger(clazz);
 
-        Constructor<?> constructor = findMemberAddressProviderConstructor(clazz);
         Properties properties = memberAddressProviderConfig.getProperties();
-        MemberAddressProvider memberAddressProvider = newMemberAddressProviderInstance(constructor, properties);
-        return new DelegatingAddressPicker(memberAddressProvider, config.getNetworkConfig(), addressPickerLogger);
-
+        MemberAddressProvider memberAddressProvider = newMemberAddressProviderInstance(clazz,
+                memberAddressProviderLogger, properties);
+        return new DelegatingAddressPicker(memberAddressProvider, config, addressPickerLogger);
     }
 
-    private MemberAddressProvider newMemberAddressProviderInstance(Constructor<?> constructor, Properties properties) {
-        Class<?>[] parameterTypes = constructor.getParameterTypes();
-        Class<?> clazz = constructor.getDeclaringClass();
-        String classname = clazz.getName();
-        try {
-            if (parameterTypes.length == 0) {
-                //we have only the no-arg constructor -> we have to fail-fast when some properties were configured
-                if (properties != null && !properties.isEmpty()) {
-                    throw new ConfigurationException("Cannot find a matching constructor for MemberAddressProvider.  "
-                            + "The member address provider has properties configured, but the class " + "'" + classname
-                            + "' does not have a public constructor accepting properties.");
-                }
-
-                return (MemberAddressProvider) constructor.newInstance();
-            } else {
-                if (properties == null) {
-                    properties = new Properties();
-                }
-                return (MemberAddressProvider) constructor.newInstance(properties);
-            }
-        } catch (InstantiationException e) {
-            throw new ConfigurationException("Cannot create a new instance of MemberAddressProvider '" + clazz + "'", e);
-        } catch (IllegalAccessException e) {
-            throw new ConfigurationException("Cannot create a new instance of MemberAddressProvider '" + clazz + "'", e);
-        } catch (InvocationTargetException e) {
-            throw new ConfigurationException("Cannot create a new instance of MemberAddressProvider '" + clazz + "'", e);
+    @SuppressWarnings("checkstyle:npathcomplexity")
+    // justification for the suppression: the flow is pretty straightforward and breaking this up into smaller pieces
+    // would make it harder to read
+    private static MemberAddressProvider newMemberAddressProviderInstance(Class<? extends MemberAddressProvider> clazz,
+                                                                          ILogger logger, Properties properties) {
+        Properties nonNullProps = properties == null ? new Properties() : properties;
+        MemberAddressProvider provider = InstantiationUtils.newInstanceOrNull(clazz, nonNullProps, logger);
+        if (provider == null) {
+            provider = InstantiationUtils.newInstanceOrNull(clazz, logger, nonNullProps);
         }
-    }
-
-    private Constructor<?> findMemberAddressProviderConstructor(Class<?> clazz) {
-        Constructor<?> constructor;
-        try {
-            constructor = clazz.getConstructor(Properties.class);
-        } catch (NoSuchMethodException e) {
-            try {
-                constructor = clazz.getConstructor();
-            } catch (NoSuchMethodException e1) {
-                throw new ConfigurationException("Cannot create a new instance of MemberAddressProvider '" + clazz + "'", e);
-            }
+        if (provider == null) {
+            provider = InstantiationUtils.newInstanceOrNull(clazz, nonNullProps);
         }
-        return constructor;
+        if (provider == null) {
+            if (properties != null && !properties.isEmpty()) {
+                throw new ConfigurationException("Cannot find a matching constructor for MemberAddressProvider.  "
+                        + "The member address provider has properties configured, but the class " + "'"
+                        + clazz.getName() + "' does not have a public constructor accepting properties.");
+            }
+            provider = InstantiationUtils.newInstanceOrNull(clazz, logger);
+        }
+        if (provider == null) {
+            provider = InstantiationUtils.newInstanceOrNull(clazz);
+        }
+        if (provider == null) {
+            throw new ConfigurationException("Cannot find a matching constructor for MemberAddressProvider "
+                    + "implementation '" + clazz.getName() + "'.");
+        }
+        return provider;
     }
 
-    private Class<?> loadMemberAddressProviderClass(ClassLoader classLoader, String classname) {
+    private Class<? extends MemberAddressProvider> loadMemberAddressProviderClass(ClassLoader classLoader,
+                                                                                  String classname) {
         try {
-            return ClassLoaderUtil.loadClass(classLoader, classname);
+            Class<?> clazz = ClassLoaderUtil.loadClass(classLoader, classname);
+            if (!(MemberAddressProvider.class.isAssignableFrom(clazz))) {
+                throw new ConfigurationException("Configured member address provider " + clazz.getName()
+                        + " does not implement the interface" + MemberAddressProvider.class.getName());
+            }
+            return (Class<? extends MemberAddressProvider>) clazz;
         } catch (ClassNotFoundException e) {
-            throw new ConfigurationException("Cannot create a new instance of MemberAddressProvider '" + classname + "'", e);
+            throw new ConfigurationException("Cannot create a new instance of MemberAddressProvider '" + classname
+                    + "'", e);
         }
     }
 
@@ -134,21 +141,22 @@ public class DefaultNodeContext implements NodeContext {
     }
 
     @Override
-    public ConnectionManager createConnectionManager(Node node, ServerSocketChannel serverSocketChannel) {
+    public NetworkingService createNetworkingService(Node node, ServerSocketRegistry registry) {
         NodeIOService ioService = new NodeIOService(node, node.nodeEngine);
-        Networking networking = createNetworking(node, ioService);
+        Networking networking = createNetworking(node);
+        Config config = node.getConfig();
 
-        return new TcpIpConnectionManager(
+        return new TcpIpNetworkingService(config,
                 ioService,
-                serverSocketChannel,
+                registry,
                 node.loggingService,
                 node.nodeEngine.getMetricsRegistry(),
                 networking,
+                node.getNodeExtension().createChannelInitializerProvider(ioService),
                 node.getProperties());
     }
 
-    private Networking createNetworking(Node node, NodeIOService ioService) {
-        ChannelInitializer initializer = node.getNodeExtension().createChannelInitializer(ioService);
+    private Networking createNetworking(Node node) {
 
         LoggingServiceImpl loggingService = node.loggingService;
 
@@ -165,7 +173,6 @@ public class DefaultNodeContext implements NodeContext {
                         .errorHandler(errorHandler)
                         .inputThreadCount(props.getInteger(IO_INPUT_THREAD_COUNT))
                         .outputThreadCount(props.getInteger(IO_OUTPUT_THREAD_COUNT))
-                        .balancerIntervalSeconds(props.getInteger(IO_BALANCER_INTERVAL_SECONDS))
-                        .channelInitializer(initializer));
+                        .balancerIntervalSeconds(props.getInteger(IO_BALANCER_INTERVAL_SECONDS)));
     }
 }

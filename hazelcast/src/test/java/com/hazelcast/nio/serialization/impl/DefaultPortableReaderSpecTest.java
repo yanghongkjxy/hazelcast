@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import com.hazelcast.nio.serialization.PortableReader;
 import com.hazelcast.query.impl.getters.MultiResult;
 import com.hazelcast.test.HazelcastTestSupport;
 import com.hazelcast.test.annotation.ParallelTest;
-import com.hazelcast.test.annotation.QuickTest;
+import com.hazelcast.test.annotation.SlowTest;
 import com.hazelcast.util.ExceptionUtil;
 import org.junit.Rule;
 import org.junit.Test;
@@ -96,7 +96,7 @@ import static org.junit.Assert.assertThat;
  * - check in which method the scenario is generated - narrow down the scope of the tests run
  */
 @RunWith(Parameterized.class)
-@Category({QuickTest.class, ParallelTest.class})
+@Category({SlowTest.class, ParallelTest.class})
 public class DefaultPortableReaderSpecTest extends HazelcastTestSupport {
 
     private static final PrimitivePortable P_NON_EMPTY = new PrimitivePortable(0, PrimitivePortable.Init.FULL);

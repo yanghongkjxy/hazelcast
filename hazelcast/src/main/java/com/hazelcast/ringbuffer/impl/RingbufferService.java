@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package com.hazelcast.ringbuffer.impl;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.RingbufferConfig;
 import com.hazelcast.core.DistributedObject;
-import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.partition.strategy.StringPartitioningStrategy;
 import com.hazelcast.quorum.QuorumService;
@@ -74,7 +73,8 @@ public class RingbufferService implements ManagedService, RemoteService, Fragmen
         SplitBrainHandlerService {
 
     /**
-     * Prefix of ringbuffers that are created for topics. Using a prefix prevents users accidentally retrieving the ringbuffer.
+     * Prefix of ringbuffers that are created for topics. Using a prefix prevents
+     * users accidentally retrieving the ringbuffer.
      */
     public static final String TOPIC_RB_PREFIX = "_hz_rb_";
 
@@ -86,8 +86,9 @@ public class RingbufferService implements ManagedService, RemoteService, Fragmen
     private static final Object NULL_OBJECT = new Object();
 
     /**
-     * Map from namespace to actual ringbuffer containers. The namespace defines the service and object name which
-     * is the owner of the ringbuffer container.
+     * Map from namespace to actual ringbuffer containers. The namespace
+     * defines the service and object name which is the owner of the ringbuffer
+     * container.
      */
     private final ConcurrentMap<Integer, Map<ObjectNamespace, RingbufferContainer>> containers
             = new ConcurrentHashMap<Integer, Map<ObjectNamespace, RingbufferContainer>>();
@@ -320,10 +321,6 @@ public class RingbufferService implements ManagedService, RemoteService, Fragmen
 
     @Override
     public String getQuorumName(final String name) {
-        // RU_COMPAT_3_9
-        if (nodeEngine.getClusterService().getClusterVersion().isLessThan(Versions.V3_10)) {
-            return null;
-        }
         Object quorumName = getOrPutSynchronized(quorumConfigCache, name, quorumConfigCacheMutexFactory,
                 quorumConfigConstructor);
         return quorumName == NULL_OBJECT ? null : (String) quorumName;

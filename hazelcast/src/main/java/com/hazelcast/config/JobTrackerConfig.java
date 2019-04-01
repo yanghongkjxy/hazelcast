@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import com.hazelcast.mapreduce.TopologyChangedStrategy;
 /**
  * Contains the configuration for an {@link com.hazelcast.mapreduce.JobTracker}.
  */
-public class JobTrackerConfig {
+public class JobTrackerConfig implements NamedConfig {
 
     /**
      * Default size of thread.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.hazelcast.config;
 
-import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
@@ -38,7 +37,7 @@ import static com.hazelcast.util.Preconditions.checkNotNull;
  * Contains the configuration for an {@link com.hazelcast.core.IQueue}.
  */
 @SuppressWarnings("checkstyle:methodcount")
-public class QueueConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSerializable, Versioned {
+public class QueueConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSerializable, Versioned , NamedConfig {
 
     /**
      * Default value for the maximum size of the Queue.
@@ -379,10 +378,7 @@ public class QueueConfig implements SplitBrainMergeTypeProvider, IdentifiedDataS
         out.writeObject(queueStoreConfig);
         out.writeBoolean(statisticsEnabled);
         out.writeUTF(quorumName);
-        // RU_COMPAT_3_9
-        if (out.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            out.writeObject(mergePolicyConfig);
-        }
+        out.writeObject(mergePolicyConfig);
     }
 
     @Override
@@ -396,10 +392,7 @@ public class QueueConfig implements SplitBrainMergeTypeProvider, IdentifiedDataS
         queueStoreConfig = in.readObject();
         statisticsEnabled = in.readBoolean();
         quorumName = in.readUTF();
-        // RU_COMPAT_3_9
-        if (in.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            mergePolicyConfig = in.readObject();
-        }
+        mergePolicyConfig = in.readObject();
     }
 
     @Override

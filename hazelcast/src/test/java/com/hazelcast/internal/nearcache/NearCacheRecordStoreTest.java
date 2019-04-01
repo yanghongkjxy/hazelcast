@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -163,8 +163,8 @@ public class NearCacheRecordStoreTest extends NearCacheRecordStoreTestSupport {
         NearCacheRecordStore<Integer, String> nearCacheRecordStore = createNearCacheRecordStore(nearCacheConfig, inMemoryFormat);
 
         for (int i = 0; i < DEFAULT_RECORD_COUNT; i++) {
-            nearCacheRecordStore.put(i, null, "Record-" + i);
-            nearCacheRecordStore.doEvictionIfRequired();
+            nearCacheRecordStore.put(i, null, "Record-" + i, null);
+            nearCacheRecordStore.doEviction(false);
             assertTrue(maxSize >= nearCacheRecordStore.size());
         }
     }

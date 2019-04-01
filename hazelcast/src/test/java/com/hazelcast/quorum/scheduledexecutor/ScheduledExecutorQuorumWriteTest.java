@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -208,12 +208,18 @@ public class ScheduledExecutorQuorumWriteTest extends AbstractQuorumTest {
 
     @Test
     public void scheduleOnMembers_callable_quorum() throws Exception {
-        wait(exec(0).scheduleOnMembers(callable(), asList(member(0)), 10, TimeUnit.MILLISECONDS));
+        Map<Member, IScheduledFuture<?>> futures = (Map<Member, IScheduledFuture<?>>) exec(0)
+                .scheduleOnMembers(callable(), asList(member(0)),
+                10, TimeUnit.MILLISECONDS);
+        wait(futures);
     }
 
     @Test(expected = QuorumException.class)
     public void scheduleOnMembers_callable_noQuorum() throws Exception {
-        wait(exec(3).scheduleOnMembers(callable(), asList(member(3)), 10, TimeUnit.MILLISECONDS));
+        Map<Member, IScheduledFuture<?>> futures = (Map<Member, IScheduledFuture<?>>) exec(3)
+                .scheduleOnMembers(callable(),
+                asList(member(3)), 10, TimeUnit.MILLISECONDS);
+        wait(futures);
     }
 
     @Test

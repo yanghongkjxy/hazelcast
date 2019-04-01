@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ public class MasterSplitTest extends HazelcastTestSupport {
 
         int partitionStateVersion = getPartitionService(member1).getPartitionStateVersion();
 
-        Operation op = new MigrationRequestOperation(migration, partitionStateVersion, true);
+        Operation op = new MigrationRequestOperation(migration, Collections.<MigrationInfo>emptyList(), partitionStateVersion, true);
 
         InvocationBuilder invocationBuilder = getOperationServiceImpl(member1)
                 .createInvocationBuilder(SERVICE_NAME, op, getAddress(member2))
@@ -82,8 +82,8 @@ public class MasterSplitTest extends HazelcastTestSupport {
 
     private MigrationInfo createMigrationInfo(HazelcastInstance master, HazelcastInstance nonMaster) {
         MigrationInfo migration
-                = new MigrationInfo(getPartitionId(nonMaster), getAddress(nonMaster), getNode(nonMaster).getThisUuid(),
-                getAddress(master), getNode(master).getThisUuid(), 0, 1, -1, 0);
+                = new MigrationInfo(getPartitionId(nonMaster), new PartitionReplica(getAddress(nonMaster), getNode(nonMaster).getThisUuid()),
+                new PartitionReplica(getAddress(master), getNode(master).getThisUuid()), 0, 1, -1, 0);
         migration.setMaster(getAddress(nonMaster));
         return migration;
     }
@@ -101,7 +101,7 @@ public class MasterSplitTest extends HazelcastTestSupport {
 
         ReplicaFragmentMigrationState migrationState
                 = new ReplicaFragmentMigrationState(Collections.<ServiceNamespace, long[]>emptyMap(), Collections.<Operation>emptySet());
-        Operation op = new MigrationOperation(migration, partitionStateVersion, migrationState, true, true);
+        Operation op = new MigrationOperation(migration, Collections.<MigrationInfo>emptyList(), partitionStateVersion, migrationState, true, true);
 
         InvocationBuilder invocationBuilder = getOperationServiceImpl(member1)
                 .createInvocationBuilder(SERVICE_NAME, op, getAddress(member2))

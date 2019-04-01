@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,14 +23,17 @@ import com.hazelcast.client.config.ClientCloudConfig;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.config.ClientConnectionStrategyConfig;
 import com.hazelcast.client.config.ClientConnectionStrategyConfig.ReconnectMode;
-import com.hazelcast.client.config.ConnectionRetryConfig;
-import com.hazelcast.client.impl.clientside.HazelcastClientProxy;
 import com.hazelcast.client.config.ClientFlakeIdGeneratorConfig;
 import com.hazelcast.client.config.ClientIcmpPingConfig;
 import com.hazelcast.client.config.ClientNetworkConfig;
+import com.hazelcast.client.config.ClientReliableTopicConfig;
+import com.hazelcast.client.config.ClientSecurityConfig;
 import com.hazelcast.client.config.ClientUserCodeDeploymentConfig;
+import com.hazelcast.client.config.ConnectionRetryConfig;
 import com.hazelcast.client.config.ProxyFactoryConfig;
+import com.hazelcast.client.impl.clientside.HazelcastClientProxy;
 import com.hazelcast.client.util.RoundRobinLB;
+import com.hazelcast.config.CredentialsFactoryConfig;
 import com.hazelcast.config.EntryListenerConfig;
 import com.hazelcast.config.EvictionConfig;
 import com.hazelcast.config.EvictionPolicy;
@@ -55,6 +58,7 @@ import com.hazelcast.core.IdGenerator;
 import com.hazelcast.core.MultiMap;
 import com.hazelcast.security.Credentials;
 import com.hazelcast.test.annotation.QuickTest;
+import com.hazelcast.topic.TopicOverloadPolicy;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -72,6 +76,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 import static com.hazelcast.config.NearCacheConfig.LocalUpdatePolicy.CACHE_ON_UPDATE;
+import static com.hazelcast.test.HazelcastTestSupport.assertContains;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -121,6 +126,15 @@ public class TestClientApplicationContext {
     @Resource(name = "client13-exponential-connection-retry")
     private HazelcastClientProxy connectionRetryClient;
 
+    @Resource(name = "client14-reliable-topic")
+    private HazelcastClientProxy hazelcastReliableTopic;
+
+    @Resource(name = "client15-credentials-factory")
+    private HazelcastClientProxy credentialsFactory;
+
+    @Resource(name = "client16-name-and-labels")
+    private HazelcastClientProxy namedClient;
+
     @Resource(name = "instance")
     private HazelcastInstance instance;
 
@@ -162,6 +176,9 @@ public class TestClientApplicationContext {
 
     @Resource(name = "semaphore")
     private ISemaphore semaphore;
+
+    @Resource(name = "reliableTopic")
+    private ITopic reliableTopic;
 
     @Autowired
     private Credentials credentials;
@@ -287,6 +304,7 @@ public class TestClientApplicationContext {
         assertNotNull(atomicReference);
         assertNotNull(countDownLatch);
         assertNotNull(semaphore);
+        assertNotNull(reliableTopic);
         assertEquals("map1", map1.getName());
         assertEquals("map2", map2.getName());
         assertEquals("multiMap", multiMap.getName());
@@ -299,6 +317,7 @@ public class TestClientApplicationContext {
         assertEquals("atomicReference", atomicReference.getName());
         assertEquals("countDownLatch", countDownLatch.getName());
         assertEquals("semaphore", semaphore.getName());
+        assertEquals("reliableTopic", reliableTopic.getName());
     }
 
     @Test
@@ -398,6 +417,15 @@ public class TestClientApplicationContext {
     }
 
     @Test
+    public void testCredentialsFactory() {
+        ClientSecurityConfig securityConfig = credentialsFactory.getClientConfig().getSecurityConfig();
+        CredentialsFactoryConfig credentialsFactoryConfig = securityConfig.getCredentialsFactoryConfig();
+        assertEquals("com.hazelcast.examples.MyCredentialsFactory", credentialsFactoryConfig.getClassName());
+        assertEquals("value", credentialsFactoryConfig.getProperties().getProperty("property"));
+        assertNotNull(credentialsFactoryConfig.getImplementation());
+    }
+
+    @Test
     public void testClientIcmpConfig() {
         ClientIcmpPingConfig icmpPingConfig = icmpPingTestClient.getClientConfig()
                 .getNetworkConfig().getClientIcmpPingConfig();
@@ -429,6 +457,14 @@ public class TestClientApplicationContext {
         assertEquals(3, connectionRetryConfig.getMultiplier(), 0);
     }
 
+    @Test
+    public void testReliableTopicConfig() {
+        ClientConfig clientConfig = hazelcastReliableTopic.getClientConfig();
+        ClientReliableTopicConfig topicConfig = clientConfig.getReliableTopicConfig("rel-topic");
+        assertEquals(100, topicConfig.getReadBatchSize());
+        assertEquals(TopicOverloadPolicy.DISCARD_NEWEST, topicConfig.getTopicOverloadPolicy());
+    }
+
     private static QueryCacheConfig getQueryCacheConfig(ClientConfig config) {
         Map<String, Map<String, QueryCacheConfig>> queryCacheConfigs = config.getQueryCacheConfigs();
         Collection<Map<String, QueryCacheConfig>> values = queryCacheConfigs.values();
@@ -439,5 +475,17 @@ public class TestClientApplicationContext {
             }
         }
         return null;
+    }
+
+    @Test
+    public void testInstanceNameConfig() {
+        assertEquals("clientName", namedClient.getName());
+    }
+
+    @Test
+    public void testLabelsConfig() {
+        Set<String> labels = namedClient.getClientConfig().getLabels();
+        assertEquals(1, labels.size());
+        assertContains(labels, "foo");
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,11 @@ import com.hazelcast.aggregation.Aggregator;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
+import com.hazelcast.query.impl.Numbers;
 
 import java.io.IOException;
 
-public final class IntegerSumAggregator<I> extends AbstractAggregator<I, Integer, Long>
+public final class IntegerSumAggregator<I> extends AbstractAggregator<I, Number, Long>
         implements IdentifiedDataSerializable {
 
     private long sum;
@@ -37,8 +38,8 @@ public final class IntegerSumAggregator<I> extends AbstractAggregator<I, Integer
     }
 
     @Override
-    public void accumulateExtracted(I entry, Integer value) {
-        sum += value;
+    public void accumulateExtracted(I entry, Number value) {
+        sum += Numbers.asIntExactly(value);
     }
 
     @Override

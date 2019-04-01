@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -71,6 +71,13 @@ public class MulticastDiscoveryStrategy extends AbstractDiscoveryStrategy {
             String group = getOrDefault(MulticastProperties.GROUP, DEFAULT_MULTICAST_GROUP);
             multicastSocket = new MulticastSocket(null);
             multicastSocket.bind(new InetSocketAddress(port));
+            if (discoveryNode != null) {
+                // See MulticastService.createMulticastService(...)
+                InetAddress inetAddress = discoveryNode.getPrivateAddress().getInetAddress();
+                if (!inetAddress.isLoopbackAddress()) {
+                    multicastSocket.setInterface(inetAddress);
+                }
+            }
             multicastSocket.setReuseAddress(true);
             multicastSocket.setTimeToLive(SOCKET_TIME_TO_LIVE);
             multicastSocket.setReceiveBufferSize(DATA_OUTPUT_BUFFER_SIZE);

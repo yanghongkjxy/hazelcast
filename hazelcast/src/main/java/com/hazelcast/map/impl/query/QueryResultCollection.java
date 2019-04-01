@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,21 +32,21 @@ public class QueryResultCollection<E> extends AbstractSet<E> {
     private final IterationType iterationType;
     private final boolean binary;
 
-    public QueryResultCollection(SerializationService serializationService, IterationType iterationType, boolean binary,
+    public QueryResultCollection(SerializationService serializationService,
+                                 IterationType iterationType,
+                                 boolean binary,
                                  boolean unique) {
         this.serializationService = serializationService;
         this.iterationType = iterationType;
         this.binary = binary;
-        if (unique) {
-            rows = new HashSet<QueryResultRow>();
-        } else {
-            rows = new ArrayList<QueryResultRow>();
-        }
+        this.rows = unique ? new HashSet<QueryResultRow>() : new ArrayList<QueryResultRow>();
     }
 
-    public QueryResultCollection(SerializationService serializationService, IterationType iterationType, boolean binary,
-                                 boolean unique, QueryResult queryResult) {
-
+    public QueryResultCollection(SerializationService serializationService,
+                                 IterationType iterationType,
+                                 boolean binary,
+                                 boolean unique,
+                                 QueryResult queryResult) {
         this(serializationService, iterationType, binary, unique);
         addAllRows(queryResult.getRows());
     }

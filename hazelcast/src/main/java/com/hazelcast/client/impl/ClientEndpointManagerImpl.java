@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,9 +90,8 @@ public class ClientEndpointManagerImpl implements ClientEndpointManager {
         } else {
             totalRegistrations.inc();
             ClientEvent event = new ClientEvent(endpoint.getUuid(),
-                    ClientEventType.CONNECTED,
-                    endpoint.getSocketAddress(),
-                    endpoint.getClientType());
+                    ClientEventType.CONNECTED, endpoint.getSocketAddress(), endpoint.getClientType(), endpoint.getName(),
+                    endpoint.getLabels());
             sendClientEvent(event);
             return true;
         }
@@ -117,9 +116,8 @@ public class ClientEndpointManagerImpl implements ClientEndpointManager {
         }
 
         ClientEvent event = new ClientEvent(endpoint.getUuid(),
-                ClientEventType.DISCONNECTED,
-                endpoint.getSocketAddress(),
-                endpoint.getClientType());
+                ClientEventType.DISCONNECTED, endpoint.getSocketAddress(), endpoint.getClientType(), endpoint.getName(),
+                endpoint.getLabels());
         sendClientEvent(event);
     }
 

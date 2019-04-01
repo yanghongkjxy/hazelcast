@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import com.hazelcast.core.MemberSelector;
 import com.hazelcast.core.MembershipEvent;
 import com.hazelcast.core.MembershipListener;
 import com.hazelcast.hotrestart.HotRestartService;
+import com.hazelcast.instance.EndpointQualifier;
 import com.hazelcast.instance.HazelcastInstanceImpl;
 import com.hazelcast.instance.LifecycleServiceImpl;
 import com.hazelcast.instance.MemberImpl;
@@ -38,7 +39,6 @@ import com.hazelcast.internal.cluster.impl.operations.ShutdownNodeOp;
 import com.hazelcast.internal.cluster.impl.operations.TriggerExplicitSuspicionOp;
 import com.hazelcast.internal.metrics.MetricsRegistry;
 import com.hazelcast.internal.metrics.Probe;
-import com.hazelcast.internal.partition.impl.InternalPartitionServiceImpl;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.Connection;
@@ -57,6 +57,7 @@ import com.hazelcast.spi.OperationService;
 import com.hazelcast.spi.TransactionalService;
 import com.hazelcast.spi.exception.RetryableHazelcastException;
 import com.hazelcast.spi.impl.NodeEngineImpl;
+import com.hazelcast.spi.impl.executionservice.InternalExecutionService;
 import com.hazelcast.spi.properties.GroupProperty;
 import com.hazelcast.transaction.TransactionOptions;
 import com.hazelcast.transaction.TransactionalObject;
@@ -68,6 +69,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -75,55 +77,44 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static com.hazelcast.cluster.memberselector.MemberSelectors.NON_LOCAL_MEMBER_SELECTOR;
+import static com.hazelcast.instance.EndpointQualifier.MEMBER;
 import static com.hazelcast.instance.MemberImpl.NA_MEMBER_LIST_JOIN_VERSION;
-import static com.hazelcast.internal.cluster.Versions.V3_10;
 import static com.hazelcast.spi.ExecutionService.SYSTEM_EXECUTOR;
 import static com.hazelcast.util.Preconditions.checkFalse;
 import static com.hazelcast.util.Preconditions.checkNotNull;
 import static com.hazelcast.util.Preconditions.checkTrue;
+import static java.lang.String.format;
 
 @SuppressWarnings({"checkstyle:methodcount", "checkstyle:classdataabstractioncoupling", "checkstyle:classfanoutcomplexity"})
 public class ClusterServiceImpl implements ClusterService, ConnectionListener, ManagedService,
         EventPublishingService<MembershipEvent, MembershipListener>, TransactionalService {
 
     public static final String SERVICE_NAME = "hz:core:clusterService";
+    public static final String SPLIT_BRAIN_HANDLER_EXECUTOR_NAME = "hz:cluster:splitbrain";
 
-    static final String EXECUTOR_NAME = "hz:cluster";
+    static final String CLUSTER_EXECUTOR_NAME = "hz:cluster";
     static final String MEMBERSHIP_EVENT_EXECUTOR_NAME = "hz:cluster:event";
+    static final String VERSION_AUTO_UPGRADE_EXECUTOR_NAME = "hz:cluster:version:auto:upgrade";
 
     private static final int DEFAULT_MERGE_RUN_DELAY_MILLIS = 100;
-    private static final int CLUSTER_EXECUTOR_QUEUE_CAPACITY = 1000;
     private static final long CLUSTER_SHUTDOWN_SLEEP_DURATION_IN_MILLIS = 1000;
     private static final boolean ASSERTION_ENABLED = ClusterServiceImpl.class.desiredAssertionStatus();
 
-    private final ReentrantLock lock = new ReentrantLock();
-
+    private final boolean useLegacyMemberListFormat;
     private final Node node;
-
-    private final NodeEngineImpl nodeEngine;
-
     private final ILogger logger;
-
+    private final NodeEngineImpl nodeEngine;
     private final ClusterClockImpl clusterClock;
-
     private final MembershipManager membershipManager;
-
-    private final ClusterStateManager clusterStateManager;
-
     private final ClusterJoinManager clusterJoinManager;
-
+    private final ClusterStateManager clusterStateManager;
     private final ClusterHeartbeatManager clusterHeartbeatManager;
-
+    private final ReentrantLock lock = new ReentrantLock();
     private final AtomicBoolean joined = new AtomicBoolean(false);
 
-    private final boolean useLegacyMemberListFormat;
-
-    private volatile MemberImpl localMember;
-
-    private volatile Address masterAddress;
-
     private volatile String clusterId;
-
+    private volatile Address masterAddress;
+    private volatile MemberImpl localMember;
 
     public ClusterServiceImpl(Node node, MemberImpl localMember) {
         this.node = node;
@@ -140,9 +131,13 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
         clusterJoinManager = new ClusterJoinManager(node, this, lock);
         clusterHeartbeatManager = new ClusterHeartbeatManager(node, this, lock);
 
-        node.connectionManager.addConnectionListener(this);
+        node.networkingService.getEndpointManager(MEMBER).addConnectionListener(this);
+        InternalExecutionService executionService = nodeEngine.getExecutionService();
+        executionService.register(CLUSTER_EXECUTOR_NAME, 2, Integer.MAX_VALUE, ExecutorType.CACHED);
+        executionService.register(SPLIT_BRAIN_HANDLER_EXECUTOR_NAME, 2, Integer.MAX_VALUE, ExecutorType.CACHED);
         //MEMBERSHIP_EVENT_EXECUTOR is a single threaded executor to ensure that events are executed in correct order.
-        nodeEngine.getExecutionService().register(MEMBERSHIP_EVENT_EXECUTOR_NAME, 1, Integer.MAX_VALUE, ExecutorType.CACHED);
+        executionService.register(MEMBERSHIP_EVENT_EXECUTOR_NAME, 1, Integer.MAX_VALUE, ExecutorType.CACHED);
+        executionService.register(VERSION_AUTO_UPGRADE_EXECUTOR_NAME, 1, Integer.MAX_VALUE, ExecutorType.CACHED);
         registerMetrics();
     }
 
@@ -157,14 +152,12 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
     public void init(NodeEngine nodeEngine, Properties properties) {
         long mergeFirstRunDelayMs = node.getProperties().getPositiveMillisOrDefault(GroupProperty.MERGE_FIRST_RUN_DELAY_SECONDS,
                 DEFAULT_MERGE_RUN_DELAY_MILLIS);
-
-        ExecutionService executionService = nodeEngine.getExecutionService();
-        executionService.register(EXECUTOR_NAME, 2, CLUSTER_EXECUTOR_QUEUE_CAPACITY, ExecutorType.CACHED);
-
         long mergeNextRunDelayMs = node.getProperties().getPositiveMillisOrDefault(GroupProperty.MERGE_NEXT_RUN_DELAY_SECONDS,
                 DEFAULT_MERGE_RUN_DELAY_MILLIS);
-        executionService.scheduleWithRepetition(EXECUTOR_NAME, new SplitBrainHandler(node), mergeFirstRunDelayMs,
-                mergeNextRunDelayMs, TimeUnit.MILLISECONDS);
+
+        ExecutionService executionService = nodeEngine.getExecutionService();
+        executionService.scheduleWithRepetition(SPLIT_BRAIN_HANDLER_EXECUTOR_NAME, new SplitBrainHandler(node),
+                mergeFirstRunDelayMs, mergeNextRunDelayMs, TimeUnit.MILLISECONDS);
 
         membershipManager.init();
         clusterHeartbeatManager.init();
@@ -199,7 +192,7 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
                 return;
             }
 
-            Connection conn = node.getConnectionManager().getConnection(address);
+            Connection conn = node.getEndpointManager(MEMBER).getConnection(address);
             if (conn != null && conn.isAlive()) {
                 if (logger.isFineEnabled()) {
                     logger.fine("Cannot suspect " + member + ", since there's a live connection -> " + conn);
@@ -327,14 +320,21 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
         assert lock.isHeldByCurrentThread() : "Called without holding cluster service lock!";
         assert !isJoined() : "Cannot reset local member UUID when joined.";
 
-        Address address = getThisAddress();
-        String newUuid = UuidUtil.createMemberUuid(address);
+        Address memberAddress = node.getThisAddress();
+        Map<EndpointQualifier, Address> addressMap = localMember.getAddressMap();
+        String newUuid = UuidUtil.createMemberUuid(memberAddress);
 
         logger.warning("Resetting local member UUID. Previous: " + localMember.getUuid() + ", new: " + newUuid);
 
-        MemberImpl memberWithNewUuid = new MemberImpl(address, localMember.getVersion(),
-                true, newUuid, localMember.getAttributes(), localMember.isLiteMember(),
-                localMember.getMemberListJoinVersion(), node.hazelcastInstance);
+        MemberImpl memberWithNewUuid = new MemberImpl.Builder(addressMap)
+                .version(localMember.getVersion())
+                .localMember(true)
+                .uuid(newUuid)
+                .attributes(localMember.getAttributes())
+                .liteMember(localMember.isLiteMember())
+                .memberListJoinVersion(localMember.getMemberListJoinVersion())
+                .instance(node.hazelcastInstance)
+                .build();
 
         localMember = memberWithNewUuid;
 
@@ -378,7 +378,15 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
 
             checkMemberUpdateContainsLocalMember(membersView, targetUuid);
 
-            initialClusterState(clusterState, clusterVersion);
+            try {
+                initialClusterState(clusterState, clusterVersion);
+            } catch (VersionMismatchException e) {
+                // node should shutdown since it cannot handle the cluster version
+                // it is safe to do so here because no operations have been executed yet
+                logger.severe(format("This member will shutdown because it cannot join the cluster: %s", e.getMessage()));
+                node.shutdown(true);
+                return false;
+            }
             setClusterId(clusterId);
             ClusterClockImpl clusterClock = getClusterClock();
             clusterClock.setClusterStartTime(clusterStartTime);
@@ -451,36 +459,6 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
         return (callerAddress != null && callerAddress.equals(getMasterAddress()));
     }
 
-    void repairPartitionTableIfReturningMember(MemberImpl member) {
-        assert lock.isHeldByCurrentThread() : "Called without holding cluster service lock!";
-        if (!isMaster()) {
-            return;
-        }
-
-        if (getClusterState().isMigrationAllowed()) {
-            return;
-        }
-
-        if (!node.getNodeExtension().isStartCompleted()) {
-            return;
-        }
-
-        Address address = member.getAddress();
-        MemberImpl memberRemovedWhileClusterIsNotActive
-                = membershipManager.getMemberRemovedInNotJoinableState(member.getUuid());
-        if (memberRemovedWhileClusterIsNotActive != null) {
-            Address oldAddress = memberRemovedWhileClusterIsNotActive.getAddress();
-            if (!oldAddress.equals(address)) {
-                assert !isMemberRemovedInNotJoinableState(address);
-
-                logger.warning(member + " is returning with a new address. Old one was: " + oldAddress
-                        + ". Will update partition table with the new address.");
-                InternalPartitionServiceImpl partitionService = node.partitionService;
-                partitionService.replaceAddress(oldAddress, address);
-            }
-        }
-    }
-
     private boolean shouldProcessMemberUpdate(MembersView membersView) {
         int memberListVersion = membershipManager.getMemberListVersion();
         if (memberListVersion > membersView.getVersion()) {
@@ -548,16 +526,20 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
         return nodeEngine;
     }
 
-    public boolean isMemberRemovedInNotJoinableState(Address target) {
-        return membershipManager.isMemberRemovedInNotJoinableState(target);
+    /**
+     * Returns whether member with given identity (either {@code UUID} or {@code Address}
+     * depending on Hot Restart is enabled or not) is a known missing member or not.
+     *
+     * @param address Address of the missing member
+     * @param uuid    Uuid of the missing member
+     * @return true if it's a known missing member, false otherwise
+     */
+    public boolean isMissingMember(Address address, String uuid) {
+        return membershipManager.isMissingMember(address, uuid);
     }
 
-    boolean isMemberRemovedInNotJoinableState(String uuid) {
-        return membershipManager.isMemberRemovedInNotJoinableState(uuid);
-    }
-
-    public Collection<Member> getCurrentMembersAndMembersRemovedInNotJoinableState() {
-        return membershipManager.getCurrentMembersAndMembersRemovedInNotJoinableState();
+    public Collection<Member> getActiveAndMissingMembers() {
+        return membershipManager.getActiveAndMissingMembers();
     }
 
     public void notifyForRemovedMember(MemberImpl member) {
@@ -569,8 +551,8 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
         }
     }
 
-    public void shrinkMembersRemovedInNotJoinableState(Collection<String> memberUuidsToRemove) {
-        membershipManager.shrinkMembersRemovedInNotJoinableState(memberUuidsToRemove);
+    public void shrinkMissingMembers(Collection<String> memberUuidsToRemove) {
+        membershipManager.shrinkMissingMembers(memberUuidsToRemove);
     }
 
     private void sendMemberAttributeEvent(MemberImpl member, MemberAttributeOperationType operationType, String key,
@@ -610,6 +592,14 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
             return null;
         }
         return membershipManager.getMember(uuid);
+    }
+
+    @Override
+    public MemberImpl getMember(Address address, String uuid) {
+        if (address == null || uuid == null) {
+            return null;
+        }
+        return membershipManager.getMember(address, uuid);
     }
 
     @Override
@@ -674,10 +664,8 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
     // should be called under lock
     void setMasterAddress(Address master) {
         assert lock.isHeldByCurrentThread() : "Called without holding cluster service lock!";
-        if (master != null) {
-            if (logger.isFineEnabled()) {
-                logger.fine("Setting master address to " + master);
-            }
+        if (logger.isFineEnabled()) {
+            logger.fine("Setting master address to " + master);
         }
         masterAddress = master;
     }
@@ -878,9 +866,13 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
 
     @Override
     public void changeClusterVersion(Version version) {
+        MemberMap memberMap = membershipManager.getMemberMap();
+        changeClusterVersion(version, memberMap);
+    }
+
+    public void changeClusterVersion(Version version, MemberMap memberMap) {
         int partitionStateVersion = node.getPartitionService().getPartitionStateVersion();
-        clusterStateManager.changeClusterState(ClusterStateChange.from(version), membershipManager.getMemberMap(),
-                partitionStateVersion, false);
+        clusterStateManager.changeClusterState(ClusterStateChange.from(version), memberMap, partitionStateVersion, false);
     }
 
     @Override
@@ -896,10 +888,6 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
         try {
             if (!isJoined()) {
                 throw new IllegalStateException("Member list join version is not available when not joined");
-            } else if (getClusterVersion().isLessThan(V3_10)) {
-                // RU_COMPAT_3_9
-                String msg = "Member list join version is not available with a cluster version less than 3.10";
-                throw new UnsupportedOperationException(msg);
             }
 
             int joinVersion = localMember.getMemberListJoinVersion();
@@ -912,10 +900,6 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
         } finally {
             lock.unlock();
         }
-    }
-
-    void addMembersRemovedInNotJoinableState(Collection<MemberImpl> members) {
-        membershipManager.addMembersRemovedInNotJoinableState(members);
     }
 
     @Override
@@ -940,16 +924,20 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
         node.getNodeExtension().getInternalHotRestartService()
                 .waitPartitionReplicaSyncOnCluster(timeoutNanos, TimeUnit.NANOSECONDS);
         timeoutNanos -= (System.nanoTime() - startNanos);
-        shutdownNodes(timeoutNanos);
+
+        if (node.config.getCPSubsystemConfig().getCPMemberCount() == 0) {
+            shutdownNodesConcurrently(timeoutNanos);
+        } else {
+            shutdownNodesSerially(timeoutNanos);
+        }
     }
 
-    private void shutdownNodes(final long timeoutNanos) {
-        final Operation op = new ShutdownNodeOp();
-
-        logger.info("Sending shutting down operations to all members...");
-
+    private void shutdownNodesConcurrently(final long timeoutNanos) {
+        Operation op = new ShutdownNodeOp();
         Collection<Member> members = getMembers(NON_LOCAL_MEMBER_SELECTOR);
-        final long startTime = System.nanoTime();
+        long startTime = System.nanoTime();
+
+        logger.info("Sending shut down operations to all members...");
 
         while ((System.nanoTime() - startTime) < timeoutNanos && !members.isEmpty()) {
             for (Member member : members) {
@@ -967,9 +955,36 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
             members = getMembers(NON_LOCAL_MEMBER_SELECTOR);
         }
 
-        logger.info("Number of other nodes remaining: " + getSize(NON_LOCAL_MEMBER_SELECTOR) + ". Shutting down itself.");
+        logger.info("Number of other members remaining: " + getSize(NON_LOCAL_MEMBER_SELECTOR) + ". Shutting down itself.");
 
-        final HazelcastInstanceImpl hazelcastInstance = node.hazelcastInstance;
+        HazelcastInstanceImpl hazelcastInstance = node.hazelcastInstance;
+        hazelcastInstance.getLifecycleService().shutdown();
+    }
+
+    private void shutdownNodesSerially(final long timeoutNanos) {
+        Operation op = new ShutdownNodeOp();
+        long startTime = System.nanoTime();
+        Collection<Member> members = getMembers(NON_LOCAL_MEMBER_SELECTOR);
+
+        logger.info("Sending shut down operations to other members one by one...");
+
+        while ((System.nanoTime() - startTime) < timeoutNanos && !members.isEmpty()) {
+            Member member = members.iterator().next();
+            nodeEngine.getOperationService().send(op, member.getAddress());
+            members = getMembers(NON_LOCAL_MEMBER_SELECTOR);
+
+            try {
+                Thread.sleep(CLUSTER_SHUTDOWN_SLEEP_DURATION_IN_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.warning("Shutdown sleep interrupted. ", e);
+                break;
+            }
+        }
+
+        logger.info("Number of other members remaining: " + getSize(NON_LOCAL_MEMBER_SELECTOR) + ". Shutting down itself.");
+
+        HazelcastInstanceImpl hazelcastInstance = node.hazelcastInstance;
         hazelcastInstance.getLifecycleService().shutdown();
     }
 
@@ -1032,8 +1047,14 @@ public class ClusterServiceImpl implements ClusterService, ConnectionListener, M
         assert member.isLiteMember() : "Local member is not lite member!";
         assert lock.isHeldByCurrentThread() : "Called without holding cluster service lock!";
 
-        localMember = new MemberImpl(member.getAddress(), member.getVersion(), true, member.getUuid(),
-                member.getAttributes(), false, member.getMemberListJoinVersion(), node.hazelcastInstance);
+        localMember = new MemberImpl.Builder(member.getAddressMap())
+                .version(member.getVersion())
+                .localMember(true)
+                .uuid(member.getUuid())
+                .attributes(member.getAttributes())
+                .memberListJoinVersion(member.getMemberListJoinVersion())
+                .instance(node.hazelcastInstance)
+                .build();
         node.loggingService.setThisMember(localMember);
         return localMember;
     }

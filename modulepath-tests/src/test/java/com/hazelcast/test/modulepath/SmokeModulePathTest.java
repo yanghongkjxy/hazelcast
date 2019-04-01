@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.Member;
 import com.hazelcast.instance.HazelcastInstanceFactory;
+import com.hazelcast.internal.util.ModularJavaUtils;
 
 /**
  * Basic test which checks if correct Hazelcast modules are on the modulepath. It also checks that Hazelcast members and clients
@@ -71,6 +72,14 @@ public class SmokeModulePathTest {
         Set<String> hazelcastModuleNames = ModuleLayer.boot().modules().stream().map(Module::getName)
                 .filter(s -> s.contains("hazelcast")).collect(Collectors.toSet());
         assertThat(hazelcastModuleNames, hasItems("com.hazelcast.core", "com.hazelcast.client", "com.hazelcast.tests"));
+    }
+
+    /**
+     * Verify the name of Hazelcast module returned by {@link ModularJavaUtils#getHazelcastModuleName()}.
+     */
+    @Test
+    public void testHazelcastModuleName() {
+        assertEquals("com.hazelcast.core", ModularJavaUtils.getHazelcastModuleName());
     }
 
     /**

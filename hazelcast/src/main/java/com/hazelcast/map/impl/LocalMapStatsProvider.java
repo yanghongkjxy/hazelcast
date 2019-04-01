@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,10 +24,10 @@ import com.hazelcast.map.impl.recordstore.RecordStore;
 import com.hazelcast.monitor.LocalMapStats;
 import com.hazelcast.monitor.LocalRecordStoreStats;
 import com.hazelcast.monitor.NearCacheStats;
-import com.hazelcast.monitor.impl.PerIndexStats;
 import com.hazelcast.monitor.impl.IndexesStats;
 import com.hazelcast.monitor.impl.LocalMapStatsImpl;
 import com.hazelcast.monitor.impl.OnDemandIndexStats;
+import com.hazelcast.monitor.impl.PerIndexStats;
 import com.hazelcast.nio.Address;
 import com.hazelcast.query.impl.Indexes;
 import com.hazelcast.query.impl.InternalIndex;
@@ -318,9 +318,7 @@ public class LocalMapStatsProvider {
         NearCacheStats nearCacheStats = nearCache.getNearCacheStats();
 
         localMapStats.setNearCacheStats(nearCacheStats);
-        if (NATIVE != nearCache.getInMemoryFormat()) {
-            onDemandStats.incrementHeapCost(nearCacheStats.getOwnedEntryMemoryCost());
-        }
+        onDemandStats.incrementHeapCost(nearCacheStats.getOwnedEntryMemoryCost());
     }
 
     private void addIndexStats(String mapName, LocalMapStatsImpl localMapStats) {
@@ -377,7 +375,7 @@ public class LocalMapStatsProvider {
         }
 
         for (InternalIndex index : freshIndexes) {
-            String indexName = index.getAttributeName();
+            String indexName = index.getName();
             OnDemandIndexStats freshIndexStats = freshStats.get(indexName);
             if (freshIndexStats == null) {
                 freshIndexStats = new OnDemandIndexStats();

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
 import com.hazelcast.spi.ExceptionAction;
 import com.hazelcast.spi.Operation;
+import com.hazelcast.spi.UrgentSystemOperation;
 import com.hazelcast.spi.exception.TargetNotMemberException;
 import com.hazelcast.spi.impl.AllowedDuringPassiveState;
 import com.hazelcast.transaction.TransactionException;
@@ -35,7 +36,8 @@ import java.io.IOException;
 
 import static java.lang.String.format;
 
-public class CommitClusterStateOp extends Operation implements AllowedDuringPassiveState, IdentifiedDataSerializable {
+public class CommitClusterStateOp extends Operation implements AllowedDuringPassiveState, UrgentSystemOperation,
+        IdentifiedDataSerializable {
 
     private ClusterStateChange stateChange;
     private Address initiator;
@@ -71,7 +73,7 @@ public class CommitClusterStateOp extends Operation implements AllowedDuringPass
 
     @Override
     public void logError(Throwable e) {
-        if (e instanceof TransactionException) {
+        if (e instanceof TransactionException || e instanceof IllegalStateException) {
             getLogger().severe(e.getMessage());
         } else {
             super.logError(e);

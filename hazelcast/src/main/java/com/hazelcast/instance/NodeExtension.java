@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,8 +27,8 @@ import com.hazelcast.internal.dynamicconfig.DynamicConfigListener;
 import com.hazelcast.internal.jmx.ManagementService;
 import com.hazelcast.internal.management.ManagementCenterConnectionFactory;
 import com.hazelcast.internal.management.TimedMemberStateFactory;
+import com.hazelcast.internal.networking.ChannelInitializerProvider;
 import com.hazelcast.internal.networking.InboundHandler;
-import com.hazelcast.internal.networking.ChannelInitializer;
 import com.hazelcast.internal.networking.OutboundHandler;
 import com.hazelcast.internal.serialization.InternalSerializationService;
 import com.hazelcast.memory.MemoryStats;
@@ -128,8 +128,9 @@ public interface NodeExtension {
      * otherwise returns null.
      *
      * @return MemberSocketInterceptor
+     * @param endpointQualifier
      */
-    MemberSocketInterceptor getMemberSocketInterceptor();
+    MemberSocketInterceptor getSocketInterceptor(EndpointQualifier endpointQualifier);
 
     /**
      * Creates a <tt>InboundHandler</tt> for given <tt>Connection</tt> instance.
@@ -141,7 +142,7 @@ public interface NodeExtension {
      * @param ioService  IOService
      * @return the created InboundHandler.
      */
-    InboundHandler[] createInboundHandlers(TcpIpConnection connection, IOService ioService);
+    InboundHandler[] createInboundHandlers(EndpointQualifier qualifier, TcpIpConnection connection, IOService ioService);
 
     /**
      * Creates a <tt>OutboundHandler</tt> for given <tt>Connection</tt> instance.
@@ -150,20 +151,16 @@ public interface NodeExtension {
      * @param ioService  IOService
      * @return the created OutboundHandler
      */
-    OutboundHandler[] createOutboundHandlers(TcpIpConnection connection, IOService ioService);
+    OutboundHandler[] createOutboundHandlers(EndpointQualifier qualifier, TcpIpConnection connection, IOService ioService);
 
 
     /**
-     * Creates the ChannelInitializer.
-     *
-     * Currently there is a single global channel instance per member; but as soon
-     * as WAN is going to run on different ports, we probably need multiple
-     * ChannelInitializers.
+     * Creates the ChannelInitializerProvider.
      *
      * @param ioService
      * @return
      */
-    ChannelInitializer createChannelInitializer(IOService ioService);
+    ChannelInitializerProvider createChannelInitializerProvider(IOService ioService);
 
     /**
      * Called on thread start to inject/intercept extension specific logic,
@@ -197,13 +194,49 @@ public interface NodeExtension {
     void validateJoinRequest(JoinMessage joinMessage);
 
     /**
-     * Called when cluster state is changed
+     * Called when initial cluster state is received while joining the cluster.
      *
-     * @param newState new state
-     * @param isTransient status of the change. A cluster state change may be transient if it has been done temporarily
-     *                         during system operations such cluster start etc.
+     * @param initialState initial cluster state
+     */
+    void onInitialClusterState(ClusterState initialState);
+
+    /**
+     * Called before starting a cluster state change transaction. Called only
+     * on the member that initiated the state change.
+     *
+     * @param currState the state before the change
+     * @param requestedState the requested cluster state
+     * @param isTransient whether the change will be recorded in persistent storage, affecting the
+     *                    initial state after cluster restart. Transient changes happen during
+     *                    system operations such as an orderly all-cluster shutdown.
+     */
+    void beforeClusterStateChange(ClusterState currState, ClusterState requestedState, boolean isTransient);
+
+    /**
+     * Called during the commit phase of the cluster state change transaction,
+     * just after updating the value of the cluster state on the local member,
+     * while still holding the cluster lock. Called on all cluster members.
+     *
+     * @param newState the new cluster state
+     * @param isTransient whether the change will be recorded in persistent storage, affecting the
+     *                    initial state after cluster restart. Transient changes happen during
+     *                    system operations such as an orderly all-cluster shutdown.
      */
     void onClusterStateChange(ClusterState newState, boolean isTransient);
+
+    /**
+     * Called after the cluster state change transaction has completed
+     * (successfully or otherwise). Called only on the member that initiated
+     * the state change.
+     *
+     * @param oldState the state before the change
+     * @param newState the new cluster state, can be equal to {@code oldState} if the
+     *                 state change transaction failed
+     * @param isTransient whether the change will be recorded in persistent storage, affecting the
+     *                    initial state after cluster restart. Transient changes happen during
+     *                    system operations such as an orderly all-cluster shutdown.
+     */
+    void afterClusterStateChange(ClusterState oldState, ClusterState newState, boolean isTransient);
 
     /**
      * Called synchronously when partition state (partition assignments, version etc) changes
@@ -287,4 +320,15 @@ public interface NodeExtension {
      * Send PhoneHome ping from OS or EE instance to PhoneHome application
      */
     void sendPhoneHome();
+
+    /**
+     * Cluster version auto upgrade is done asynchronously. Every call of this
+     * method creates and schedules a new auto upgrade task.
+     */
+    void scheduleClusterVersionAutoUpgrade();
+
+    /**
+     * @return true if client failover feature is supported
+     */
+    boolean isClientFailoverSupported();
 }

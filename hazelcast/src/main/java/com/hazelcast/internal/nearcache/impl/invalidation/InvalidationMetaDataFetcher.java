@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.hazelcast.internal.nearcache.impl.invalidation;
 
-import com.hazelcast.core.HazelcastInstanceNotActiveException;
 import com.hazelcast.core.Member;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.nio.Address;
@@ -97,12 +96,8 @@ public abstract class InvalidationMetaDataFetcher {
             Address address = member.getAddress();
             try {
                 futureByMember.put(member, fetchMetadataOf(address, names));
-            } catch (HazelcastInstanceNotActiveException e) {
-                logger.finest(e);
             } catch (Exception e) {
-                if (logger.isWarningEnabled()) {
-                    logger.warning(format("Can't fetch invalidation meta-data of %s", member), e);
-                }
+                handleExceptionWhileProcessingMetadata(member, e);
             }
         }
 
@@ -115,16 +110,23 @@ public abstract class InvalidationMetaDataFetcher {
         MetadataHolder resultHolder = new MetadataHolder();
         try {
             extractMemberMetadata(member, future, resultHolder);
-        } catch (HazelcastInstanceNotActiveException e) {
-            logger.finest(e);
         } catch (Exception e) {
-            if (logger.isWarningEnabled()) {
-                logger.warning(format("Can't extract invalidation meta-data of %s", member), e);
-            }
+            handleExceptionWhileProcessingMetadata(member, e);
+            return;
         }
 
         repairUuids(resultHolder.partitionUuidList, handlers);
         repairSequences(resultHolder.namePartitionSequenceList, handlers);
+    }
+
+    protected void handleExceptionWhileProcessingMetadata(Member member, Exception e) {
+        if (e instanceof IllegalStateException) {
+            // log at finest when
+            // HazelcastInstanceNotActive, HazelcastClientNotActive or HazelcastClientOffline exception
+            logger.finest(e);
+        } else if (logger.isWarningEnabled()) {
+            logger.warning(format("Can't fetch or extract invalidation meta-data of %s", member), e);
+        }
     }
 
     private List<String> getDataStructureNames(ConcurrentMap<String, RepairingHandler> handlers) {

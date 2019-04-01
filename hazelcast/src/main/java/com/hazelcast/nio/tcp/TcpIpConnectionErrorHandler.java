@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,9 +32,9 @@ public class TcpIpConnectionErrorHandler {
     private int faults;
     private long lastFaultTime;
 
-    public TcpIpConnectionErrorHandler(TcpIpConnectionManager connectionManager, Address endPoint) {
+    TcpIpConnectionErrorHandler(TcpIpEndpointManager endpointManager, Address endPoint) {
         this.endPoint = endPoint;
-        this.ioService = connectionManager.getIoService();
+        this.ioService = endpointManager.getNetworkingService().getIoService();
         this.minInterval = ioService.getConnectionMonitorInterval();
         this.maxFaults = ioService.getConnectionMonitorMaxFaults();
         this.logger = ioService.getLoggingService().getLogger(getClass());

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import com.hazelcast.cache.impl.CacheService;
 import com.hazelcast.cache.impl.HazelcastServerCachingProvider;
 import com.hazelcast.cache.impl.event.CachePartitionLostEvent;
 import com.hazelcast.cache.impl.event.CachePartitionLostListener;
-import com.hazelcast.client.HazelcastClientManager;
 import com.hazelcast.client.cache.impl.HazelcastClientCachingProvider;
 import com.hazelcast.client.test.TestHazelcastFactory;
 import com.hazelcast.config.CacheConfig;
@@ -64,7 +63,6 @@ public class ClientCachePartitionLostListenerTest extends HazelcastTestSupport {
     @After
     public void tearDown() {
         hazelcastFactory.terminateAll();
-        HazelcastClientManager.shutdownAll();
     }
 
     @Test

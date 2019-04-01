@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 import static com.hazelcast.instance.OutOfMemoryErrorDispatcher.inspectOutOfMemoryError;
+import static com.hazelcast.instance.EndpointQualifier.MEMBER;
 import static com.hazelcast.internal.metrics.ProbeLevel.MANDATORY;
 import static com.hazelcast.internal.util.counters.SwCounter.newSwCounter;
 import static com.hazelcast.nio.Packet.FLAG_OP_CONTROL;
@@ -190,6 +191,15 @@ public class InvocationMonitor implements Consumer<Packet>, MetricsProvider {
         int memberListVersion = nodeEngine.getClusterService().getMemberListVersion();
         // postpone notifying invocations since real response may arrive in the mean time.
         scheduler.execute(new OnMemberLeftTask(member, memberListVersion));
+    }
+
+    /**
+     * Cleans up heartbeats and fails invocations for the given endpoint.
+     *
+     * @param endpoint the endpoint that has left
+     */
+    void onEndpointLeft(Address endpoint) {
+        scheduler.execute(new OnEndpointLeftTask(endpoint));
     }
 
     void execute(Runnable runnable) {
@@ -341,6 +351,28 @@ public class InvocationMonitor implements Consumer<Packet>, MetricsProvider {
         }
     }
 
+    /**
+     * Task for cleaning up heartbeats and failing invocations for an endpoint which has left.
+     */
+    private final class OnEndpointLeftTask extends MonitorTask {
+        private final Address endpoint;
+
+        private OnEndpointLeftTask(Address endpoint) {
+            this.endpoint = endpoint;
+        }
+
+        @Override
+        public void run0() {
+            heartbeatPerMember.remove(endpoint);
+
+            for (Invocation invocation : invocationRegistry) {
+                if (endpoint.equals(invocation.getTargetAddress())) {
+                    invocation.notifyError(new MemberLeftException("Endpoint " + endpoint + " has left"));
+                }
+            }
+        }
+    }
+
     private final class OnMemberLeftTask extends MonitorTask {
         private final MemberImpl leftMember;
         private final int memberListVersion;
@@ -364,9 +396,9 @@ public class InvocationMonitor implements Consumer<Packet>, MetricsProvider {
         }
 
         private boolean hasTargetLeft(Invocation invocation) {
-            MemberImpl targetMember = invocation.targetMember;
+            Member targetMember = invocation.getTargetMember();
             if (targetMember == null) {
-                Address invTarget = invocation.invTarget;
+                Address invTarget = invocation.getTargetAddress();
                 return leftMember.getAddress().equals(invTarget);
             } else {
                 return leftMember.getUuid().equals(targetMember.getUuid());
@@ -388,7 +420,7 @@ public class InvocationMonitor implements Consumer<Packet>, MetricsProvider {
             // operation is submitted to the target. If a member restarts with the same identity (UUID),
             // by comparing member-list-version during member removal with the invocation's member-list-version
             // we can determine whether invocation is submitted before member left or after restart.
-            if (invocation.memberListVersion < memberListVersion) {
+            if (invocation.getMemberListVersion() < memberListVersion) {
                 invocation.notifyError(new MemberLeftException(leftMember));
             }
         }
@@ -486,7 +518,7 @@ public class InvocationMonitor implements Consumer<Packet>, MetricsProvider {
             }
             for (Invocation invocation : invocationRegistry) {
                 if (invocation.future.isCancelled()) {
-                    calls.addOpToCancel(invocation.invTarget, invocation.op.getCallId());
+                    calls.addOpToCancel(invocation.getTargetAddress(), invocation.op.getCallId());
                 }
             }
             return calls;
@@ -501,7 +533,7 @@ public class InvocationMonitor implements Consumer<Packet>, MetricsProvider {
                 Packet packet = new Packet(serializationService.toBytes(opControl))
                         .setPacketType(Packet.Type.OPERATION)
                         .raiseFlags(FLAG_OP_CONTROL | FLAG_URGENT);
-                nodeEngine.getNode().getConnectionManager().transmit(packet, address);
+                nodeEngine.getNode().getNetworkingService().getEndpointManager(MEMBER).transmit(packet, address);
             }
         }
     }

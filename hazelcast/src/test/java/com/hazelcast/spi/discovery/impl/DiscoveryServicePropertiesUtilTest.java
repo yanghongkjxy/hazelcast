@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import com.hazelcast.config.properties.PropertyDefinition;
 import com.hazelcast.config.properties.SimplePropertyDefinition;
 import com.hazelcast.config.properties.ValidationException;
 import com.hazelcast.config.properties.ValueValidator;
+import com.hazelcast.core.TypeConverter;
 import com.hazelcast.test.HazelcastParallelClassRunner;
 import com.hazelcast.test.annotation.ParallelTest;
 import com.hazelcast.test.annotation.QuickTest;
@@ -118,6 +119,26 @@ public class DiscoveryServicePropertiesUtilTest {
 
         // then
         // throw exception
+    }
+
+    @Test
+    public void nullProperty() {
+        // given
+        Map<String, Comparable> properties = singletonMap(PROPERTY_KEY_1, null);
+        TypeConverter typeConverter = new TypeConverter() {
+            @Override
+            public Comparable convert(Comparable value) {
+                return value == null ? "hazel" : "cast";
+            }
+        };
+        Collection<PropertyDefinition> propertyDefinitions = singletonList(
+                (PropertyDefinition) new SimplePropertyDefinition(PROPERTY_KEY_1, true, typeConverter));
+
+        // when
+        Map<String, Comparable> result = prepareProperties(properties, propertyDefinitions);
+
+        // then
+        assertEquals("hazel", result.get(PROPERTY_KEY_1));
     }
 
     private static class DummyValidator implements ValueValidator<String> {

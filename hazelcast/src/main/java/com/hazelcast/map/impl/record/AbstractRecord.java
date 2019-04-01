@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@
 package com.hazelcast.map.impl.record;
 
 import com.hazelcast.nio.serialization.Data;
+import com.hazelcast.query.Metadata;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import static com.hazelcast.nio.Bits.INT_SIZE_IN_BYTES;
 import static com.hazelcast.nio.Bits.LONG_SIZE_IN_BYTES;
 import static com.hazelcast.util.JVMUtil.REFERENCE_COST_IN_BYTES;
+import static com.hazelcast.util.TimeUtil.zeroOutMs;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -34,8 +36,14 @@ public abstract class AbstractRecord<V> implements Record<V> {
     /**
      * Base time to be used for storing time values as diffs (int) rather than full blown epoch based vals (long)
      * This allows for a space in seconds, of roughly 68 years.
+     *
+     * Reference value (1514764800000) - Monday, January 1, 2018 12:00:00 AM
+     *
+     * The fixed time in the past (instead of {@link System#currentTimeMillis()} prevents any
+     * time discrepancies among nodes, mis-translated as diffs of -1 ie. {@link Record#NOT_AVAILABLE} values.
+     * (see. https://github.com/hazelcast/hazelcast-enterprise/issues/2527)
      */
-    public static final long EPOCH_TIME = zeroOutMillis(System.currentTimeMillis());
+    public static final long EPOCH_TIME = zeroOutMs(1514764800000L);
 
     private static final int NUMBER_OF_LONGS = 2;
     private static final int NUMBER_OF_INTS = 5;
@@ -51,8 +59,19 @@ public abstract class AbstractRecord<V> implements Record<V> {
     private volatile int lastAccessTime = NOT_AVAILABLE;
     private volatile int lastUpdateTime = NOT_AVAILABLE;
     private int creationTime = NOT_AVAILABLE;
+    private Metadata metadata;
 
     AbstractRecord() {
+    }
+
+    @Override
+    public void setMetadata(Metadata metadata) {
+        this.metadata = metadata;
+    }
+
+    @Override
+    public Metadata getMetadata() {
+        return metadata;
     }
 
     @Override
@@ -268,7 +287,4 @@ public abstract class AbstractRecord<V> implements Record<V> {
         return diff;
     }
 
-    private static long zeroOutMillis(long value) {
-        return SECONDS.toMillis(MILLISECONDS.toSeconds(value));
-    }
 }

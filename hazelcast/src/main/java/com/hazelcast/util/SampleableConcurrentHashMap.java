@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,12 +40,16 @@ public class SampleableConcurrentHashMap<K, V> extends ConcurrentReferenceHashMa
     private static final float LOAD_FACTOR = 0.91f;
 
     public SampleableConcurrentHashMap(int initialCapacity) {
-        // Concurrency level 1 is important for fetch-method to function properly.
-        // Moreover partitions are single threaded and higher concurrency has not much gain
-        this(initialCapacity, LOAD_FACTOR, 1, ReferenceType.STRONG, ReferenceType.STRONG, null);
+        this(initialCapacity, ReferenceType.STRONG, ReferenceType.STRONG);
     }
 
-    public SampleableConcurrentHashMap(int initialCapacity, float loadFactor, int concurrencyLevel,
+    public SampleableConcurrentHashMap(int initialCapacity, ReferenceType keyType, ReferenceType valueType) {
+        // Concurrency level 1 is important for fetch-method to function properly.
+        // Moreover partitions are single threaded and higher concurrency has not much gain
+        this(initialCapacity, LOAD_FACTOR, 1, keyType, valueType, null);
+    }
+
+    private SampleableConcurrentHashMap(int initialCapacity, float loadFactor, int concurrencyLevel,
                                        ReferenceType keyType, ReferenceType valueType, EnumSet<Option> options) {
         super(initialCapacity, loadFactor, concurrencyLevel, keyType, valueType, options);
     }
@@ -197,10 +201,7 @@ public class SampleableConcurrentHashMap<K, V> extends ConcurrentReferenceHashMa
     }
 
     /**
-     * This class is implements both of "Iterable" and "Iterator" interfaces.
-     * So we can use only one object (instead of two) both for "Iterable" and "Iterator" interfaces.
-     *
-     * NOTE: Assumed that it is not accessed by multiple threads. So there is no synchronization.
+     * Not thread safe
      */
     private final class LazySamplingEntryIterableIterator<E extends SamplingEntry> implements Iterable<E>, Iterator<E> {
 
@@ -209,7 +210,7 @@ public class SampleableConcurrentHashMap<K, V> extends ConcurrentReferenceHashMa
         private final int firstSegmentIndex;
         private int currentSegmentIndex;
         private int currentBucketIndex;
-        private HashEntry<K, V> currentEntry;
+        private HashEntry<K, V> mostRecentlyReturnedEntry;
         private int returnedEntryCount;
         private boolean reachedToEnd;
         private E currentSample;
@@ -250,28 +251,26 @@ public class SampleableConcurrentHashMap<K, V> extends ConcurrentReferenceHashMa
                     }
                     do {
                         // If current entry is not initialized yet, initialize it
-                        if (currentEntry == null) {
-                            currentEntry = table[currentBucketIndex];
+                        if (mostRecentlyReturnedEntry == null) {
+                            mostRecentlyReturnedEntry = table[currentBucketIndex];
+                        } else {
+                            mostRecentlyReturnedEntry = mostRecentlyReturnedEntry.next;
                         }
-                        while (currentEntry != null) {
-                            V value = currentEntry.value();
-                            K key = currentEntry.key();
-                            // Advance to next entry
-                            currentEntry = currentEntry.next;
-                            if (isValidForSampling(value)) {
+
+                        while (mostRecentlyReturnedEntry != null) {
+                            V value = mostRecentlyReturnedEntry.value();
+                            K key = mostRecentlyReturnedEntry.key();
+
+                            if (isValidForSampling(key, value)) {
                                 currentSample = createSamplingEntry(key, value);
                                 // If we reached end of entries, advance current bucket index
-                                if (currentEntry == null) {
-                                    currentBucketIndex = ++currentBucketIndex < table.length ? currentBucketIndex : 0;
-                                }
                                 returnedEntryCount++;
                                 return;
                             }
+                            mostRecentlyReturnedEntry = mostRecentlyReturnedEntry.next;
                         }
                         // Advance current bucket index
                         currentBucketIndex = ++currentBucketIndex < table.length ? currentBucketIndex : 0;
-                        // Clear current entry index to initialize at next bucket
-                        currentEntry = null;
                     } while (currentBucketIndex != firstBucketIndex);
                 }
                 // Advance current segment index
@@ -279,7 +278,7 @@ public class SampleableConcurrentHashMap<K, V> extends ConcurrentReferenceHashMa
                 // Clear current bucket index to initialize at next segment
                 currentBucketIndex = -1;
                 // Clear current entry index to initialize at next segment
-                currentEntry = null;
+                mostRecentlyReturnedEntry = null;
             } while (currentSegmentIndex != firstSegmentIndex);
 
             reachedToEnd = true;
@@ -288,14 +287,18 @@ public class SampleableConcurrentHashMap<K, V> extends ConcurrentReferenceHashMa
 
         @Override
         public boolean hasNext() {
-            iterate();
+            if (currentSample == null) {
+                iterate();
+            }
             return currentSample != null;
         }
 
         @Override
         public E next() {
-            if (currentSample != null) {
-                return currentSample;
+            if (hasNext()) {
+                E returnValue = currentSample;
+                currentSample = null;
+                return returnValue;
             } else {
                 throw new NoSuchElementException();
             }
@@ -307,7 +310,7 @@ public class SampleableConcurrentHashMap<K, V> extends ConcurrentReferenceHashMa
         }
     }
 
-    protected boolean isValidForSampling(V value) {
-        return value != null;
+    protected boolean isValidForSampling(K key, V value) {
+        return key != null && value != null;
     }
 }

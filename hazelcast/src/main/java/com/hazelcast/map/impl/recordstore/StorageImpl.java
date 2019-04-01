@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.hazelcast.map.impl.recordstore;
 
 import com.hazelcast.config.InMemoryFormat;
+import com.hazelcast.core.EntryView;
 import com.hazelcast.map.impl.EntryCostEstimator;
 import com.hazelcast.map.impl.iterator.MapEntriesWithCursor;
 import com.hazelcast.map.impl.iterator.MapKeysWithCursor;
@@ -154,7 +155,7 @@ public class StorageImpl<R extends Record> implements Storage<Data, R> {
     }
 
     @Override
-    public Iterable<LazyEntryViewFromRecord> getRandomSamples(int sampleCount) {
+    public Iterable getRandomSamples(int sampleCount) {
         return records.getRandomSamples(sampleCount);
     }
 
@@ -176,6 +177,11 @@ public class StorageImpl<R extends Record> implements Storage<Data, R> {
             entriesData.add(new AbstractMap.SimpleEntry<Data, Data>(entry.getKey(), dataValue));
         }
         return new MapEntriesWithCursor(entriesData, newTableIndex);
+    }
+
+    @Override
+    public Record extractRecordFromLazy(EntryView entryView) {
+        return ((LazyEntryViewFromRecord) entryView).getRecord();
     }
 
 }

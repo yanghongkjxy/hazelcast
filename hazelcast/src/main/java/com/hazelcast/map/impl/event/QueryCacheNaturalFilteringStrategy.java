@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.hazelcast.map.impl.event;
 
 import com.hazelcast.core.EntryEventType;
+import com.hazelcast.internal.serialization.InternalSerializationService;
 import com.hazelcast.map.impl.EntryEventFilter;
 import com.hazelcast.map.impl.EventListenerFilter;
 import com.hazelcast.map.impl.MapPartitionLostEventFilter;
@@ -27,7 +28,6 @@ import com.hazelcast.nio.Address;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.spi.EventFilter;
 import com.hazelcast.spi.impl.eventservice.impl.TrueEventFilter;
-import com.hazelcast.spi.serialization.SerializationService;
 import com.hazelcast.util.collection.Int2ObjectHashMap;
 
 import java.util.Collection;
@@ -82,13 +82,14 @@ public class QueryCacheNaturalFilteringStrategy extends AbstractFilteringStrateg
     // Default capacity of event-type > EventData map.
     private static final int EVENT_DATA_MAP_CAPACITY = 4;
 
-    public QueryCacheNaturalFilteringStrategy(SerializationService serializationService, MapServiceContext mapServiceContext) {
+    public QueryCacheNaturalFilteringStrategy(InternalSerializationService serializationService,
+                                              MapServiceContext mapServiceContext) {
         super(serializationService, mapServiceContext);
     }
 
     @SuppressWarnings({"checkstyle:npathcomplexity", "checkstyle:cyclomaticcomplexity"})
     @Override
-    public int doFilter(EventFilter filter, Data dataKey, Object dataOldValue, Object dataValue, EntryEventType eventType,
+    public int doFilter(EventFilter filter, Data dataKey, Object oldValue, Object dataValue, EntryEventType eventType,
                         String mapNameOrNull) {
         if (filter instanceof MapPartitionLostEventFilter) {
             return FILTER_DOES_NOT_MATCH;
@@ -121,7 +122,7 @@ public class QueryCacheNaturalFilteringStrategy extends AbstractFilteringStrateg
         }
 
         if (filter instanceof QueryEventFilter) {
-            int effectiveEventType = processQueryEventFilterWithAlternativeEventType(filter, eventType, dataKey, dataOldValue,
+            int effectiveEventType = processQueryEventFilterWithAlternativeEventType(filter, eventType, dataKey, oldValue,
                     dataValue, mapNameOrNull);
             if (effectiveEventType == FILTER_DOES_NOT_MATCH) {
                 return FILTER_DOES_NOT_MATCH;
@@ -154,8 +155,12 @@ public class QueryCacheNaturalFilteringStrategy extends AbstractFilteringStrateg
         return "QueryCacheNaturalFilteringStrategy";
     }
 
-    private int processQueryEventFilterWithAlternativeEventType(EventFilter filter, EntryEventType eventType,
-                                                Data dataKey, Object dataOldValue, Object dataValue, String mapNameOrNull) {
+    private int processQueryEventFilterWithAlternativeEventType(EventFilter filter,
+                                                                EntryEventType eventType,
+                                                                Data dataKey,
+                                                                Object dataOldValue,
+                                                                Object dataValue,
+                                                                String mapNameOrNull) {
         if (eventType == UPDATED) {
             // need to evaluate the filter on both old and new value and morph accordingly the event type
             boolean newValueMatches = evaluateQueryEventFilter(filter, dataKey, dataValue, mapNameOrNull);

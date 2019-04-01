@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -181,7 +181,7 @@ public abstract class Operation implements DataSerializable {
     }
 
     /**
-     * Method is intended to be subclassed. If it returns {@code true},
+     * Method is intended to be overridden. If it returns {@code true},
      * {@link #getResponse()} will be called right after {@link #run()} method.
      * If it returns {@code false}, {@link #sendResponse(Object)} must be
      * called later to finish the operation.

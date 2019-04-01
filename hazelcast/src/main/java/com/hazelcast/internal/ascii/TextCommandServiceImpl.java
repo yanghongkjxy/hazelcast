@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,6 +38,9 @@ import com.hazelcast.internal.ascii.rest.HttpHeadCommandProcessor;
 import com.hazelcast.internal.ascii.rest.HttpPostCommandProcessor;
 import com.hazelcast.internal.ascii.rest.RestValue;
 import com.hazelcast.logging.ILogger;
+import com.hazelcast.nio.AggregateEndpointManager;
+import com.hazelcast.nio.EndpointManager;
+import com.hazelcast.nio.NetworkingService;
 import com.hazelcast.nio.ascii.TextEncoder;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.util.Clock;
@@ -51,6 +54,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.hazelcast.instance.EndpointQualifier.MEMCACHE;
 import static com.hazelcast.internal.ascii.TextCommandConstants.TextCommandType.ADD;
 import static com.hazelcast.internal.ascii.TextCommandConstants.TextCommandType.APPEND;
 import static com.hazelcast.internal.ascii.TextCommandConstants.TextCommandType.BULK_GET;
@@ -170,8 +174,13 @@ public class TextCommandServiceImpl implements TextCommandService {
         stats.setIncrMisses(incrementMisses.get());
         stats.setDecrHits(decrementHits.get());
         stats.setDecrMisses(decrementMisses.get());
-        stats.setCurrConnections(node.connectionManager.getCurrentClientConnections());
-        stats.setTotalConnections(node.connectionManager.getAllTextConnections());
+        NetworkingService cm = node.networkingService;
+        EndpointManager mem = cm.getEndpointManager(MEMCACHE);
+        int totalText = (mem != null ? mem.getActiveConnections().size() : 0);
+
+        AggregateEndpointManager aem = cm.getAggregateEndpointManager();
+        stats.setCurrConnections(totalText);
+        stats.setTotalConnections(aem.getActiveConnections().size());
         return stats;
     }
 

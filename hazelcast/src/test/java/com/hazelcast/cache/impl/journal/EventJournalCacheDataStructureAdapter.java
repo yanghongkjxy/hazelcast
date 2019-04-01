@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,9 +24,9 @@ import com.hazelcast.core.ICompletableFuture;
 import com.hazelcast.internal.journal.EventJournalInitialSubscriberState;
 import com.hazelcast.internal.journal.EventJournalReader;
 import com.hazelcast.journal.EventJournalDataStructureAdapter;
-import com.hazelcast.projection.Projection;
 import com.hazelcast.ringbuffer.ReadResultSet;
 import com.hazelcast.spi.ObjectNamespace;
+import com.hazelcast.util.function.Function;
 import com.hazelcast.util.function.Predicate;
 
 import javax.cache.Cache;
@@ -68,6 +68,21 @@ public class EventJournalCacheDataStructureAdapter<K, V>
     }
 
     @Override
+    public void putAll(Map<K, V> map) {
+        cache.putAll(map);
+    }
+
+    @Override
+    public void load(K key) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void loadAll(Set<K> keys) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public ObjectNamespace getNamespace() {
         return CacheService.getObjectNamespace(cache.getPrefixedName());
     }
@@ -96,7 +111,7 @@ public class EventJournalCacheDataStructureAdapter<K, V>
             int maxSize,
             int partitionId,
             Predicate<? super EventJournalCacheEvent<K, V>> predicate,
-            Projection<? super EventJournalCacheEvent<K, V>, ? extends T> projection
+            Function<? super EventJournalCacheEvent<K, V>, ? extends T> projection
     ) {
         final EventJournalReader<EventJournalCacheEvent<K, V>> reader
                 = (EventJournalReader<EventJournalCacheEvent<K, V>>) this.cache;

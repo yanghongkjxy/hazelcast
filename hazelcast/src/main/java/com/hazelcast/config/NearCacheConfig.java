@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import static com.hazelcast.util.Preconditions.isNotNull;
  * Contains the configuration for a Near Cache.
  */
 @SuppressWarnings("checkstyle:methodcount")
-public class NearCacheConfig implements IdentifiedDataSerializable, Serializable {
+public class NearCacheConfig implements IdentifiedDataSerializable, Serializable, NamedConfig {
 
     /**
      * Default value for the in-memory format.

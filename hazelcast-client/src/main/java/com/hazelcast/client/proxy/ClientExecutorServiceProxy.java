@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -256,13 +256,7 @@ public class ClientExecutorServiceProxy extends ClientProxy implements IExecutor
     @Override
     public <T> void submitToAllMembers(Callable<T> task, MultiExecutionCallback callback) {
         final Collection<Member> memberList = getContext().getClusterService().getMemberList();
-        MultiExecutionCallbackWrapper multiExecutionCallbackWrapper =
-                new MultiExecutionCallbackWrapper(memberList.size(), callback);
-        for (Member member : memberList) {
-            final ExecutionCallbackWrapper<T> executionCallback =
-                    new ExecutionCallbackWrapper<T>(multiExecutionCallbackWrapper, member);
-            submitToMember(task, member, executionCallback);
-        }
+        submitToMembers(task, memberList, callback);
     }
 
     // submit random

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import com.hazelcast.client.impl.protocol.codec.DynamicConfigAddFlakeIdGenerator
 import com.hazelcast.client.impl.protocol.codec.DynamicConfigAddListConfigCodec;
 import com.hazelcast.client.impl.protocol.codec.DynamicConfigAddLockConfigCodec;
 import com.hazelcast.client.impl.protocol.codec.DynamicConfigAddMapConfigCodec;
+import com.hazelcast.client.impl.protocol.codec.DynamicConfigAddMerkleTreeConfigCodec;
 import com.hazelcast.client.impl.protocol.codec.DynamicConfigAddMultiMapConfigCodec;
 import com.hazelcast.client.impl.protocol.codec.DynamicConfigAddPNCounterConfigCodec;
 import com.hazelcast.client.impl.protocol.codec.DynamicConfigAddQueueConfigCodec;
@@ -48,6 +49,7 @@ import com.hazelcast.client.impl.protocol.task.dynamicconfig.QueueStoreConfigHol
 import com.hazelcast.client.impl.protocol.task.dynamicconfig.RingbufferStoreConfigHolder;
 import com.hazelcast.client.spi.impl.ClientInvocation;
 import com.hazelcast.client.spi.impl.ClientInvocationFuture;
+import com.hazelcast.config.AdvancedNetworkConfig;
 import com.hazelcast.config.AtomicLongConfig;
 import com.hazelcast.config.AtomicReferenceConfig;
 import com.hazelcast.config.CRDTReplicationConfig;
@@ -91,6 +93,7 @@ import com.hazelcast.config.SetConfig;
 import com.hazelcast.config.TopicConfig;
 import com.hazelcast.config.UserCodeDeploymentConfig;
 import com.hazelcast.config.WanReplicationConfig;
+import com.hazelcast.config.cp.CPSubsystemConfig;
 import com.hazelcast.core.ManagedContext;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.spi.serialization.SerializationService;
@@ -154,7 +157,7 @@ public class ClientDynamicClusterConfig extends Config {
                 NearCacheConfigHolder.of(mapConfig.getNearCacheConfig(), serializationService),
                 mapConfig.getWanReplicationRef(), mapConfig.getMapIndexConfigs(), mapConfig.getMapAttributeConfigs(),
                 queryCacheConfigHolders, partitioningStrategyClassName, partitioningStrategy, mapConfig.getHotRestartConfig(),
-                mapConfig.getMergePolicyConfig().getBatchSize());
+                mapConfig.getMergePolicyConfig().getBatchSize(), mapConfig.getMetadataPolicy().getId());
         invoke(request);
         return this;
     }
@@ -464,9 +467,11 @@ public class ClientDynamicClusterConfig extends Config {
 
     @Override
     public Config addMerkleTreeConfig(MerkleTreeConfig merkleTreeConfig) {
-        final String mapName = merkleTreeConfig.getMapName();
+        String mapName = merkleTreeConfig.getMapName();
         Preconditions.checkHasText(mapName, "Merkle tree config must define a map name");
-        // TODO add client invocation
+        ClientMessage request = DynamicConfigAddMerkleTreeConfigCodec.encodeRequest(
+                merkleTreeConfig.getMapName(), merkleTreeConfig.isEnabled(), merkleTreeConfig.getDepth());
+        invoke(request);
         return this;
     }
 
@@ -570,6 +575,16 @@ public class ClientDynamicClusterConfig extends Config {
 
     @Override
     public Config setNetworkConfig(NetworkConfig networkConfig) {
+        throw new UnsupportedOperationException(UNSUPPORTED_ERROR_MESSAGE);
+    }
+
+    @Override
+    public AdvancedNetworkConfig getAdvancedNetworkConfig() {
+        throw new UnsupportedOperationException(UNSUPPORTED_ERROR_MESSAGE);
+    }
+
+    @Override
+    public Config setAdvancedNetworkConfig(AdvancedNetworkConfig advancedNetworkConfig) {
         throw new UnsupportedOperationException(UNSUPPORTED_ERROR_MESSAGE);
     }
 
@@ -1221,6 +1236,16 @@ public class ClientDynamicClusterConfig extends Config {
 
     @Override
     public Config setPNCounterConfigs(Map<String, PNCounterConfig> pnCounterConfigs) {
+        throw new UnsupportedOperationException(UNSUPPORTED_ERROR_MESSAGE);
+    }
+
+    @Override
+    public CPSubsystemConfig getCPSubsystemConfig() {
+        throw new UnsupportedOperationException(UNSUPPORTED_ERROR_MESSAGE);
+    }
+
+    @Override
+    public Config setCPSubsystemConfig(CPSubsystemConfig cpSubsystemConfig) {
         throw new UnsupportedOperationException(UNSUPPORTED_ERROR_MESSAGE);
     }
 

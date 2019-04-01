@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.hazelcast.monitor.impl;
 import com.hazelcast.internal.metrics.Probe;
 import com.hazelcast.internal.json.JsonObject;
 import com.hazelcast.monitor.LocalTopicStats;
+import com.hazelcast.topic.impl.reliable.ReliableMessageRunner;
 import com.hazelcast.util.Clock;
 
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
@@ -78,7 +79,7 @@ public class LocalTopicStatsImpl implements LocalTopicStats {
      * on one member).
      *
      * @see com.hazelcast.topic.impl.TopicService
-     * @see com.hazelcast.topic.impl.reliable.ReliableMessageListenerRunner
+     * @see ReliableMessageRunner
      */
     public void incrementReceives() {
         TOTAL_RECEIVED_MESSAGES.incrementAndGet(this);

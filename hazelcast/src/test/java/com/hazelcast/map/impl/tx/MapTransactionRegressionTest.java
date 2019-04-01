@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -324,7 +324,7 @@ public class MapTransactionRegressionTest extends HazelcastTestSupport {
         };
 
         EntryObject e = new PredicateBuilder().getEntryObject();
-        Predicate<String, Integer> p = e.equal(1);
+        Predicate<String, Integer> p = e.get("this").equal(1);
         map.addEntryListener(l, p, null, false);
 
         for (Integer i = 0; i < 100; i++) {

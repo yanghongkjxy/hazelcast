@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,10 +47,18 @@ public class ClientLoggingService implements LoggingService {
     };
 
     private final LoggerFactory loggerFactory;
-    private final String versionMessage;
+    private final BuildInfo buildInfo;
+    private final String clientName;
+    private volatile String versionMessage;
 
     public ClientLoggingService(String groupName, String loggingType, BuildInfo buildInfo, String clientName) {
         this.loggerFactory = Logger.newLoggerFactory(loggingType);
+        this.buildInfo = buildInfo;
+        this.clientName = clientName;
+        updateGroupName(groupName);
+    }
+
+    public void updateGroupName(String groupName) {
         JetBuildInfo jetBuildInfo = buildInfo.getJetBuildInfo();
         this.versionMessage = clientName + " [" + groupName + "]"
                 + (jetBuildInfo != null ? " [" + jetBuildInfo.getVersion() + "]" : "")

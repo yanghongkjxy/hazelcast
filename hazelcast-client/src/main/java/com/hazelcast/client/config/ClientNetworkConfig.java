@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,11 @@
 
 package com.hazelcast.client.config;
 
+import com.hazelcast.config.AzureConfig;
 import com.hazelcast.config.DiscoveryConfig;
+import com.hazelcast.config.EurekaConfig;
+import com.hazelcast.config.GcpConfig;
+import com.hazelcast.config.KubernetesConfig;
 import com.hazelcast.config.SSLConfig;
 import com.hazelcast.config.SocketInterceptorConfig;
 
@@ -36,21 +40,52 @@ public class ClientNetworkConfig {
 
     private static final int CONNECTION_TIMEOUT = 5000;
     private static final int CONNECTION_ATTEMPT_PERIOD = 3000;
-    private final List<String> addressList = new ArrayList<String>(10);
+    private final List<String> addressList;
     private boolean smartRouting = true;
     private boolean redoOperation;
     private int connectionTimeout = CONNECTION_TIMEOUT;
     private int connectionAttemptLimit = -1;
     private int connectionAttemptPeriod = CONNECTION_ATTEMPT_PERIOD;
-    private SocketInterceptorConfig socketInterceptorConfig;
+    private SocketInterceptorConfig socketInterceptorConfig = new SocketInterceptorConfig();
     private SocketOptions socketOptions = new SocketOptions();
     private SSLConfig sslConfig;
-    private ClientAwsConfig clientAwsConfig;
+    private ClientAwsConfig awsConfig = new ClientAwsConfig();
+    private GcpConfig gcpConfig = new GcpConfig();
+    private AzureConfig azureConfig = new AzureConfig();
+    private KubernetesConfig kubernetesConfig = new KubernetesConfig();
+    private EurekaConfig eurekaConfig = new EurekaConfig();
     private ClientCloudConfig cloudConfig = new ClientCloudConfig();
-    private DiscoveryConfig discoveryConfig;
+    private DiscoveryConfig discoveryConfig = new DiscoveryConfig();
     private Collection<String> outboundPortDefinitions;
     private Collection<Integer> outboundPorts;
     private ClientIcmpPingConfig clientIcmpPingConfig = new ClientIcmpPingConfig();
+
+    public ClientNetworkConfig() {
+        addressList = new ArrayList<String>();
+    }
+
+    public ClientNetworkConfig(ClientNetworkConfig networkConfig) {
+        addressList = new ArrayList<String>(networkConfig.addressList);
+        smartRouting = networkConfig.smartRouting;
+        redoOperation = networkConfig.redoOperation;
+        connectionTimeout = networkConfig.connectionTimeout;
+        connectionAttemptLimit = networkConfig.connectionAttemptLimit;
+        connectionAttemptPeriod = networkConfig.connectionAttemptPeriod;
+        socketInterceptorConfig = new SocketInterceptorConfig(networkConfig.socketInterceptorConfig);
+        socketOptions = new SocketOptions(networkConfig.socketOptions);
+        sslConfig = networkConfig.sslConfig == null ? null : new SSLConfig(networkConfig.sslConfig);
+        awsConfig = new ClientAwsConfig(networkConfig.awsConfig);
+        gcpConfig = new GcpConfig(networkConfig.gcpConfig);
+        azureConfig = new AzureConfig(networkConfig.azureConfig);
+        kubernetesConfig = new KubernetesConfig(networkConfig.kubernetesConfig);
+        eurekaConfig = new EurekaConfig(networkConfig.eurekaConfig);
+        cloudConfig = new ClientCloudConfig(networkConfig.cloudConfig);
+        discoveryConfig = new DiscoveryConfig(networkConfig.discoveryConfig);
+        outboundPortDefinitions = networkConfig.outboundPortDefinitions == null
+                ? null : new HashSet<String>(networkConfig.outboundPortDefinitions);
+        outboundPorts = networkConfig.outboundPorts == null ? null : new HashSet<Integer>(networkConfig.outboundPorts);
+        clientIcmpPingConfig = new ClientIcmpPingConfig(networkConfig.clientIcmpPingConfig);
+    }
 
     /**
      * Returns the configuration of the Hazelcast Discovery SPI and configured discovery providers
@@ -58,9 +93,6 @@ public class ClientNetworkConfig {
      * @return Discovery Provider SPI configuration
      */
     public DiscoveryConfig getDiscoveryConfig() {
-        if (discoveryConfig == null) {
-            discoveryConfig = new DiscoveryConfig();
-        }
         return discoveryConfig;
     }
 
@@ -116,7 +148,7 @@ public class ClientNetworkConfig {
      * @return configured {@link com.hazelcast.client.config.ClientNetworkConfig} for chaining
      */
     public ClientNetworkConfig setSocketInterceptorConfig(SocketInterceptorConfig socketInterceptorConfig) {
-        this.socketInterceptorConfig = socketInterceptorConfig;
+        this.socketInterceptorConfig = isNotNull(socketInterceptorConfig, "socketInterceptorConfig");
         return this;
     }
 
@@ -218,6 +250,7 @@ public class ClientNetworkConfig {
      */
     // required for spring module
     public ClientNetworkConfig setAddresses(List<String> addresses) {
+        isNotNull(addresses, "addresses");
         addressList.clear();
         addressList.addAll(addresses);
         return this;
@@ -298,25 +331,113 @@ public class ClientNetworkConfig {
     }
 
     /**
-     * Sets configuration to connect nodes in aws environment.
-     * null value indicates that no AwsConfig should be used.
+     * Sets configuration to connect nodes in AWS environment.
      *
      * @param clientAwsConfig the ClientAwsConfig
      * @see #getAwsConfig()
      */
     public ClientNetworkConfig setAwsConfig(ClientAwsConfig clientAwsConfig) {
-        this.clientAwsConfig = clientAwsConfig;
+        isNotNull(clientAwsConfig, "clientAwsConfig");
+        this.awsConfig = clientAwsConfig;
         return this;
     }
 
     /**
-     * Returns the current {@link ClientAwsConfig}. It is possible that null is returned if no SSLConfig has been
+     * Returns the current {@link ClientAwsConfig}.
      *
      * @return ClientAwsConfig
      * @see #setAwsConfig(ClientAwsConfig)
      */
     public ClientAwsConfig getAwsConfig() {
-        return clientAwsConfig;
+        return awsConfig;
+    }
+
+    /**
+     * Sets configuration to connect nodes in GCP environment.
+     *
+     * @param gcpConfig the GcpConfig
+     * @see #getGcpConfig()
+     */
+    public ClientNetworkConfig setGcpConfig(GcpConfig gcpConfig) {
+        isNotNull(gcpConfig, "gcpConfig");
+        this.gcpConfig = gcpConfig;
+        return this;
+    }
+
+    /**
+     * Returns the current {@link GcpConfig}.
+     *
+     * @return GcpConfig
+     * @see #setGcpConfig(GcpConfig)
+     */
+    public GcpConfig getGcpConfig() {
+        return gcpConfig;
+    }
+
+    /**
+     * Sets configuration to connect nodes in Azure environment.
+     *
+     * @param azureConfig the AzureConfig
+     * @see #getAzureConfig()
+     */
+    public ClientNetworkConfig setAzureConfig(AzureConfig azureConfig) {
+        isNotNull(azureConfig, "azureConfig");
+        this.azureConfig = azureConfig;
+        return this;
+    }
+
+    /**
+     * Returns the current {@link AzureConfig}.
+     *
+     * @return AzureConfig
+     * @see #setAzureConfig(AzureConfig)
+     */
+    public AzureConfig getAzureConfig() {
+        return azureConfig;
+    }
+
+    /**
+     * Sets configuration to connect nodes in Kubernetes environment.
+     *
+     * @param kubernetesConfig the KubernetesConfig
+     * @see #getKubernetesConfig()
+     */
+    public ClientNetworkConfig setKubernetesConfig(KubernetesConfig kubernetesConfig) {
+        isNotNull(kubernetesConfig, "kubernetesConfig");
+        this.kubernetesConfig = kubernetesConfig;
+        return this;
+    }
+
+    /**
+     * Returns the current {@link KubernetesConfig}.
+     *
+     * @return KubernetesConfig
+     * @see #setKubernetesConfig(KubernetesConfig)
+     */
+    public KubernetesConfig getKubernetesConfig() {
+        return kubernetesConfig;
+    }
+
+    /**
+     * Sets configuration to connect nodes in Eureka environment.
+     *
+     * @param eurekaConfig the EurekaConfig
+     * @see #getEurekaConfig()
+     */
+    public ClientNetworkConfig setEurekaConfig(EurekaConfig eurekaConfig) {
+        isNotNull(eurekaConfig, "eurekaConfig");
+        this.eurekaConfig = eurekaConfig;
+        return this;
+    }
+
+    /**
+     * Returns the current {@link EurekaConfig}.
+     *
+     * @return EurekaConfig
+     * @see #setEurekaConfig(EurekaConfig)
+     */
+    public EurekaConfig getEurekaConfig() {
+        return eurekaConfig;
     }
 
     public ClientCloudConfig getCloudConfig() {
@@ -324,6 +445,7 @@ public class ClientNetworkConfig {
     }
 
     public void setCloudConfig(ClientCloudConfig cloudConfig) {
+        isNotNull(cloudConfig, "cloudConfig");
         this.cloudConfig = cloudConfig;
     }
 
@@ -413,5 +535,99 @@ public class ClientNetworkConfig {
     public ClientNetworkConfig setClientIcmpPingConfig(ClientIcmpPingConfig clientIcmpPingConfig) {
         this.clientIcmpPingConfig = clientIcmpPingConfig;
         return this;
+    }
+
+    @Override
+    @SuppressWarnings({"checkstyle:cyclomaticcomplexity", "checkstyle:npathcomplexity", "checkstyle:methodlength"})
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        ClientNetworkConfig that = (ClientNetworkConfig) o;
+
+        if (smartRouting != that.smartRouting) {
+            return false;
+        }
+        if (redoOperation != that.redoOperation) {
+            return false;
+        }
+        if (connectionTimeout != that.connectionTimeout) {
+            return false;
+        }
+        if (connectionAttemptLimit != that.connectionAttemptLimit) {
+            return false;
+        }
+        if (connectionAttemptPeriod != that.connectionAttemptPeriod) {
+            return false;
+        }
+        if (!addressList.equals(that.addressList)) {
+            return false;
+        }
+        if (!socketInterceptorConfig.equals(that.socketInterceptorConfig)) {
+            return false;
+        }
+        if (!socketOptions.equals(that.socketOptions)) {
+            return false;
+        }
+        if (sslConfig != null ? !sslConfig.equals(that.sslConfig) : that.sslConfig != null) {
+            return false;
+        }
+        if (!awsConfig.equals(that.awsConfig)) {
+            return false;
+        }
+        if (!gcpConfig.equals(that.gcpConfig)) {
+            return false;
+        }
+        if (!azureConfig.equals(that.azureConfig)) {
+            return false;
+        }
+        if (!kubernetesConfig.equals(that.kubernetesConfig)) {
+            return false;
+        }
+        if (!eurekaConfig.equals(that.eurekaConfig)) {
+            return false;
+        }
+        if (!cloudConfig.equals(that.cloudConfig)) {
+            return false;
+        }
+        if (!discoveryConfig.equals(that.discoveryConfig)) {
+            return false;
+        }
+        if (outboundPortDefinitions != null
+                ? !outboundPortDefinitions.equals(that.outboundPortDefinitions) : that.outboundPortDefinitions != null) {
+            return false;
+        }
+        if (outboundPorts != null ? !outboundPorts.equals(that.outboundPorts) : that.outboundPorts != null) {
+            return false;
+        }
+        return clientIcmpPingConfig.equals(that.clientIcmpPingConfig);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = addressList.hashCode();
+        result = 31 * result + (smartRouting ? 1 : 0);
+        result = 31 * result + (redoOperation ? 1 : 0);
+        result = 31 * result + connectionTimeout;
+        result = 31 * result + connectionAttemptLimit;
+        result = 31 * result + connectionAttemptPeriod;
+        result = 31 * result + socketInterceptorConfig.hashCode();
+        result = 31 * result + socketOptions.hashCode();
+        result = 31 * result + (sslConfig != null ? sslConfig.hashCode() : 0);
+        result = 31 * result + awsConfig.hashCode();
+        result = 31 * result + gcpConfig.hashCode();
+        result = 31 * result + azureConfig.hashCode();
+        result = 31 * result + kubernetesConfig.hashCode();
+        result = 31 * result + eurekaConfig.hashCode();
+        result = 31 * result + cloudConfig.hashCode();
+        result = 31 * result + discoveryConfig.hashCode();
+        result = 31 * result + (outboundPortDefinitions != null ? outboundPortDefinitions.hashCode() : 0);
+        result = 31 * result + (outboundPorts != null ? outboundPorts.hashCode() : 0);
+        result = 31 * result + clientIcmpPingConfig.hashCode();
+        return result;
     }
 }

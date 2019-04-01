@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.hazelcast.config;
 
-import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
@@ -27,7 +26,7 @@ import java.io.IOException;
 /**
  * Contains the configuration for an {@link com.hazelcast.core.IExecutorService}.
  */
-public class ExecutorConfig implements IdentifiedDataSerializable, Versioned {
+public class ExecutorConfig implements IdentifiedDataSerializable, Versioned, NamedConfig {
 
     /**
      * The number of executor threads per Member for the Executor based on this configuration.
@@ -214,10 +213,7 @@ public class ExecutorConfig implements IdentifiedDataSerializable, Versioned {
         out.writeInt(poolSize);
         out.writeInt(queueCapacity);
         out.writeBoolean(statisticsEnabled);
-        // RU_COMPAT_3_9
-        if (out.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            out.writeUTF(quorumName);
-        }
+        out.writeUTF(quorumName);
     }
 
     @Override
@@ -226,10 +222,7 @@ public class ExecutorConfig implements IdentifiedDataSerializable, Versioned {
         poolSize = in.readInt();
         queueCapacity = in.readInt();
         statisticsEnabled = in.readBoolean();
-        // RU_COMPAT_3_9
-        if (in.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            quorumName = in.readUTF();
-        }
+        quorumName = in.readUTF();
     }
 
     @Override

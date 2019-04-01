@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,10 +43,13 @@ public class TcpIpConnectionChannelErrorHandler implements ChannelErrorHandler {
             logger.severe(error);
         } else {
             TcpIpConnection connection = (TcpIpConnection) channel.attributeMap().get(TcpIpConnection.class);
-            if (error instanceof EOFException) {
-                connection.close("Connection closed by the other side", error);
+            if (connection != null) {
+                String closeReason = (error instanceof EOFException)
+                        ? "Connection closed by the other side"
+                        : "Exception in " + connection + ", thread=" + Thread.currentThread().getName();
+                connection.close(closeReason, error);
             } else {
-                connection.close("Exception in " + connection + ", thread=" + Thread.currentThread().getName(), error);
+                logger.warning("Channel error occured", error);
             }
         }
     }

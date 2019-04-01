@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,13 +25,14 @@ public class ObjectRecordFactory implements RecordFactory<Object> {
     private final SerializationService serializationService;
     private final boolean statisticsEnabled;
 
-    public ObjectRecordFactory(MapConfig config, SerializationService serializationService) {
+    public ObjectRecordFactory(MapConfig config,
+                               SerializationService serializationService) {
         this.serializationService = serializationService;
         this.statisticsEnabled = config.isStatisticsEnabled();
     }
 
     @Override
-    public Record<Object> newRecord(Object value) {
+    public Record<Object> newRecord(Data key, Object value) {
         assert value != null : "value can not be null";
 
         Object objectValue = serializationService.toObject(value);

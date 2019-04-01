@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 
 package com.hazelcast.client.impl;
 
+import com.hazelcast.client.impl.protocol.ClientExceptions;
 import com.hazelcast.client.impl.protocol.ClientMessage;
-import com.hazelcast.config.Config;
+import com.hazelcast.core.Client;
 import com.hazelcast.core.ClientType;
-import com.hazelcast.instance.MemberImpl;
 import com.hazelcast.internal.cluster.ClusterService;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.nio.Address;
@@ -27,9 +27,10 @@ import com.hazelcast.security.SecurityContext;
 import com.hazelcast.spi.EventService;
 import com.hazelcast.spi.ProxyService;
 import com.hazelcast.spi.partition.IPartitionService;
-import com.hazelcast.spi.serialization.SerializationService;
+import com.hazelcast.transaction.TransactionManagerService;
 import com.hazelcast.util.function.Consumer;
 
+import java.util.Collection;
 import java.util.Map;
 
 /**
@@ -38,6 +39,22 @@ import java.util.Map;
  * todo: what is the purpose of the client engine.
  */
 public interface ClientEngine extends Consumer<ClientMessage> {
+
+    /**
+     * Registers client endpoint to endpointManager.
+     * Only authenticated endpoints should be registered here.
+     * bind can be called twice for same connection, as long as client is allowed to be registered all calls to this
+     * method returns true
+     *
+     * A selector could prevent endpoint to be registered
+     * see {@link #applySelector}
+     *
+     * @param endpoint to be registered to client engine
+     * @return false if client is not allowed to join because of a selector, true otherwise
+     */
+    boolean bind(ClientEndpoint endpoint);
+
+    Collection<Client> getClients();
 
     int getClientEndpointCount();
 
@@ -49,33 +66,32 @@ public interface ClientEngine extends Consumer<ClientMessage> {
 
     ProxyService getProxyService();
 
-    Config getConfig();
-
     ILogger getLogger(Class clazz);
 
-    Address getMasterAddress();
-
+    /**
+     * @return the address of this member that listens for CLIENT protocol connections. When advanced network config
+     * is in use, it will be different from the MEMBER listening address reported eg by {@code Node.getThisAddress()}
+     */
     Address getThisAddress();
 
     String getThisUuid();
 
-    MemberImpl getLocalMember();
+    ClientEndpointManager getEndpointManager();
+
+    ClientExceptions getClientExceptions();
 
     SecurityContext getSecurityContext();
 
-    /**
-     * Returns the SerializationService.
-     *
-     * @return the SerializationService
-     */
-    SerializationService getSerializationService();
+    TransactionManagerService getTransactionManagerService();
+
+    ClientPartitionListenerService getPartitionListenerService();
 
     /**
      * Returns Map which contains number of connected clients to the cluster.
      *
      * The returned map can be used to get information about connected clients to the cluster.
      *
-     * @return Map<ClientType , Integer> .
+     * @return Map<ClientType, Integer> .
      */
     Map<ClientType, Integer> getConnectedClientStats();
 
@@ -147,4 +163,41 @@ public interface ClientEngine extends Consumer<ClientMessage> {
     Map<String, String> getClientStatistics();
 
     String getOwnerUuid(String clientUuid);
+
+    /**
+     * @param client to check if allowed through current ClientSelector
+     * @return true if allowed, false otherwise
+     */
+    boolean isClientAllowed(Client client);
+
+    /**
+     * Only Clients that can pass through filter are allowed to connect to cluster.
+     * Only one selector can be active at a time. Applying new one will override old selector.
+     *
+     * @param selector to select a client or group of clients to act upon
+     */
+    void applySelector(ClientSelector selector);
+
+
+    /**
+     * Locates the cluster member that has the provided client address and returns its member address,
+     * to be used for intra-cluster communication. This is required when clients deliver messages with
+     * designated target members, since clients may be unaware of the actual member address (when
+     * advanced network config is enabled).
+     * Throws a {@link com.hazelcast.spi.exception.TargetNotMemberException} when no member with the
+     * provided client address can be located.
+     *
+     * @param clientAddress the client address of the member
+     * @return the member address of the member
+     */
+    Address memberAddressOf(Address clientAddress);
+
+    /**
+     * Locates the client address of the given member address. Performs the reverse transformation
+     * of {@link #memberAddressOf(Address)}.
+     *
+     * @param memberAddress the member address of the member
+     * @return the client address of the member
+     */
+    Address clientAddressOf(Address memberAddress);
 }

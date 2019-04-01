@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@ import com.hazelcast.internal.journal.EventJournalReader;
 import com.hazelcast.journal.EventJournalDataStructureAdapter;
 import com.hazelcast.map.impl.MapService;
 import com.hazelcast.map.journal.EventJournalMapEvent;
-import com.hazelcast.projection.Projection;
 import com.hazelcast.ringbuffer.ReadResultSet;
 import com.hazelcast.spi.ObjectNamespace;
 
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -61,6 +61,21 @@ public class EventJournalMapDataStructureAdapter<K, V>
     }
 
     @Override
+    public void putAll(Map<K, V> map) {
+        this.map.putAll(map);
+    }
+
+    @Override
+    public void load(K key) {
+        map.get(key);
+    }
+
+    @Override
+    public void loadAll(Set<K> keys) {
+        map.loadAll(keys, true);
+    }
+
+    @Override
     public ObjectNamespace getNamespace() {
         return MapService.getObjectNamespace(map.getName());
     }
@@ -86,7 +101,7 @@ public class EventJournalMapDataStructureAdapter<K, V>
     public <T> ICompletableFuture<ReadResultSet<T>> readFromEventJournal(
             long startSequence, int minSize, int maxSize, int partitionId,
             com.hazelcast.util.function.Predicate<? super EventJournalMapEvent<K, V>> predicate,
-            Projection<? super EventJournalMapEvent<K, V>, ? extends T> projection) {
+            com.hazelcast.util.function.Function<? super EventJournalMapEvent<K, V>, ? extends T> projection) {
         return ((EventJournalReader<EventJournalMapEvent<K, V>>) map)
                 .readFromEventJournal(startSequence, minSize, maxSize, partitionId, predicate, projection);
     }

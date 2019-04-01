@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.hazelcast.map.impl.proxy;
 import com.hazelcast.config.MapConfig;
 import com.hazelcast.config.NearCacheConfig;
 import com.hazelcast.core.ExecutionCallback;
+import com.hazelcast.core.ICompletableFuture;
 import com.hazelcast.internal.cluster.ClusterService;
 import com.hazelcast.internal.nearcache.NearCache;
 import com.hazelcast.internal.nearcache.impl.invalidation.BatchNearCacheInvalidation;
@@ -168,10 +169,10 @@ public class NearCachedMapProxyImpl<K, V> extends MapProxyImpl<K, V> {
     }
 
     @Override
-    protected void setTTLInternal(Object key, long ttl, TimeUnit timeUnit) {
+    protected boolean setTtlInternal(Object key, long ttl, TimeUnit timeUnit) {
         key = toNearCacheKeyWithStrategy(key);
         try {
-            super.setTTLInternal(key, ttl, timeUnit);
+            return super.setTtlInternal(key, ttl, timeUnit);
         } finally {
             invalidateNearCache(key);
         }
@@ -519,12 +520,13 @@ public class NearCachedMapProxyImpl<K, V> extends MapProxyImpl<K, V> {
     }
 
     @Override
-    public Map<K, Object> executeOnKeysInternal(Set<K> keys, Set<Data> dataKeys, EntryProcessor entryProcessor) {
+    public ICompletableFuture<Map<K, Object>> submitToKeysInternal(Set<K> keys, Set<Data> dataKeys,
+                                                                   EntryProcessor entryProcessor) {
         if (serializeKeys) {
             toDataCollectionWithNonNullKeyValidation(keys, dataKeys);
         }
         try {
-            return super.executeOnKeysInternal(keys, dataKeys, entryProcessor);
+            return super.submitToKeysInternal(keys, dataKeys, entryProcessor);
         } finally {
             Set<?> ncKeys = serializeKeys ? dataKeys : keys;
             for (Object key : ncKeys) {

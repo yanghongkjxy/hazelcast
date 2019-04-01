@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,16 @@ public interface ClusterService extends CoreService, Cluster {
      * @return the found member, or {@code null} if not found (if the UUID is {@code null}, {@code null} is returned)
      */
     MemberImpl getMember(String uuid);
+
+    /**
+     * Gets the member with the given UUID and address.
+     *
+     * @param address the address of the member
+     * @param uuid the UUID of the member
+     * @return the found member, or {@code null} if not found
+     * (if the UUID and/or address is {@code null}, {@code null} is returned)
+     */
+    MemberImpl getMember(Address address, String uuid);
 
     /**
      * Gets the collection of members.

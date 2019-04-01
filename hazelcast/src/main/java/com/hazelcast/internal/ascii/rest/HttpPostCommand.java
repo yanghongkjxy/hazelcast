@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,7 +41,6 @@ public class HttpPostCommand extends HttpCommand {
     private final TextDecoder decoder;
 
     private boolean chunked;
-    private boolean nextLine;
     private boolean readyToReadData;
     private ByteBuffer data;
     private String contentType;
@@ -80,25 +79,30 @@ public class HttpPostCommand extends HttpCommand {
     }
 
     private boolean doActualRead(ByteBuffer cb) {
-        if (readyToReadData) {
-            if (chunked && (data == null || !data.hasRemaining())) {
-
+        setReadyToReadData(cb);
+        if (!readyToReadData) {
+            return false;
+        }
+        if (!isSpaceForData()) {
+            if (chunked) {
                 if (data != null && cb.hasRemaining()) {
                     readCRLFOrPositionChunkSize(cb);
                 }
-
-                boolean done = readChunkSize(cb);
-                if (done) {
+                if (readChunkSize(cb)) {
                     return true;
                 }
+            } else {
+                return true;
             }
-
+        }
+        if (data != null) {
             IOUtil.copyToHeapBuffer(cb, data);
         }
+        return !chunked && !isSpaceForData();
+    }
 
-        setReadyToReadData(cb);
-
-        return !chunked && ((data != null) && !data.hasRemaining());
+    private boolean isSpaceForData() {
+        return data != null && data.hasRemaining();
     }
 
     private void setReadyToReadData(ByteBuffer cb) {

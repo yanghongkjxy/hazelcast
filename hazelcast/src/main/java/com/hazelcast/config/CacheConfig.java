@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.BinaryInterface;
 import com.hazelcast.spi.merge.SplitBrainMergeTypeProvider;
 import com.hazelcast.spi.merge.SplitBrainMergeTypes;
+import com.hazelcast.spi.tenantcontrol.TenantControl;
 
 import javax.cache.configuration.CacheEntryListenerConfiguration;
 import javax.cache.configuration.CompleteConfiguration;
@@ -43,6 +44,7 @@ import javax.cache.expiry.ModifiedExpiryPolicy;
 import javax.cache.expiry.TouchedExpiryPolicy;
 import javax.cache.integration.CacheLoader;
 import javax.cache.integration.CacheWriter;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +53,7 @@ import java.util.Set;
 import static com.hazelcast.config.CacheSimpleConfig.DEFAULT_BACKUP_COUNT;
 import static com.hazelcast.config.CacheSimpleConfig.DEFAULT_IN_MEMORY_FORMAT;
 import static com.hazelcast.config.CacheSimpleConfig.MIN_BACKUP_COUNT;
+import static com.hazelcast.spi.tenantcontrol.TenantControl.NOOP_TENANT_CONTROL;
 import static com.hazelcast.util.Preconditions.checkAsyncBackupCount;
 import static com.hazelcast.util.Preconditions.checkBackupCount;
 import static com.hazelcast.util.Preconditions.isNotNull;
@@ -87,6 +90,7 @@ public class CacheConfig<K, V> extends AbstractCacheConfig<K, V> implements Spli
      */
     private boolean disablePerEntryInvalidationEvents;
 
+    private TenantControl tenantControl = NOOP_TENANT_CONTROL;
 
     public CacheConfig() {
     }
@@ -517,6 +521,7 @@ public class CacheConfig<K, V> extends AbstractCacheConfig<K, V> implements Spli
         out.writeObject(wanReplicationRef);
         // SUPER
         writeKeyValueTypes(out);
+        writeTenant(out);
         writeFactories(out);
 
         out.writeBoolean(isReadThrough);
@@ -548,27 +553,34 @@ public class CacheConfig<K, V> extends AbstractCacheConfig<K, V> implements Spli
 
         String resultInMemoryFormat = in.readUTF();
         inMemoryFormat = InMemoryFormat.valueOf(resultInMemoryFormat);
-        evictionConfig = in.readObject();
+        // set the thread-context and class loading context for this cache's tenant application
+        // This way user customizations (loader factories, listeners) and keyType/valueType
+        // can be CDI / EJB / JPA objects
+        Closeable tenantContext = tenantControl.setTenant(false);
+        try {
+            evictionConfig = in.readObject();
+            wanReplicationRef = in.readObject();
 
-        wanReplicationRef = in.readObject();
+            readKeyValueTypes(in);
+            readTenant(in);
+            readFactories(in);
 
-        // SUPER
-        readKeyValueTypes(in);
-        readFactories(in);
+            isReadThrough = in.readBoolean();
+            isWriteThrough = in.readBoolean();
+            isStoreByValue = in.readBoolean();
+            isManagementEnabled = in.readBoolean();
+            isStatisticsEnabled = in.readBoolean();
+            hotRestartConfig.setEnabled(in.readBoolean());
+            hotRestartConfig.setFsync(in.readBoolean());
 
-        isReadThrough = in.readBoolean();
-        isWriteThrough = in.readBoolean();
-        isStoreByValue = in.readBoolean();
-        isManagementEnabled = in.readBoolean();
-        isStatisticsEnabled = in.readBoolean();
-        hotRestartConfig.setEnabled(in.readBoolean());
-        hotRestartConfig.setFsync(in.readBoolean());
+            quorumName = in.readUTF();
 
-        quorumName = in.readUTF();
-
-        final boolean listNotEmpty = in.readBoolean();
-        if (listNotEmpty) {
-            readListenerConfigurations(in);
+            final boolean listNotEmpty = in.readBoolean();
+            if (listNotEmpty) {
+                readListenerConfigurations(in);
+            }
+        } finally {
+            tenantContext.close();
         }
 
         mergePolicy = in.readUTF();
@@ -622,6 +634,20 @@ public class CacheConfig<K, V> extends AbstractCacheConfig<K, V> implements Spli
                 + '}';
     }
 
+    TenantControl getTenantControl() {
+        return tenantControl;
+    }
+
+    void setTenantControl(TenantControl tenantControl) {
+        this.tenantControl = tenantControl;
+    }
+
+    protected void writeTenant(ObjectDataOutput out) throws IOException {
+    }
+
+    protected void readTenant(ObjectDataInput in) throws IOException {
+    }
+
     protected void writeKeyValueTypes(ObjectDataOutput out) throws IOException {
         out.writeObject(getKeyType());
         out.writeObject(getValueType());
@@ -671,6 +697,7 @@ public class CacheConfig<K, V> extends AbstractCacheConfig<K, V> implements Spli
      * @return          the target config
      */
     public <T extends CacheConfig<K, V>> T copy(T target, boolean resolved) {
+        target.setTenantControl(getTenantControl());
         target.setAsyncBackupCount(getAsyncBackupCount());
         target.setBackupCount(getBackupCount());
         target.setDisablePerEntryInvalidationEvents(isDisablePerEntryInvalidationEvents());

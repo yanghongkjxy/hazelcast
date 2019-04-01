@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,17 +39,14 @@ public abstract class ClientConnectionStrategy {
      * Initialize this strategy with client context and config
      * @param clientContext hazelcast client context to access internal services
      */
-    public final void init(ClientContext clientContext) {
+    public void init(ClientContext clientContext) {
         this.clientContext = clientContext;
         this.clientConnectionStrategyConfig = clientContext.getClientConfig().getConnectionStrategyConfig();
         this.logger = clientContext.getLoggingService().getLogger(ClientConnectionStrategy.class);
     }
 
     /**
-     * Called after {@link ClientConnectionManager} started.
-     * Connecting to cluster can be triggered from this method using one of
-     * {@link ClientConnectionManager#connectToCluster} or
-     * {@link ClientConnectionManager#connectToClusterAsync}
+     * Starts the ClientConnectionStrategy; this will trigger connecting to the cluster.
      */
     public abstract void start();
 
@@ -88,7 +85,7 @@ public abstract class ClientConnectionStrategy {
      * If a cluster connection is established, this method will be called.
      * if an exception is thrown, the already established connection will be closed.
      */
-    public abstract void onConnectToCluster();
+    public abstract void onClusterConnect();
 
     /**
      * If the cluster connection is lost for any reason, this method will be called.
@@ -110,7 +107,7 @@ public abstract class ClientConnectionStrategy {
     public abstract void onDisconnect(ClientConnection connection);
 
     /**
-     * The {@link ClientConnectionManager} will call this method as a last step of its shutdown.
+     * This will be called as the last step of the HazelcastClient's shutdown.
      */
     public abstract void shutdown();
 

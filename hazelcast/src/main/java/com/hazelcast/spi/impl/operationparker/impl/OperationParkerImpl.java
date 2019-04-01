@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,13 +23,13 @@ import com.hazelcast.internal.metrics.MetricsRegistry;
 import com.hazelcast.internal.metrics.Probe;
 import com.hazelcast.internal.partition.MigrationInfo;
 import com.hazelcast.logging.ILogger;
-import com.hazelcast.nio.Address;
 import com.hazelcast.spi.BlockingOperation;
 import com.hazelcast.spi.LiveOperations;
 import com.hazelcast.spi.LiveOperationsTracker;
 import com.hazelcast.spi.Notifier;
 import com.hazelcast.spi.WaitNotifyKey;
 import com.hazelcast.spi.exception.PartitionMigratingException;
+import com.hazelcast.spi.exception.TargetDisconnectedException;
 import com.hazelcast.spi.impl.NodeEngineImpl;
 import com.hazelcast.spi.impl.operationparker.OperationParker;
 import com.hazelcast.util.ConstructorFunction;
@@ -132,16 +132,14 @@ public class OperationParkerImpl implements OperationParker, LiveOperationsTrack
 
     // invalidated waiting ops will removed from queue eventually by notifiers.
     public void onMemberLeft(MemberImpl leftMember) {
-        invalidateWaitingOps(leftMember.getUuid());
+        for (WaitSet waitSet : waitSetMap.values()) {
+            waitSet.invalidateAll(leftMember.getUuid());
+        }
     }
 
     public void onClientDisconnected(String clientUuid) {
-        invalidateWaitingOps(clientUuid);
-    }
-
-    private void invalidateWaitingOps(String callerUuid) {
         for (WaitSet waitSet : waitSetMap.values()) {
-            waitSet.invalidateAll(callerUuid);
+            waitSet.cancelAll(clientUuid, new TargetDisconnectedException("Client disconnected: " + clientUuid));
         }
     }
 
@@ -150,13 +148,13 @@ public class OperationParkerImpl implements OperationParker, LiveOperationsTrack
      * response.
      * Invoked on the migration destination. This is executed under partition migration lock!
      */
-    public void onPartitionMigrate(Address thisAddress, MigrationInfo migrationInfo) {
-        if (!thisAddress.equals(migrationInfo.getSource())) {
+    public void onPartitionMigrate(MigrationInfo migrationInfo) {
+        if (migrationInfo.getSource() == null || !migrationInfo.getSource().isIdentical(nodeEngine.getLocalMember())) {
             return;
         }
 
         for (WaitSet waitSet : waitSetMap.values()) {
-            waitSet.onPartitionMigrate(thisAddress, migrationInfo);
+            waitSet.onPartitionMigrate(migrationInfo);
         }
     }
 

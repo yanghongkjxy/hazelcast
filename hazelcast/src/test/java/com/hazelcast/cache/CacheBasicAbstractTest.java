@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -917,6 +917,27 @@ public abstract class CacheBasicAbstractTest extends CacheTestSupport {
         sleepAtLeastMillis(createdExpiryTimeMillis + 1);
 
         assertNull(cache.get(1));
+    }
+
+    @Test
+    public void testSetExpiryPolicyReturnsTrue() {
+        ICache<Integer, String> cache = createCache();
+        cache.put(1, "value");
+        assertTrue(cache.setExpiryPolicy(1, new TouchedExpiryPolicy(Duration.FIVE_MINUTES)));
+    }
+
+    @Test
+    public void testSetExpiryPolicyReturnsFalse_whenKeyDoesNotExist() {
+        ICache<Integer, String> cache = createCache();
+        assertFalse(cache.setExpiryPolicy(1, new TouchedExpiryPolicy(Duration.FIVE_MINUTES)));
+    }
+
+    @Test
+    public void testSetExpiryPolicyReturnsFalse_whenKeyIsAlreadyExpired() {
+        ICache<Integer, String> cache = createCache();
+        cache.put(1, "value", new CreatedExpiryPolicy(new Duration(TimeUnit.SECONDS, 1)));
+        sleepAtLeastSeconds(2);
+        assertFalse(cache.setExpiryPolicy(1, new TouchedExpiryPolicy(Duration.FIVE_MINUTES)));
     }
 
     @Test

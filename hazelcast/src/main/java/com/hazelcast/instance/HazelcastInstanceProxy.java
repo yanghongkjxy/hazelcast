@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ import com.hazelcast.core.Member;
 import com.hazelcast.core.MultiMap;
 import com.hazelcast.core.PartitionService;
 import com.hazelcast.core.ReplicatedMap;
+import com.hazelcast.cp.CPSubsystem;
 import com.hazelcast.crdt.pncounter.PNCounter;
 import com.hazelcast.durableexecutor.DurableExecutorService;
 import com.hazelcast.flakeidgen.FlakeIdGenerator;
@@ -297,6 +298,11 @@ public final class HazelcastInstanceProxy implements HazelcastInstance, Serializ
     @Override
     public IScheduledExecutorService getScheduledExecutorService(String name) {
         return getOriginal().getScheduledExecutorService(name);
+    }
+
+    @Override
+    public CPSubsystem getCPSubsystem() {
+        return getOriginal().getCPSubsystem();
     }
 
     @Override

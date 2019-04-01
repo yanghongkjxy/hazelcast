@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import com.hazelcast.client.impl.ClientEndpoint;
 import com.hazelcast.client.impl.protocol.ClientMessage;
 import com.hazelcast.client.impl.protocol.codec.CacheAddEntryListenerCodec;
 import com.hazelcast.client.impl.protocol.task.AbstractCallableMessageTask;
+import com.hazelcast.client.impl.protocol.task.ListenerMessageTask;
 import com.hazelcast.instance.Node;
 import com.hazelcast.internal.serialization.impl.HeapData;
 import com.hazelcast.nio.Connection;
@@ -46,7 +47,7 @@ import java.util.concurrent.Callable;
  * @see CacheService#registerListener(String, CacheEventListener, boolean localOnly)
  */
 public class CacheAddEntryListenerMessageTask
-        extends AbstractCallableMessageTask<CacheAddEntryListenerCodec.RequestParameters> {
+        extends AbstractCallableMessageTask<CacheAddEntryListenerCodec.RequestParameters> implements ListenerMessageTask {
 
     public CacheAddEntryListenerMessageTask(ClientMessage clientMessage, Node node, Connection connection) {
         super(clientMessage, node, connection);

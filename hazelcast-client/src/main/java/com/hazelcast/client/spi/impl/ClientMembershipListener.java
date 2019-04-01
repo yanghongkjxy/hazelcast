@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,16 +46,16 @@ import java.util.concurrent.TimeUnit;
 import static java.util.Collections.unmodifiableSet;
 
 class ClientMembershipListener extends ClientAddMembershipListenerCodec.AbstractEventHandler
-        implements EventHandler<ClientMessage> {
+        implements EventHandler<ClientMessage>  {
 
     private static final int INITIAL_MEMBERS_TIMEOUT_SECONDS = 5;
 
     private final ILogger logger;
-    private final Set<Member> members = new LinkedHashSet<Member>();
     private final HazelcastClientInstanceImpl client;
     private final ClientClusterServiceImpl clusterService;
     private final ClientPartitionServiceImpl partitionService;
     private final ClientConnectionManagerImpl connectionManager;
+    private volatile Set<Member> members = new LinkedHashSet<Member>();
 
     private volatile CountDownLatch initialListFetchedLatch;
 
@@ -98,7 +98,7 @@ class ClientMembershipListener extends ClientAddMembershipListenerCodec.Abstract
         }
 
         if (prevMembers.isEmpty()) {
-            //this means this is the first time client connected to server
+            //this means this is the first time client connected to cluster
             logger.info(membersString());
             clusterService.handleInitialMembershipEvent(
                     new InitialMembershipEvent(client.getCluster(), unmodifiableSet(members)));
@@ -229,5 +229,9 @@ class ClientMembershipListener extends ClientAddMembershipListenerCodec.Abstract
                 + ", members=" + members
                 + ", client=" + client
                 + '}';
+    }
+
+    public void clearMembers() {
+        members = new LinkedHashSet<Member>();
     }
 }

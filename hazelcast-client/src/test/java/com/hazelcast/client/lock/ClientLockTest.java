@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ public class ClientLockTest extends HazelcastTestSupport {
                 }
             }
         }.start();
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
+        assertOpenEventually(latch);
         lock.forceUnlock();
     }
 
@@ -362,4 +362,5 @@ public class ClientLockTest extends HazelcastTestSupport {
 
         assertTrue("Lock should have been released after lease expires", lock.tryLock(2, TimeUnit.MINUTES));
     }
+
 }

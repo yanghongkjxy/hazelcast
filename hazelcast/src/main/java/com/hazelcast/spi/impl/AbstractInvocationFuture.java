@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.hazelcast.spi.impl;
 import com.hazelcast.core.ExecutionCallback;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.spi.InternalCompletableFuture;
+import com.hazelcast.internal.util.executor.UnblockableThread;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.util.concurrent.CancellationException;
@@ -295,6 +296,7 @@ public abstract class AbstractInvocationFuture<V> implements InternalCompletable
      * is the response.
      */
     private Object registerWaiter(Object waiter, Executor executor) {
+        assert !(waiter instanceof UnblockableThread) : "Waiting for response on this thread is illegal";
         WaitNode waitNode = null;
         for (; ; ) {
             final Object oldState = state;

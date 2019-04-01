@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import com.hazelcast.config.CacheDeserializedValues;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.ConsistencyCheckStrategy;
 import com.hazelcast.config.EventJournalConfig;
+import com.hazelcast.config.EvictionPolicy;
 import com.hazelcast.config.InvalidConfigurationException;
 import com.hazelcast.config.MapConfig;
 import com.hazelcast.config.WanConsumerConfig;
@@ -29,7 +30,10 @@ import com.hazelcast.config.WanReplicationRef;
 import com.hazelcast.core.IFunction;
 import com.hazelcast.core.PartitioningStrategy;
 import com.hazelcast.internal.serialization.InternalSerializationService;
+import com.hazelcast.map.eviction.LFUEvictionPolicy;
+import com.hazelcast.map.eviction.LRUEvictionPolicy;
 import com.hazelcast.map.eviction.MapEvictionPolicy;
+import com.hazelcast.map.eviction.RandomEvictionPolicy;
 import com.hazelcast.map.impl.eviction.EvictionChecker;
 import com.hazelcast.map.impl.eviction.Evictor;
 import com.hazelcast.map.impl.eviction.EvictorImpl;
@@ -43,7 +47,6 @@ import com.hazelcast.nio.ClassLoaderUtil;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.nio.serialization.SerializableByConvention;
 import com.hazelcast.query.impl.Index;
-import com.hazelcast.query.impl.IndexInfo;
 import com.hazelcast.query.impl.Indexes;
 import com.hazelcast.query.impl.QueryableEntry;
 import com.hazelcast.query.impl.getters.Extractors;
@@ -61,8 +64,6 @@ import com.hazelcast.wan.WanReplicationService;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.hazelcast.config.InMemoryFormat.NATIVE;
@@ -70,7 +71,7 @@ import static com.hazelcast.config.InMemoryFormat.OBJECT;
 import static com.hazelcast.map.impl.eviction.Evictor.NULL_EVICTOR;
 import static com.hazelcast.map.impl.mapstore.MapStoreContextFactory.createMapStoreContext;
 import static com.hazelcast.spi.properties.GroupProperty.MAP_EVICTION_BATCH_SIZE;
-import static com.hazelcast.spi.properties.GroupProperty.MAP_LOAD_ALL_PUBLISHES_ADD_EVENT;
+import static com.hazelcast.spi.properties.GroupProperty.MAP_LOAD_ALL_PUBLISHES_ADDED_EVENT;
 import static java.lang.System.getProperty;
 
 /**
@@ -94,7 +95,7 @@ public class MapContainer {
     protected final QueryEntryFactory queryEntryFactory;
     protected final EventJournalConfig eventJournalConfig;
     protected final PartitioningStrategy partitioningStrategy;
-    protected final SerializationService serializationService;
+    protected final InternalSerializationService serializationService;
     protected final InterceptorRegistry interceptorRegistry = new InterceptorRegistry();
     protected final IFunction<Object, Data> toDataFunction = new ObjectToData();
     protected final ConstructorFunction<Void, RecordFactory> recordFactoryConstructor;
@@ -102,16 +103,6 @@ public class MapContainer {
      * Holds number of registered {@link InvalidationListener} from clients.
      */
     protected final AtomicInteger invalidationListenerCount = new AtomicInteger();
-    // RU_COMPAT_3_9
-    /**
-     * Definitions of indexes that need to be added on partition threads
-     *
-     * @see MapIndexSynchronizer
-     * @see com.hazelcast.map.impl.operation.SynchronizeIndexesForPartitionTask
-     * @see com.hazelcast.map.impl.operation.PostJoinMapOperation
-     * @see com.hazelcast.map.impl.operation.MapReplicationStateHolder
-     */
-    protected final Set<IndexInfo> partitionIndexesToAdd = new ConcurrentSkipListSet<IndexInfo>();
 
     protected Object wanMergePolicy;
     protected WanReplicationPublisher wanReplicationPublisher;
@@ -135,19 +126,23 @@ public class MapContainer {
         NodeEngine nodeEngine = mapServiceContext.getNodeEngine();
         this.partitioningStrategy = createPartitioningStrategy();
         this.quorumName = mapConfig.getQuorumName();
-        this.serializationService = nodeEngine.getSerializationService();
+        this.serializationService = ((InternalSerializationService) nodeEngine.getSerializationService());
         this.recordFactoryConstructor = createRecordFactoryConstructor(serializationService);
-        this.queryEntryFactory = new QueryEntryFactory(mapConfig.getCacheDeserializedValues());
         this.objectNamespace = MapService.getObjectNamespace(name);
         initWanReplication(nodeEngine);
         ClassLoader classloader = mapServiceContext.getNodeEngine().getConfigClassLoader();
-        this.extractors = new Extractors(mapConfig.getMapAttributeConfigs(), classloader);
+        this.extractors = Extractors.newBuilder(serializationService)
+                .setMapAttributeConfigs(mapConfig.getMapAttributeConfigs())
+                .setClassLoader(classloader)
+                .build();
+        this.queryEntryFactory = new QueryEntryFactory(mapConfig.getCacheDeserializedValues(),
+                serializationService, extractors);
         if (shouldUseGlobalIndex(mapConfig)) {
             this.globalIndexes = createIndexes(true);
         } else {
             this.globalIndexes = null;
         }
-        this.addEventPublishingEnabled = nodeEngine.getProperties().getBoolean(MAP_LOAD_ALL_PUBLISHES_ADD_EVENT);
+        this.addEventPublishingEnabled = nodeEngine.getProperties().getBoolean(MAP_LOAD_ALL_PUBLISHES_ADDED_EVENT);
         this.mapStoreContext = createMapStoreContext(this);
         this.mapStoreContext.start();
         initEvictor();
@@ -174,7 +169,7 @@ public class MapContainer {
 
     // this method is overridden
     public void initEvictor() {
-        MapEvictionPolicy mapEvictionPolicy = mapConfig.getMapEvictionPolicy();
+        MapEvictionPolicy mapEvictionPolicy = getMapEvictionPolicy();
         if (mapEvictionPolicy == null) {
             evictor = NULL_EVICTOR;
         } else {
@@ -184,6 +179,29 @@ public class MapContainer {
             IPartitionService partitionService = nodeEngine.getPartitionService();
             int batchSize = nodeEngine.getProperties().getInteger(MAP_EVICTION_BATCH_SIZE);
             evictor = new EvictorImpl(mapEvictionPolicy, evictionChecker, partitionService, batchSize);
+        }
+    }
+
+    public MapEvictionPolicy getMapEvictionPolicy() {
+        MapEvictionPolicy mapEvictionPolicy = mapConfig.getMapEvictionPolicy();
+        if (mapEvictionPolicy != null) {
+            return mapEvictionPolicy;
+        }
+        EvictionPolicy evictionPolicy = mapConfig.getEvictionPolicy();
+        if (evictionPolicy == null) {
+            return null;
+        }
+        switch (evictionPolicy) {
+            case LRU:
+                return LRUEvictionPolicy.INSTANCE;
+            case LFU:
+                return LFUEvictionPolicy.INSTANCE;
+            case RANDOM:
+                return RandomEvictionPolicy.INSTANCE;
+            case NONE:
+                return null;
+            default:
+                throw new IllegalArgumentException("Not known eviction policy: " + evictionPolicy);
         }
     }
 
@@ -384,7 +402,7 @@ public class MapContainer {
     }
 
     public QueryableEntry newQueryEntry(Data key, Object value) {
-        return queryEntryFactory.newEntry((InternalSerializationService) serializationService, key, value, extractors);
+        return queryEntryFactory.newEntry(key, value);
     }
 
     public Evictor getEvictor() {
@@ -418,11 +436,10 @@ public class MapContainer {
 
     // callback called when the MapContainer is de-registered from MapService and destroyed - basically on map-destroy
     public void onDestroy() {
-        partitionIndexesToAdd.clear();
     }
 
     public boolean shouldCloneOnEntryProcessing(int partitionId) {
-        return getIndexes(partitionId).hasIndex() && OBJECT.equals(mapConfig.getInMemoryFormat());
+        return getIndexes(partitionId).haveAtLeastOneIndex() && OBJECT.equals(mapConfig.getInMemoryFormat());
     }
 
     public ObjectNamespace getObjectNamespace() {
@@ -433,28 +450,16 @@ public class MapContainer {
         Map<String, Boolean> definitions = new HashMap<String, Boolean>();
         if (isGlobalIndexEnabled()) {
             for (Index index : globalIndexes.getIndexes()) {
-                definitions.put(index.getAttributeName(), index.isOrdered());
+                definitions.put(index.getName(), index.isOrdered());
             }
         } else {
             for (PartitionContainer container : mapServiceContext.getPartitionContainers()) {
                 for (Index index : container.getIndexes(name).getIndexes()) {
-                    definitions.put(index.getAttributeName(), index.isOrdered());
+                    definitions.put(index.getName(), index.isOrdered());
                 }
             }
         }
         return definitions;
-    }
-
-    public void addPartitionIndexToAdd(IndexInfo indexInfo) {
-        partitionIndexesToAdd.add(indexInfo);
-    }
-
-    public Set<IndexInfo> getPartitionIndexesToAdd() {
-        return partitionIndexesToAdd;
-    }
-
-    public void clearPartitionIndexesToAdd() {
-        partitionIndexesToAdd.clear();
     }
 
     public boolean isPersistWanReplicatedData() {

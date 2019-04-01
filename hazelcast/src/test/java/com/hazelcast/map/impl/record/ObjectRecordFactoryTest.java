@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,8 @@ import org.junit.runner.RunWith;
 public class ObjectRecordFactoryTest extends AbstractRecordFactoryTest<Object> {
 
     @Override
-    void newRecordFactory(boolean isStatisticsEnabled, CacheDeserializedValues cacheDeserializedValues) {
+    void newRecordFactory(boolean isStatisticsEnabled,
+                          CacheDeserializedValues cacheDeserializedValues) {
         MapConfig mapConfig = new MapConfig()
                 .setStatisticsEnabled(isStatisticsEnabled)
                 .setCacheDeserializedValues(cacheDeserializedValues);

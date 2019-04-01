@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.hazelcast.internal.partition.operation;
 
 import com.hazelcast.internal.partition.MigrationCycleOperation;
 import com.hazelcast.internal.partition.MigrationInfo;
+import com.hazelcast.internal.partition.PartitionReplica;
 import com.hazelcast.internal.partition.impl.InternalPartitionServiceImpl;
 import com.hazelcast.internal.partition.impl.PartitionReplicaManager;
 import com.hazelcast.internal.partition.impl.PartitionStateManager;
@@ -99,8 +100,9 @@ public final class FinalizeMigrationOperation extends AbstractPartitionOperation
         // Old backup owner is not notified about migration until migration
         // is committed on destination. This is the only place on backup owner
         // knows replica is moved away from itself.
-        if (nodeEngine.getThisAddress().equals(migrationInfo.getSource())
-                && migrationInfo.getSourceCurrentReplicaIndex() > 0) {
+        PartitionReplica source = migrationInfo.getSource();
+        if (source != null && migrationInfo.getSourceCurrentReplicaIndex() > 0
+                && source.isIdentical(nodeEngine.getLocalMember())) {
             // execute beforeMigration on old backup before commit/rollback
             for (MigrationAwareService service : migrationAwareServices) {
                 beforeMigration(event, service);

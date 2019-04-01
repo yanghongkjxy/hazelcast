@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,8 @@ import static com.hazelcast.replicatedmap.impl.ReplicatedMapService.SERVICE_NAME
 /**
  * Dispatches published events on replicated map to corresponding listeners.
  */
-public class ReplicatedMapEventPublishingService implements EventPublishingService {
+public class ReplicatedMapEventPublishingService
+        implements EventPublishingService {
 
     private final HashMap<String, Boolean> statisticsMap = new HashMap<String, Boolean>();
 
@@ -161,7 +162,9 @@ public class ReplicatedMapEventPublishingService implements EventPublishingServi
     private Member getMember(EventData eventData) {
         Member member = replicatedMapService.getNodeEngine().getClusterService().getMember(eventData.getCaller());
         if (member == null) {
-            member = new MemberImpl(eventData.getCaller(), nodeEngine.getVersion(), false);
+            member = new MemberImpl.Builder(eventData.getCaller())
+                    .version(nodeEngine.getVersion())
+                    .build();
         }
         return member;
     }

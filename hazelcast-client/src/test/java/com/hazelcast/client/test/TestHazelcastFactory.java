@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import com.hazelcast.client.config.ClientAwsConfig;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.config.XmlClientConfigBuilder;
 import com.hazelcast.client.connection.AddressProvider;
+import com.hazelcast.client.connection.Addresses;
 import com.hazelcast.client.impl.clientside.HazelcastClientInstanceImpl;
 import com.hazelcast.client.impl.clientside.HazelcastClientProxy;
 import com.hazelcast.client.spi.properties.ClientProperty;
@@ -33,22 +34,24 @@ import com.hazelcast.test.TestEnvironment;
 import com.hazelcast.test.TestHazelcastInstanceFactory;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 public class TestHazelcastFactory extends TestHazelcastInstanceFactory {
 
     private final boolean mockNetwork = TestEnvironment.isMockNetwork();
     private final List<HazelcastClientInstanceImpl> clients = new ArrayList<HazelcastClientInstanceImpl>(10);
-    private final TestClientRegistry clientRegistry;
+    private final TestClientRegistry clientRegistry = new TestClientRegistry(getRegistry());
 
-    public TestHazelcastFactory() {
-        this(0);
+    public TestHazelcastFactory(int initialPort, String... addresses) {
+        super(initialPort, addresses);
     }
 
     public TestHazelcastFactory(int count) {
         super(count);
-        this.clientRegistry = new TestClientRegistry(getRegistry());
+    }
+
+    public TestHazelcastFactory() {
+        this(0);
     }
 
     public HazelcastInstance newHazelcastClient() {
@@ -70,7 +73,7 @@ public class TestHazelcastFactory extends TestHazelcastInstanceFactory {
             if (tccl == ClassLoader.getSystemClassLoader()) {
                 currentThread.setContextClassLoader(HazelcastClient.class.getClassLoader());
             }
-            HazelcastClientInstanceImpl client = new HazelcastClientInstanceImpl(config,
+            HazelcastClientInstanceImpl client = new HazelcastClientInstanceImpl(config, null,
                     clientRegistry.createClientServiceFactory(), createAddressProvider(config));
             client.start();
             clients.add(client);
@@ -97,10 +100,10 @@ public class TestHazelcastFactory extends TestHazelcastInstanceFactory {
 
         return new AddressProvider() {
             @Override
-            public Collection<Address> loadAddresses() {
-                Collection<Address> possibleAddresses = new ArrayList<Address>();
+            public Addresses loadAddresses() {
+                Addresses possibleAddresses = new Addresses();
                 for (Address address : getKnownAddresses()) {
-                    Collection<Address> addresses = AddressHelper.getPossibleSocketAddresses(address.getPort(),
+                    Addresses addresses = AddressHelper.getPossibleSocketAddresses(address.getPort(),
                             address.getHost(), 1);
                     possibleAddresses.addAll(addresses);
                 }

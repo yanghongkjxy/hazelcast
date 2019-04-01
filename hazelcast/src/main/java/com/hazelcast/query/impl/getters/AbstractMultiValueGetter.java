@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import com.hazelcast.util.collection.ArrayUtils;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Member;
 import java.util.Collection;
 
 
@@ -229,6 +230,15 @@ public abstract class AbstractMultiValueGetter extends Getter {
 
     static void validateModifier(String modifier) {
         parseModifier(modifier);
+    }
+
+    protected static String composeAttributeValueExtractionFailedMessage(Member member) {
+        return "Attribute value extraction failed for: " + member + ". Make "
+                + "sure attribute values or collection/array attribute value "
+                + "elements are all of the same concrete type. Consider custom "
+                + "attribute extractors if it's impossible or undesirable to "
+                + "reduce the variety of types to a single type, see Custom "
+                + "Attributes section in the reference manual for more details.";
     }
 
 }

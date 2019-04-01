@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 
 package com.hazelcast.spi.impl.operationservice.impl;
 
+import com.hazelcast.core.IndeterminateOperationState;
 import com.hazelcast.core.IndeterminateOperationStateException;
-import com.hazelcast.core.MemberLeftException;
 import com.hazelcast.core.OperationTimeoutException;
 import com.hazelcast.nio.Packet;
 import com.hazelcast.nio.serialization.Data;
@@ -117,9 +117,8 @@ final class InvocationFuture<E> extends AbstractInvocationFuture<E> {
             }
         }
 
-        if (invocation.shouldFailOnIndeterminateOperationState() && (value instanceof MemberLeftException)) {
-            String message = invocation + " failed because the target has left the cluster before response is received";
-            value = new IndeterminateOperationStateException(message, (MemberLeftException) value);
+        if (invocation.shouldFailOnIndeterminateOperationState() && (value instanceof IndeterminateOperationState)) {
+            value = new IndeterminateOperationStateException("indeterminate operation state", (Throwable) value);
         }
 
         if (value instanceof Throwable) {
@@ -146,7 +145,7 @@ final class InvocationFuture<E> extends AbstractInvocationFuture<E> {
             appendHeartbeat(sb, lastHeartbeatMillis);
 
             long lastHeartbeatFromMemberMillis = invocation.context.invocationMonitor
-                    .getLastMemberHeartbeatMillis(invocation.invTarget);
+                    .getLastMemberHeartbeatMillis(invocation.getTargetAddress());
             sb.append("Last operation heartbeat from member: ");
             appendHeartbeat(sb, lastHeartbeatFromMemberMillis);
         } else {
@@ -171,4 +170,5 @@ final class InvocationFuture<E> extends AbstractInvocationFuture<E> {
             sb.append(timeToString(lastHeartbeatMillis)).append(". ");
         }
     }
+
 }

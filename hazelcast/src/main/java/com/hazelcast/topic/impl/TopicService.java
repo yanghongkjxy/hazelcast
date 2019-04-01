@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -127,7 +127,9 @@ public class TopicService implements ManagedService, RemoteService, EventPublish
         ClusterService clusterService = nodeEngine.getClusterService();
         MemberImpl member = clusterService.getMember(topicEvent.publisherAddress);
         if (member == null) {
-            member = new MemberImpl(topicEvent.publisherAddress, nodeEngine.getVersion(), false);
+            member = new MemberImpl.Builder(topicEvent.publisherAddress)
+                    .version(nodeEngine.getVersion())
+                    .build();
         }
         Message message = new DataAwareMessage(topicEvent.name, topicEvent.data, topicEvent.publishTime, member
                 , nodeEngine.getSerializationService());

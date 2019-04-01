@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -134,6 +134,30 @@ public class HazelcastProperties {
         }
 
         return property.getDefaultValue();
+    }
+
+    /**
+     * Returns true if value for given key is provided (either as a HazelcastProperty or a System property). Default values are
+     * not taken into account.
+     *
+     * @param property the {@link HazelcastProperty} to check
+     * @return {@code true} if the value was explicitly provided
+     */
+    public boolean containsKey(HazelcastProperty property) {
+        if (property == null) {
+            return false;
+        }
+        return containsKey(property.getName())
+                || containsKey(property.getParent())
+                || containsKey(property.getDeprecatedName());
+    }
+
+    private boolean containsKey(String propertyName) {
+        if (propertyName == null) {
+            return false;
+        }
+        return properties.containsKey(propertyName)
+                || System.getProperty(propertyName) != null;
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import com.hazelcast.client.spi.impl.ClientProxyFactoryWithContext;
 import com.hazelcast.config.NearCacheConfig;
 import com.hazelcast.config.SSLConfig;
 import com.hazelcast.config.SerializationConfig;
+import com.hazelcast.config.SocketInterceptorConfig;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.PartitioningStrategy;
 import com.hazelcast.instance.BuildInfoProvider;
@@ -54,6 +55,7 @@ import com.hazelcast.spi.properties.HazelcastProperties;
 import com.hazelcast.spi.serialization.SerializationService;
 import com.hazelcast.util.function.Supplier;
 
+import static com.hazelcast.config.NearCacheConfigAccessor.initDefaultMaxSizeForOnHeapMaps;
 import static com.hazelcast.internal.config.ConfigValidator.checkNearCacheConfig;
 import static com.hazelcast.spi.properties.GroupProperty.SOCKET_CLIENT_BUFFER_DIRECT;
 import static com.hazelcast.util.ExceptionUtil.rethrow;
@@ -126,16 +128,29 @@ public class DefaultClientExtension implements ClientExtension {
     }
 
     @Override
+    public SocketInterceptor createSocketInterceptor(SocketInterceptorConfig socketInterceptorConfig) {
+        if (socketInterceptorConfig != null && socketInterceptorConfig.isEnabled()) {
+            LOGGER.warning("SocketInterceptor feature is only available on Hazelcast Enterprise!");
+        }
+        return null;
+    }
+
+    @Override
     public ChannelInitializer createChannelInitializer() {
         ClientNetworkConfig networkConfig = client.getClientConfig().getNetworkConfig();
         SSLConfig sslConfig = networkConfig.getSSLConfig();
+        SocketOptions socketOptions = networkConfig.getSocketOptions();
+        return createChannelInitializer(sslConfig, socketOptions);
+    }
+
+    @Override
+    public ChannelInitializer createChannelInitializer(SSLConfig sslConfig, SocketOptions socketOptions) {
         if (sslConfig != null && sslConfig.isEnabled()) {
             if (!BuildInfoProvider.getBuildInfo().isEnterprise()) {
                 throw new IllegalStateException("SSL/TLS requires Hazelcast Enterprise Edition");
             }
         }
 
-        SocketOptions socketOptions = networkConfig.getSocketOptions();
         HazelcastProperties properties = client.getProperties();
         boolean directBuffer = properties.getBoolean(SOCKET_CLIENT_BUFFER_DIRECT);
         return new ClientPlainChannelInitializer(socketOptions, directBuffer);
@@ -162,6 +177,7 @@ public class DefaultClientExtension implements ClientExtension {
                 NearCacheConfig nearCacheConfig = clientConfig.getNearCacheConfig(id);
                 if (nearCacheConfig != null) {
                     checkNearCacheConfig(id, nearCacheConfig, clientConfig.getNativeMemoryConfig(), true);
+                    initDefaultMaxSizeForOnHeapMaps(nearCacheConfig);
                     return new NearCachedClientMapProxy(MapService.SERVICE_NAME, id, context);
                 } else {
                     return new ClientMapProxy(MapService.SERVICE_NAME, id, context);
@@ -175,7 +191,8 @@ public class DefaultClientExtension implements ClientExtension {
         SerializationService ss = client.getSerializationService();
         ClientExecutionService es = client.getClientExecutionService();
         ClassLoader classLoader = client.getClientConfig().getClassLoader();
+        HazelcastProperties properties = client.getProperties();
 
-        return new DefaultNearCacheManager(ss, es, classLoader);
+        return new DefaultNearCacheManager(ss, es, classLoader, properties);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,19 @@
 
 package com.hazelcast.internal.management.operation;
 
+import com.hazelcast.config.ManagementCenterConfig;
 import com.hazelcast.core.HazelcastException;
 import com.hazelcast.internal.management.ManagementDataSerializerHook;
 import com.hazelcast.internal.management.ScriptEngineManagerContext;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
 import com.hazelcast.nio.serialization.impl.Versioned;
-import com.hazelcast.util.ExceptionUtil;
 
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 import java.io.IOException;
+import java.security.AccessControlException;
 
 import static com.hazelcast.internal.cluster.Versions.V3_10;
 
@@ -51,6 +52,10 @@ public class ScriptExecutorOperation extends AbstractManagementOperation impleme
 
     @Override
     public void run() {
+        ManagementCenterConfig managementCenterConfig = getNodeEngine().getConfig().getManagementCenterConfig();
+        if (!managementCenterConfig.isScriptingEnabled()) {
+            throw new AccessControlException("Using ScriptEngine is not allowed on this Hazelcast member.");
+        }
         ScriptEngineManager scriptEngineManager = ScriptEngineManagerContext.getScriptEngineManager();
         ScriptEngine engine = scriptEngineManager.getEngineByName(engineName);
         if (engine == null) {
@@ -60,7 +65,10 @@ public class ScriptExecutorOperation extends AbstractManagementOperation impleme
         try {
             this.result = engine.eval(script);
         } catch (ScriptException e) {
-            throw new HazelcastException(ExceptionUtil.toString(e));
+            // ScriptException's cause is not serializable - we don't need the cause
+            HazelcastException hazelcastException = new HazelcastException(e.getMessage());
+            hazelcastException.setStackTrace(e.getStackTrace());
+            throw hazelcastException;
         }
     }
 

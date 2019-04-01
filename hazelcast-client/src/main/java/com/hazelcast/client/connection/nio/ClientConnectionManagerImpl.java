@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,44 +17,44 @@
 package com.hazelcast.client.connection.nio;
 
 import com.hazelcast.client.AuthenticationException;
-import com.hazelcast.client.ClientExtension;
+import com.hazelcast.client.ClientNotAllowedInClusterException;
+import com.hazelcast.client.HazelcastClientNotActiveException;
 import com.hazelcast.client.HazelcastClientOfflineException;
 import com.hazelcast.client.config.ClientNetworkConfig;
-import com.hazelcast.client.connection.AddressProvider;
 import com.hazelcast.client.connection.AddressTranslator;
 import com.hazelcast.client.connection.ClientConnectionManager;
 import com.hazelcast.client.connection.ClientConnectionStrategy;
 import com.hazelcast.client.impl.ClientTypes;
 import com.hazelcast.client.impl.client.ClientPrincipal;
+import com.hazelcast.client.impl.clientside.CandidateClusterContext;
 import com.hazelcast.client.impl.clientside.HazelcastClientInstanceImpl;
 import com.hazelcast.client.impl.protocol.AuthenticationStatus;
 import com.hazelcast.client.impl.protocol.ClientMessage;
 import com.hazelcast.client.impl.protocol.codec.ClientAuthenticationCodec;
 import com.hazelcast.client.impl.protocol.codec.ClientAuthenticationCustomCodec;
-import com.hazelcast.client.spi.ClientContext;
-import com.hazelcast.client.spi.impl.ClientExecutionServiceImpl;
+import com.hazelcast.client.impl.protocol.codec.ClientIsFailoverSupportedCodec;
+import com.hazelcast.client.spi.ClientExecutionService;
 import com.hazelcast.client.spi.impl.ClientInvocation;
 import com.hazelcast.client.spi.impl.ClientInvocationFuture;
 import com.hazelcast.config.SSLConfig;
-import com.hazelcast.config.SocketInterceptorConfig;
 import com.hazelcast.core.ExecutionCallback;
 import com.hazelcast.core.HazelcastException;
 import com.hazelcast.instance.BuildInfoProvider;
 import com.hazelcast.internal.networking.Channel;
 import com.hazelcast.internal.networking.ChannelErrorHandler;
+import com.hazelcast.internal.networking.ChannelInitializerProvider;
 import com.hazelcast.internal.networking.nio.NioNetworking;
 import com.hazelcast.internal.serialization.InternalSerializationService;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.nio.Address;
-import com.hazelcast.nio.ClassLoaderUtil;
 import com.hazelcast.nio.Connection;
 import com.hazelcast.nio.ConnectionListener;
 import com.hazelcast.nio.SocketInterceptor;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.security.Credentials;
 import com.hazelcast.security.UsernamePasswordCredentials;
+import com.hazelcast.spi.exception.TargetDisconnectedException;
 import com.hazelcast.spi.properties.HazelcastProperties;
-import com.hazelcast.spi.serialization.SerializationService;
 import com.hazelcast.util.AddressUtil;
 
 import java.io.EOFException;
@@ -62,14 +62,15 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.UnknownHostException;
 import java.nio.channels.SocketChannel;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.Future;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -96,55 +97,47 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
     private final ILogger logger;
     private final int connectionTimeoutMillis;
     private final HazelcastClientInstanceImpl client;
-    private final SocketInterceptor socketInterceptor;
-
-    private final ClientExecutionServiceImpl executionService;
-    private final AddressTranslator addressTranslator;
-    private final ConcurrentMap<Address, ClientConnection> activeConnections = new ConcurrentHashMap<Address, ClientConnection>();
-    private final ConcurrentMap<Address, AuthenticationFuture> connectionsInProgress =
-            new ConcurrentHashMap<Address, AuthenticationFuture>();
-    private final Set<ConnectionListener> connectionListeners = new CopyOnWriteArraySet<ConnectionListener>();
+    private final ClientExecutionService executionService;
+    private final InetSocketAddressCache inetSocketAddressCache = new InetSocketAddressCache();
+    private final ConcurrentMap<InetSocketAddress, ClientConnection> activeConnections
+            = new ConcurrentHashMap<InetSocketAddress, ClientConnection>();
+    private final ConcurrentMap<InetSocketAddress, AuthenticationFuture> connectionsInProgress =
+            new ConcurrentHashMap<InetSocketAddress, AuthenticationFuture>();
+    private final Collection<ConnectionListener> connectionListeners = new CopyOnWriteArrayList<ConnectionListener>();
     private final boolean allowInvokeWhenDisconnected;
-    private final Credentials credentials;
     private final NioNetworking networking;
     private final HeartbeatManager heartbeat;
-    private final ClusterConnector clusterConnector;
     private final long authenticationTimeout;
-    private volatile ClientPrincipal principal;
     private final ClientConnectionStrategy connectionStrategy;
     // accessed only in synchronized block
     private final LinkedList<Integer> outboundPorts = new LinkedList<Integer>();
+    private final Set<String> labels;
     private final int outboundPortCount;
+    private final boolean failoverConfigProvided;
+    private volatile Credentials lastCredentials;
+    private volatile ClientPrincipal principal;
+    private volatile Integer clusterPartitionCount;
+    private volatile String clusterId;
+    private volatile Address ownerConnectionAddress;
+    private volatile CandidateClusterContext currentClusterContext;
 
-    public ClientConnectionManagerImpl(HazelcastClientInstanceImpl client, AddressTranslator addressTranslator,
-                                       Collection<AddressProvider> addressProviders) {
-        allowInvokeWhenDisconnected = client.getProperties().getBoolean(ALLOW_INVOCATIONS_WHEN_DISCONNECTED);
+    public ClientConnectionManagerImpl(HazelcastClientInstanceImpl client) {
+        this.allowInvokeWhenDisconnected = client.getProperties().getBoolean(ALLOW_INVOCATIONS_WHEN_DISCONNECTED);
         this.client = client;
-
-        this.addressTranslator = addressTranslator;
-
+        this.labels = Collections.unmodifiableSet(client.getClientConfig().getLabels());
         this.logger = client.getLoggingService().getLogger(ClientConnectionManager.class);
-
         ClientNetworkConfig networkConfig = client.getClientConfig().getNetworkConfig();
 
         final int connTimeout = networkConfig.getConnectionTimeout();
         this.connectionTimeoutMillis = connTimeout == 0 ? Integer.MAX_VALUE : connTimeout;
-
-        this.executionService = (ClientExecutionServiceImpl) client.getClientExecutionService();
-
+        this.executionService = client.getClientExecutionService();
         this.networking = initNetworking(client);
-
-        this.socketInterceptor = initSocketInterceptor(networkConfig.getSocketInterceptorConfig());
-
-        this.credentials = client.getCredentials();
-        this.connectionStrategy = initializeStrategy(client);
-
+        this.connectionStrategy = client.getConnectionStrategy();
         this.outboundPorts.addAll(getOutboundPorts(networkConfig));
         this.outboundPortCount = outboundPorts.size();
         this.heartbeat = new HeartbeatManager(this, client);
         this.authenticationTimeout = heartbeat.getHeartbeatTimeout();
-
-        this.clusterConnector = new ClusterConnector(client, this, connectionStrategy, addressProviders);
+        this.failoverConfigProvided = client.getFailoverConfig() != null;
     }
 
     private Collection<Integer> getOutboundPorts(ClientNetworkConfig networkConfig) {
@@ -153,28 +146,11 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
         return AddressUtil.getOutboundPorts(outboundPorts, outboundPortDefinitions);
     }
 
-    private ClientConnectionStrategy initializeStrategy(HazelcastClientInstanceImpl client) {
-        ClientConnectionStrategy strategy;
-        //internal property
-        String className = client.getProperties().get("hazelcast.client.connection.strategy.classname");
-        if (className != null) {
-            try {
-                ClassLoader configClassLoader = client.getClientConfig().getClassLoader();
-                return ClassLoaderUtil.newInstance(configClassLoader, className);
-            } catch (Exception e) {
-                throw rethrow(e);
-            }
-        } else {
-            strategy = new DefaultClientConnectionStrategy();
-        }
-        return strategy;
-    }
-
     public NioNetworking getNetworking() {
         return networking;
     }
 
-    protected NioNetworking initNetworking(HazelcastClientInstanceImpl client) {
+    protected NioNetworking initNetworking(final HazelcastClientInstanceImpl client) {
         HazelcastProperties properties = client.getProperties();
 
         SSLConfig sslConfig = client.getClientConfig().getNetworkConfig().getSSLConfig();
@@ -205,17 +181,9 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
                         .errorHandler(new ClientConnectionChannelErrorHandler())
                         .inputThreadCount(inputThreads)
                         .outputThreadCount(outputThreads)
-                        .balancerIntervalSeconds(properties.getInteger(IO_BALANCER_INTERVAL_SECONDS))
-                        .channelInitializer(client.getClientExtension().createChannelInitializer()));
+                        .balancerIntervalSeconds(properties.getInteger(IO_BALANCER_INTERVAL_SECONDS)));
     }
 
-    private SocketInterceptor initSocketInterceptor(SocketInterceptorConfig sic) {
-        if (sic != null && sic.isEnabled()) {
-            ClientExtension clientExtension = client.getClientExtension();
-            return clientExtension.createSocketInterceptor();
-        }
-        return null;
-    }
 
     public ClientConnectionStrategy getConnectionStrategy() {
         return connectionStrategy;
@@ -231,7 +199,7 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
         return alive;
     }
 
-    public synchronized void start(ClientContext clientContext) {
+    public synchronized void start() {
         if (alive) {
             return;
         }
@@ -239,8 +207,6 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
         startNetworking();
 
         heartbeat.start();
-        connectionStrategy.init(clientContext);
-        connectionStrategy.start();
     }
 
     protected void startNetworking() {
@@ -256,12 +222,13 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
         for (Connection connection : activeConnections.values()) {
             connection.close("Hazelcast client is shutting down", null);
         }
-        clusterConnector.shutdown();
+
         stopNetworking();
         connectionListeners.clear();
         heartbeat.shutdown();
-
-        connectionStrategy.shutdown();
+        if (currentClusterContext != null) {
+            currentClusterContext.destroy();
+        }
     }
 
     @Override
@@ -282,7 +249,7 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
         if (target == null) {
             return null;
         }
-        return activeConnections.get(target);
+        return activeConnections.get(inetSocketAddressCache.get(target));
     }
 
     @Override
@@ -306,7 +273,7 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
             throw new IllegalStateException("Address can not be null");
         }
 
-        ClientConnection connection = activeConnections.get(target);
+        ClientConnection connection = activeConnections.get(inetSocketAddressCache.get(target));
 
         if (connection != null) {
             if (!asOwner) {
@@ -320,6 +287,9 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
     }
 
     private void checkAllowed(Address target, boolean asOwner, boolean acquiresResources) throws IOException {
+        if (!alive) {
+            throw new HazelcastClientNotActiveException("ConnectionManager is not active!");
+        }
         if (asOwner) {
             connectionStrategy.beforeConnectToCluster(target);
             //opening an owner connection is always allowed
@@ -345,10 +315,10 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
 
     @Override
     public Address getOwnerConnectionAddress() {
-        return clusterConnector.getOwnerConnectionAddress();
+        return ownerConnectionAddress;
     }
 
-    Connection getOrConnect(Address address, boolean asOwner) {
+    public Connection getOrConnect(Address address, boolean asOwner) {
         try {
             while (true) {
                 ClientConnection connection = (ClientConnection) getConnection(address, asOwner, true);
@@ -374,12 +344,9 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
         if (!asOwner) {
             connectionStrategy.beforeOpenConnection(target);
         }
-        if (!alive) {
-            throw new HazelcastException("ConnectionManager is not active!");
-        }
 
         AuthenticationFuture future = new AuthenticationFuture();
-        AuthenticationFuture oldFuture = connectionsInProgress.putIfAbsent(target, future);
+        AuthenticationFuture oldFuture = connectionsInProgress.putIfAbsent(inetSocketAddressCache.get(target), future);
         if (oldFuture == null) {
             executionService.execute(new InitConnectionTask(target, asOwner, future));
             return future;
@@ -389,7 +356,6 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
 
     @Override
     public ClientConnection getOwnerConnection() {
-        Address ownerConnectionAddress = clusterConnector.getOwnerConnectionAddress();
         if (ownerConnectionAddress == null) {
             return null;
         }
@@ -404,16 +370,11 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
     }
 
     private void fireConnectionRemovedEvent(ClientConnection connection) {
-        if (connection.isAuthenticatedAsOwner()) {
-            clusterConnector.disconnectFromCluster(connection);
-        }
-
         for (ConnectionListener listener : connectionListeners) {
             listener.connectionRemoved(connection);
         }
         connectionStrategy.onDisconnect(connection);
     }
-
 
     private boolean useAnyOutboundPort() {
         return outboundPortCount == 0;
@@ -457,9 +418,6 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
     }
 
     protected ClientConnection createSocketConnection(final Address remoteAddress) throws IOException {
-        if (!alive) {
-            throw new HazelcastException("ConnectionManager is not active!");
-        }
         SocketChannel socketChannel = null;
         try {
             socketChannel = SocketChannel.open();
@@ -467,13 +425,15 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
 
             bindSocketToPort(socket);
 
-            Channel channel = networking.register(socketChannel, true);
-            channel.connect(remoteAddress.getInetSocketAddress(), connectionTimeoutMillis);
+            ChannelInitializerProvider channelInitializer = currentClusterContext.getChannelInitializerProvider();
+            Channel channel = networking.register(null, channelInitializer, socketChannel, true);
+            channel.connect(inetSocketAddressCache.get(remoteAddress), connectionTimeoutMillis);
 
             ClientConnection connection
                     = new ClientConnection(client, connectionIdGen.incrementAndGet(), channel);
 
             socketChannel.configureBlocking(true);
+            SocketInterceptor socketInterceptor = currentClusterContext.getSocketInterceptor();
             if (socketInterceptor != null) {
                 socketInterceptor.onConnect(socket);
             }
@@ -487,10 +447,10 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
     }
 
     void onClose(Connection connection) {
-        removeFromActiveConnections(connection);
+        removeFromActiveConnections((ClientConnection) connection);
     }
 
-    private void removeFromActiveConnections(Connection connection) {
+    private void removeFromActiveConnections(ClientConnection connection) {
         Address endpoint = connection.getEndPoint();
 
         if (endpoint == null) {
@@ -500,9 +460,9 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
             }
             return;
         }
-        if (activeConnections.remove(endpoint, connection)) {
+        if (activeConnections.remove(inetSocketAddressCache.get(endpoint), connection)) {
             logger.info("Removed connection to endpoint: " + endpoint + ", connection: " + connection);
-            fireConnectionRemovedEvent((ClientConnection) connection);
+            fireConnectionRemovedEvent(connection);
         } else {
             if (logger.isFinestEnabled()) {
                 logger.finest("Destroying a connection, but there is no mapping " + endpoint + " -> " + connection
@@ -516,84 +476,30 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
         connectionListeners.add(connectionListener);
     }
 
-    private void authenticate(final Address target, final ClientConnection connection, final boolean asOwner,
-                              final AuthenticationFuture future) {
-        final ClientPrincipal principal = getPrincipal();
-        ClientMessage clientMessage = encodeAuthenticationRequest(asOwner, client.getSerializationService(), principal);
-        ClientInvocation clientInvocation = new ClientInvocation(client, clientMessage, null, connection);
-        ClientInvocationFuture invocationFuture = clientInvocation.invokeUrgent();
-
-        ScheduledFuture timeoutTaskFuture = executionService.schedule(
-                new TimeoutAuthenticationTask(invocationFuture), authenticationTimeout, MILLISECONDS);
-        invocationFuture.andThen(new AuthCallback(connection, asOwner, target, future, timeoutTaskFuture));
+    public Credentials getLastCredentials() {
+        return lastCredentials;
     }
 
-    private ClientMessage encodeAuthenticationRequest(boolean asOwner, SerializationService ss, ClientPrincipal principal) {
-        byte serializationVersion = ((InternalSerializationService) ss).getVersion();
-        String uuid = null;
-        String ownerUuid = null;
-        if (principal != null) {
-            uuid = principal.getUuid();
-            ownerUuid = principal.getOwnerUuid();
+    @Override
+    public void setCandidateClusterContext(CandidateClusterContext context) {
+        if (currentClusterContext == null) {
+            context.start();
         }
-        ClientMessage clientMessage;
-        if (credentials.getClass().equals(UsernamePasswordCredentials.class)) {
-            UsernamePasswordCredentials cr = (UsernamePasswordCredentials) credentials;
-            clientMessage = ClientAuthenticationCodec
-                    .encodeRequest(cr.getUsername(), cr.getPassword(), uuid, ownerUuid, asOwner, ClientTypes.JAVA,
-                            serializationVersion, BuildInfoProvider.getBuildInfo().getVersion());
-        } else {
-            Data data = ss.toData(credentials);
-            clientMessage = ClientAuthenticationCustomCodec.encodeRequest(data, uuid, ownerUuid,
-                    asOwner, ClientTypes.JAVA, serializationVersion, BuildInfoProvider.getBuildInfo().getVersion());
-        }
-        return clientMessage;
+        currentClusterContext = context;
     }
 
-    private void onAuthenticated(Address target, ClientConnection connection) {
-        ClientConnection oldConnection = activeConnections.put(connection.getEndPoint(), connection);
-        if (oldConnection == null) {
-            if (logger.isFinestEnabled()) {
-                logger.finest("Authentication succeeded for " + connection
-                        + " and there was no old connection to this end-point");
-            }
-            fireConnectionAddedEvent(connection);
-        } else {
-            if (logger.isFinestEnabled()) {
-                logger.finest("Re-authentication succeeded for " + connection);
-            }
-            assert connection.equals(oldConnection);
+    public void beforeClusterSwitch(CandidateClusterContext context) {
+        for (ClientConnection activeConnection : activeConnections.values()) {
+            activeConnection.close(null, new TargetDisconnectedException("Closing since client is switching cluster"));
         }
 
-        connectionsInProgress.remove(target);
-        logger.info("Authenticated with server " + connection.getEndPoint() + ", server version:" + connection
-                .getConnectedServerVersionString() + " Local address: " + connection.getLocalSocketAddress());
-
-        /* check if connection is closed by remote before authentication complete, if that is the case
-        we need to remove it back from active connections.
-        Race description from https://github.com/hazelcast/hazelcast/pull/8832.(A little bit changed)
-        - open a connection client -> member
-        - send auth message
-        - receive auth reply -> reply processing is offloaded to an executor. Did not start to run yet.
-        - member closes the connection -> the connection is trying to removed from map
-                                                             but it was not there to begin with
-        - the executor start processing the auth reply -> it put the connection to the connection map.
-        - we end up with a closed connection in activeConnections map */
-        if (!connection.isAlive()) {
-            removeFromActiveConnections(connection);
+        if (currentClusterContext != null) {
+            currentClusterContext.destroy();
         }
-    }
-
-    private void onAuthenticationFailed(Address target, ClientConnection connection, Throwable cause) {
-        if (logger.isFinestEnabled()) {
-            logger.finest("Authentication of " + connection + " failed.", cause);
-        }
-        connection.close(null, cause);
-        connectionsInProgress.remove(target);
-    }
-
-    Collection<Address> getPossibleMemberAddresses() {
-        return clusterConnector.getPossibleMemberAddresses();
+        clusterId = null;
+        inetSocketAddressCache.clear();
+        currentClusterContext = context;
+        currentClusterContext.start();
     }
 
     private class TimeoutAuthenticationTask implements Runnable {
@@ -612,7 +518,26 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
             future.complete(new TimeoutException("Authentication response did not come back in "
                     + authenticationTimeout + " millis"));
         }
+    }
 
+    private class ClientConnectionChannelErrorHandler implements ChannelErrorHandler {
+        @Override
+        public void onError(Channel channel, Throwable cause) {
+            if (channel == null) {
+                logger.severe(cause);
+            } else {
+                if (cause instanceof OutOfMemoryError) {
+                    logger.severe(cause);
+                }
+
+                Connection connection = (Connection) channel.attributeMap().get(ClientConnection.class);
+                if (cause instanceof EOFException) {
+                    connection.close("Connection closed by the other side", cause);
+                } else {
+                    connection.close("Exception in " + connection + ", thread=" + Thread.currentThread().getName(), cause);
+                }
+            }
+        }
     }
 
     private class InitConnectionTask implements Runnable {
@@ -631,28 +556,81 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
         public void run() {
             ClientConnection connection;
             try {
-                connection = getConnection(target);
+                connection = getConnection();
             } catch (Exception e) {
                 logger.finest(e);
                 future.onFailure(e);
-                connectionsInProgress.remove(target);
+                connectionsInProgress.remove(inetSocketAddressCache.get(target));
                 return;
             }
 
             try {
-                authenticate(target, connection, asOwner, future);
+                authenticateAsync(connection);
             } catch (Exception e) {
                 future.onFailure(e);
                 connection.close("Failed to authenticate connection", e);
-                connectionsInProgress.remove(target);
+                connectionsInProgress.remove(inetSocketAddressCache.get(target));
             }
         }
 
-        private ClientConnection getConnection(Address target) throws IOException {
-            ClientConnection connection = activeConnections.get(target);
+        private void authenticateAsync(ClientConnection connection) {
+            ClientMessage clientMessage = encodeAuthenticationRequest();
+            ClientInvocation clientInvocation = new ClientInvocation(client, clientMessage, null, connection);
+            ClientInvocationFuture invocationFuture = clientInvocation.invokeUrgent();
+
+            ClientInvocationFuture failoverFuture = null;
+            if (failoverConfigProvided && asOwner) {
+                ClientMessage isFailoverSupportedMessage = ClientIsFailoverSupportedCodec.encodeRequest();
+                failoverFuture = new ClientInvocation(client, isFailoverSupportedMessage, null, connection).invoke();
+            }
+
+            ScheduledFuture timeoutTaskFuture = executionService.schedule(
+                    new TimeoutAuthenticationTask(invocationFuture), authenticationTimeout, MILLISECONDS);
+            AuthCallback callback = new AuthCallback(connection, asOwner, target, future, timeoutTaskFuture, failoverFuture);
+            invocationFuture.andThen(callback);
+        }
+
+        private ClientMessage encodeAuthenticationRequest() {
+            InternalSerializationService ss = client.getSerializationService();
+            byte serializationVersion = ss.getVersion();
+            String uuid = null;
+            String ownerUuid = null;
+            ClientPrincipal principal = getPrincipal();
+            if (principal != null) {
+                uuid = principal.getUuid();
+                ownerUuid = principal.getOwnerUuid();
+            }
+
+            Credentials credentials = currentClusterContext.getCredentialsFactory().newCredentials();
+            lastCredentials = credentials;
+
+            String resolvedClusterId = null;
+            if (failoverConfigProvided) {
+                resolvedClusterId = clusterId;
+            }
+
+            if (credentials.getClass().equals(UsernamePasswordCredentials.class)) {
+                UsernamePasswordCredentials cr = (UsernamePasswordCredentials) credentials;
+                return ClientAuthenticationCodec
+                        .encodeRequest(cr.getUsername(), cr.getPassword(), uuid, ownerUuid,
+                                asOwner, ClientTypes.JAVA,
+                                serializationVersion, BuildInfoProvider.getBuildInfo().getVersion(), client.getName(),
+                                labels, clusterPartitionCount, resolvedClusterId);
+            } else {
+                Data data = ss.toData(credentials);
+                return ClientAuthenticationCustomCodec.encodeRequest(data, uuid, ownerUuid,
+                        asOwner, ClientTypes.JAVA, serializationVersion,
+                        BuildInfoProvider.getBuildInfo().getVersion(), client.getName(),
+                        labels, clusterPartitionCount, resolvedClusterId);
+            }
+        }
+
+        private ClientConnection getConnection() throws IOException {
+            ClientConnection connection = activeConnections.get(inetSocketAddressCache.get(target));
             if (connection != null) {
                 return connection;
             }
+            AddressTranslator addressTranslator = currentClusterContext.getAddressTranslator();
             Address address = addressTranslator.translate(target);
             if (address == null) {
                 throw new NullPointerException("Address Translator " + addressTranslator.getClass()
@@ -662,51 +640,22 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
         }
     }
 
-    private class ClientConnectionChannelErrorHandler implements ChannelErrorHandler {
-        @Override
-        public void onError(Channel channel, Throwable cause) {
-            if (channel == null) {
-                logger.severe(cause);
-            } else {
-                if (cause instanceof OutOfMemoryError) {
-                    logger.severe(cause);
-                }
-
-                ClientConnection connection = (ClientConnection) channel.attributeMap().get(ClientConnection.class);
-                if (cause instanceof EOFException) {
-                    connection.close("Connection closed by the other side", cause);
-                } else {
-                    connection.close("Exception in " + connection + ", thread=" + Thread.currentThread().getName(), cause);
-                }
-            }
-        }
-    }
-
-    @Override
-    public void connectToCluster() {
-        clusterConnector.connectToCluster();
-    }
-
-    @Override
-    public Future<Void> connectToClusterAsync() {
-        return clusterConnector.connectToClusterAsync();
-    }
-
-
     private class AuthCallback implements ExecutionCallback<ClientMessage> {
         private final ClientConnection connection;
         private final boolean asOwner;
         private final Address target;
         private final AuthenticationFuture future;
         private final ScheduledFuture timeoutTaskFuture;
+        private final ClientInvocationFuture isFailoverFuture;
 
         AuthCallback(ClientConnection connection, boolean asOwner, Address target,
-                     AuthenticationFuture future, ScheduledFuture timeoutTaskFuture) {
+                     AuthenticationFuture future, ScheduledFuture timeoutTaskFuture, ClientInvocationFuture isFailoverFuture) {
             this.connection = connection;
             this.asOwner = asOwner;
             this.target = target;
             this.future = future;
             this.timeoutTaskFuture = timeoutTaskFuture;
+            this.isFailoverFuture = isFailoverFuture;
         }
 
         @Override
@@ -719,26 +668,24 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
                 onFailure(e);
                 return;
             }
+
             AuthenticationStatus authenticationStatus = AuthenticationStatus.getById(result.status);
             switch (authenticationStatus) {
                 case AUTHENTICATED:
-                    connection.setConnectedServerVersion(result.serverHazelcastVersion);
-                    connection.setRemoteEndpoint(result.address);
-                    if (asOwner) {
-                        connection.setIsAuthenticatedAsOwner();
-                        ClientPrincipal principal = new ClientPrincipal(result.uuid, result.ownerUuid);
-                        setPrincipal(principal);
-                        //setting owner connection is moved to here(before onAuthenticated/before connected event)
-                        //so that invocations that requires owner connection on this connection go through
-                        clusterConnector.setOwnerConnectionAddress(connection.getEndPoint());
-                        logger.info("Setting " + connection + " as owner with principal " + principal);
-
+                    if (!checkFailoverSupportIfNeeded()) {
+                        onFailure(new IllegalStateException("Cluster does not support failover. "
+                                + "This feature is available in Hazelcast Enterprise"));
+                        return;
                     }
-                    onAuthenticated(target, connection);
+                    handleSuccessResult(result);
+                    onAuthenticated();
                     future.onSuccess(connection);
                     break;
                 case CREDENTIALS_FAILED:
                     onFailure(new AuthenticationException("Invalid credentials! Principal: " + principal));
+                    break;
+                case NOT_ALLOWED_IN_CLUSTER:
+                    onFailure(new ClientNotAllowedInClusterException("Client is not allowed in the cluster"));
                     break;
                 default:
                     onFailure(new AuthenticationException("Authentication status code not supported. status: "
@@ -746,11 +693,116 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager {
             }
         }
 
+        private void handleSuccessResult(ClientAuthenticationCodec.ResponseParameters result) {
+            if (result.partitionCountExist) {
+                clusterPartitionCount = result.partitionCount;
+            }
+            if (result.clusterIdExist) {
+                clusterId = result.clusterId;
+            }
+            if (result.serverHazelcastVersionExist) {
+                connection.setConnectedServerVersion(result.serverHazelcastVersion);
+            }
+            connection.setRemoteEndpoint(result.address);
+            if (asOwner) {
+                connection.setIsAuthenticatedAsOwner();
+                ClientPrincipal principal = new ClientPrincipal(result.uuid, result.ownerUuid);
+                setPrincipal(principal);
+                ownerConnectionAddress = connection.getEndPoint();
+                logger.info("Setting " + connection + " as owner with principal " + principal);
+            }
+        }
+
+        private boolean checkFailoverSupportIfNeeded() {
+            if (!asOwner) {
+                return true;
+            }
+            boolean isFailoverAskedToCluster = isFailoverFuture != null;
+            if (!isFailoverAskedToCluster) {
+                return true;
+            }
+            try {
+                return ClientIsFailoverSupportedCodec.decodeResponse(isFailoverFuture.get()).response;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        private void onAuthenticated() {
+            Address memberAddress = connection.getEndPoint();
+            ClientConnection oldConnection = activeConnections.put(inetSocketAddressCache.get(memberAddress), connection);
+            if (oldConnection == null) {
+                if (logger.isFinestEnabled()) {
+                    logger.finest("Authentication succeeded for " + connection
+                            + " and there was no old connection to this end-point");
+                }
+                fireConnectionAddedEvent(connection);
+            } else {
+                if (logger.isFinestEnabled()) {
+                    logger.finest("Re-authentication succeeded for " + connection);
+                }
+                if (!connection.equals(oldConnection)) {
+                    logger.severe("The address that client is connected from does not match with the member address. "
+                            + " This setup is illegal and will cause inconsistent behaviour "
+                            + "Address that client uses : " + target + ", member address : " + memberAddress);
+                }
+            }
+
+            connectionsInProgress.remove(inetSocketAddressCache.get(target));
+            logger.info("Authenticated with server " + memberAddress + ", server version:" + connection
+                    .getConnectedServerVersionString() + " Local address: " + connection.getLocalSocketAddress());
+
+            // Check if connection is closed by remote before authentication complete, if that is the case
+            // we need to remove it back from active connections.
+            // Race description from https://github.com/hazelcast/hazelcast/pull/8832.(A little bit changed)
+            // - open a connection client -> member
+            // - send auth message
+            // - receive auth reply -> reply processing is offloaded to an executor. Did not start to run yet.
+            // - member closes the connection -> the connection is trying to removed from map
+            //                                                     but it was not there to begin with
+            // - the executor start processing the auth reply -> it put the connection to the connection map.
+            // - we end up with a closed connection in activeConnections map
+            if (!connection.isAlive()) {
+                removeFromActiveConnections(connection);
+            }
+        }
+
         @Override
-        public void onFailure(Throwable t) {
+        public void onFailure(Throwable cause) {
             timeoutTaskFuture.cancel(true);
-            onAuthenticationFailed(target, connection, t);
-            future.onFailure(t);
+            if (logger.isFinestEnabled()) {
+                logger.finest("Authentication of " + connection + " failed.", cause);
+            }
+            connection.close(null, cause);
+            connectionsInProgress.remove(inetSocketAddressCache.get(target));
+            future.onFailure(cause);
+        }
+    }
+
+    private static class InetSocketAddressCache {
+
+        private final ConcurrentMap<Address, InetSocketAddress> cache = new ConcurrentHashMap<Address, InetSocketAddress>();
+
+        private InetSocketAddress get(Address target) {
+            try {
+                InetSocketAddress resolvedAddress = cache.get(target);
+                if (resolvedAddress != null) {
+                    return resolvedAddress;
+                }
+                InetSocketAddress newResolvedAddress = new InetSocketAddress(target.getInetAddress(), target.getPort());
+                InetSocketAddress prevAddress = cache.putIfAbsent(target, newResolvedAddress);
+                if (prevAddress != null) {
+                    return prevAddress;
+                }
+                return newResolvedAddress;
+            } catch (UnknownHostException e) {
+                throw rethrow(e);
+            }
+        }
+
+        //only called when there is a cluster switch
+        public void clear() {
+            cache.clear();
         }
     }
 }

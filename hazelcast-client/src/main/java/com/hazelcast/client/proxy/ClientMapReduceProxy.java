@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -258,8 +258,8 @@ public class ClientMapReduceProxy
         }
 
         @Override
-        protected void setResult(Object result) {
-            super.setResult(result);
+        protected boolean setResult(Object result) {
+            return super.setResult(result);
         }
     }
 

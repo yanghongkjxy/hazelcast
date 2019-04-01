@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ package com.hazelcast.internal.nearcache;
 import com.hazelcast.config.NearCacheConfig;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.spi.ExecutionService;
+import com.hazelcast.spi.impl.NodeEngineImpl;
+import com.hazelcast.spi.properties.HazelcastProperties;
 import com.hazelcast.spi.serialization.SerializationService;
 import org.junit.Before;
 
@@ -40,13 +42,16 @@ public abstract class NearCacheManagerTestSupport extends CommonNearCacheTestSup
     protected abstract NearCacheManager createNearCacheManager();
 
     protected SerializationService ss;
+    protected HazelcastProperties properties;
     protected ExecutionService executionService;
 
     @Before
     public void setUp() {
         HazelcastInstance instance = createHazelcastInstance();
-        ss = getSerializationService(instance);
-        executionService = getNodeEngineImpl(instance).getExecutionService();
+        NodeEngineImpl nodeEngineImpl = getNodeEngineImpl(instance);
+        properties = nodeEngineImpl.getProperties();
+        ss = nodeEngineImpl.getSerializationService();
+        executionService = nodeEngineImpl.getExecutionService();
     }
 
     void doCreateAndGetNearCache() {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -124,10 +124,7 @@ public class SplitBrainMergeValidationOp extends AbstractJoinOperation {
             }
             return true;
         } else {
-            // ping master to check if it's still valid
-            service.getClusterHeartbeatManager().sendMasterConfirmation();
-            logger.info("Ignoring join check from " + getCallerAddress()
-                    + ", because this node is not master...");
+            logger.info("Ignoring join check from " + getCallerAddress() + ", because this node is not master...");
             return false;
         }
     }

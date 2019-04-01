@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ import com.hazelcast.internal.journal.EventJournal;
 import com.hazelcast.internal.journal.EventJournalReadOperation;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
-import com.hazelcast.projection.Projection;
 import com.hazelcast.ringbuffer.impl.ReadResultSetImpl;
+import com.hazelcast.util.function.Function;
 import com.hazelcast.util.function.Predicate;
 
 import java.io.IOException;
@@ -46,7 +46,7 @@ import java.io.IOException;
 public class CacheEventJournalReadOperation<K, V, T>
         extends EventJournalReadOperation<T, InternalEventJournalCacheEvent> {
     protected Predicate<? super EventJournalCacheEvent<K, V>> predicate;
-    protected Projection<? super EventJournalCacheEvent<K, V>, ? extends T> projection;
+    protected Function<? super EventJournalCacheEvent<K, V>, ? extends T> projection;
 
     public CacheEventJournalReadOperation() {
     }
@@ -54,7 +54,7 @@ public class CacheEventJournalReadOperation<K, V, T>
     public CacheEventJournalReadOperation(
             String cacheName, long startSequence, int minSize, int maxSize,
             Predicate<? super EventJournalCacheEvent<K, V>> predicate,
-            Projection<? super EventJournalCacheEvent<K, V>, ? extends T> projection
+            Function<? super EventJournalCacheEvent<K, V>, ? extends T> projection
     ) {
         super(cacheName, startSequence, minSize, maxSize);
         this.predicate = predicate;

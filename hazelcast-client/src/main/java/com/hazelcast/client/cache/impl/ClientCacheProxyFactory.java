@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,12 @@ public class ClientCacheProxyFactory extends ClientProxyFactoryWithContext {
             return new NearCachedClientCacheProxy(cacheConfig, context);
         }
         return new ClientCacheProxy(cacheConfig, context);
+    }
+
+    public void recreateCachesOnCluster() {
+        for (CacheConfig cacheConfig : configs.values()) {
+            ClientCacheHelper.createCacheConfig(client, cacheConfig);
+        }
     }
 
     @SuppressFBWarnings("RV_RETURN_VALUE_OF_PUTIFABSENT_IGNORED")

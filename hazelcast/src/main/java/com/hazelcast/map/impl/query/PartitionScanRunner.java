@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import com.hazelcast.map.impl.record.Record;
 import com.hazelcast.map.impl.record.Records;
 import com.hazelcast.map.impl.recordstore.RecordStore;
 import com.hazelcast.nio.serialization.Data;
+import com.hazelcast.query.Metadata;
 import com.hazelcast.query.PagingPredicate;
 import com.hazelcast.query.Predicate;
 import com.hazelcast.query.impl.QueryableEntriesSegment;
@@ -51,7 +52,7 @@ import static com.hazelcast.query.PagingPredicateAccessor.getNearestAnchorEntry;
 import static com.hazelcast.util.SortingUtil.compareAnchor;
 
 /**
- * Responsible for running a full-partition scna for a single partition in the calling thread.
+ * Responsible for running a full-partition scan for a single partition in the calling thread.
  */
 public class PartitionScanRunner {
 
@@ -79,7 +80,8 @@ public class PartitionScanRunner {
 
         PartitionContainer partitionContainer = mapServiceContext.getPartitionContainer(partitionId);
         MapContainer mapContainer = mapServiceContext.getMapContainer(mapName);
-        Iterator<Record> iterator = partitionContainer.getRecordStore(mapName).loadAwareIterator(getNow(), false);
+        RecordStore recordStore = partitionContainer.getRecordStore(mapName);
+        Iterator<Record> iterator = recordStore.loadAwareIterator(getNow(), false);
         Map.Entry<Integer, Map.Entry> nearestAnchorEntry = getNearestAnchorEntry(pagingPredicate);
         boolean useCachedValues = isUseCachedDeserializedValuesEnabled(mapContainer, partitionId);
         Extractors extractors = mapServiceContext.getExtractors(mapName);
@@ -87,6 +89,7 @@ public class PartitionScanRunner {
         while (iterator.hasNext()) {
             Record record = iterator.next();
             Data key = (Data) toData(record.getKey());
+            Metadata metadata = getMetadataFromRecord(recordStore, record);
             Object value = toData(
                     useCachedValues ? Records.getValueOrCachedValue(record, serializationService) : record.getValue());
             if (value == null) {
@@ -94,7 +97,9 @@ public class PartitionScanRunner {
             }
 
             queryEntry.init(serializationService, key, value, extractors);
-            if (predicate.apply(queryEntry) && compareAnchor(pagingPredicate, queryEntry, nearestAnchorEntry)) {
+            queryEntry.setMetadata(metadata);
+            boolean valid = predicate.apply(queryEntry);
+            if (valid && compareAnchor(pagingPredicate, queryEntry, nearestAnchorEntry)) {
                 result.add(queryEntry);
 
                 // We can't reuse the existing entry after it was added to the
@@ -103,6 +108,11 @@ public class PartitionScanRunner {
             }
         }
         result.orderAndLimit(pagingPredicate, nearestAnchorEntry);
+    }
+
+    // overridden in ee
+    protected Metadata getMetadataFromRecord(RecordStore recordStore, Record record) {
+        return record.getMetadata();
     }
 
     /**
@@ -155,7 +165,7 @@ public class PartitionScanRunner {
                 return true;
             default:
                 //if index exists then cached value is already set -> let's use it
-                return mapContainer.getIndexes(partitionId).hasIndex();
+                return mapContainer.getIndexes(partitionId).haveAtLeastOneIndex();
         }
     }
 

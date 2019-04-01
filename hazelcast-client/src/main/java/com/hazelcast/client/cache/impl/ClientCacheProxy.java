@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,10 +47,10 @@ import com.hazelcast.internal.journal.EventJournalInitialSubscriberState;
 import com.hazelcast.internal.journal.EventJournalReader;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.serialization.Data;
-import com.hazelcast.projection.Projection;
 import com.hazelcast.ringbuffer.ReadResultSet;
 import com.hazelcast.ringbuffer.impl.client.PortableReadResultSet;
 import com.hazelcast.spi.serialization.SerializationService;
+import com.hazelcast.util.function.Function;
 import com.hazelcast.util.function.Predicate;
 
 import javax.cache.CacheException;
@@ -483,11 +483,6 @@ public class ClientCacheProxy<K, V> extends AbstractClientCacheProxy<K, V>
     }
 
     @Override
-    public void setExpiryPolicy(K key, ExpiryPolicy expiryPolicy) {
-        setExpiryPolicy(Collections.singleton(key), expiryPolicy);
-    }
-
-    @Override
     public String addPartitionLostListener(CachePartitionLostListener listener) {
         EventHandler<ClientMessage> handler = new ClientCachePartitionLostEventHandler(listener);
         injectDependencies(listener);
@@ -539,7 +534,7 @@ public class ClientCacheProxy<K, V> extends AbstractClientCacheProxy<K, V>
             int maxSize,
             int partitionId,
             Predicate<? super EventJournalCacheEvent<K, V>> predicate,
-            Projection<? super EventJournalCacheEvent<K, V>, ? extends T> projection
+            Function<? super EventJournalCacheEvent<K, V>, ? extends T> projection
     ) {
         if (maxSize < minSize) {
             throw new IllegalArgumentException("maxSize " + maxSize

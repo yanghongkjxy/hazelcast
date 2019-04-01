@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ class LazyEntryView<K, V> implements EntryView<K, V> {
     private long lastUpdateTime;
     private long version;
     private long ttl;
-    private long maxIdle;
+    private Long maxIdle;
 
     private SerializationService serializationService;
     private MapMergePolicy mergePolicy;
@@ -190,11 +190,11 @@ class LazyEntryView<K, V> implements EntryView<K, V> {
     }
 
     @Override
-    public long getMaxIdle() {
+    public Long getMaxIdle() {
         return maxIdle;
     }
 
-    public LazyEntryView<K, V> setMaxIdle(long maxIdle) {
+    public LazyEntryView<K, V> setMaxIdle(Long maxIdle) {
         this.maxIdle = maxIdle;
         return this;
     }

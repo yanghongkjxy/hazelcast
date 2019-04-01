@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,14 +30,12 @@ import com.hazelcast.query.Predicates;
 import com.hazelcast.query.QueryException;
 import com.hazelcast.query.SampleTestObjects.Employee;
 import com.hazelcast.query.SampleTestObjects.Value;
-import com.hazelcast.query.impl.AttributeType;
 import com.hazelcast.query.impl.Index;
 import com.hazelcast.query.impl.IndexImpl;
 import com.hazelcast.query.impl.QueryContext;
 import com.hazelcast.query.impl.QueryEntry;
 import com.hazelcast.query.impl.QueryableEntry;
 import com.hazelcast.query.impl.getters.Extractors;
-import com.hazelcast.query.impl.getters.ReflectionHelper;
 import com.hazelcast.test.HazelcastSerialClassRunner;
 import com.hazelcast.test.HazelcastTestSupport;
 import com.hazelcast.test.annotation.QuickTest;
@@ -245,6 +243,7 @@ public class PredicatesTest extends HazelcastTestSupport {
         assertPredicateTrue(like(ATTRIBUTE, "J.-*.*\\%"), "J.-*.*%");
         assertPredicateTrue(like(ATTRIBUTE, "J\\_"), "J_");
         assertPredicateTrue(like(ATTRIBUTE, "J%"), "Java");
+        assertPredicateTrue(like(ATTRIBUTE, "J%"), "Java\n");
     }
 
     @Test
@@ -254,6 +253,7 @@ public class PredicatesTest extends HazelcastTestSupport {
         assertPredicateTrue(ilike(ATTRIBUTE, "java%ld"), "Java World");
         assertPredicateTrue(ilike(ATTRIBUTE, "%world"), "Java World");
         assertPredicateFalse(ilike(ATTRIBUTE, "Java_World"), "gava World");
+        assertPredicateTrue(ilike(ATTRIBUTE, "J%"), "java\nworld");
     }
 
     @Test
@@ -313,7 +313,8 @@ public class PredicatesTest extends HazelcastTestSupport {
 
     @Test
     public void testNotEqualsPredicateDoesNotUseIndex() {
-        Index dummyIndex = new IndexImpl("foo", false, ss, Extractors.empty(), COPY_ON_READ, PerIndexStats.EMPTY);
+        Index dummyIndex =
+                new IndexImpl("foo", null, false, ss, Extractors.newBuilder(ss).build(), COPY_ON_READ, PerIndexStats.EMPTY);
         QueryContext mockQueryContext = mock(QueryContext.class);
         when(mockQueryContext.getIndex(anyString())).thenReturn(dummyIndex);
 
@@ -326,17 +327,12 @@ public class PredicatesTest extends HazelcastTestSupport {
     private class DummyEntry extends QueryEntry {
 
         DummyEntry(Comparable attribute) {
-            super(ss, toData("1"), attribute, Extractors.empty());
+            super(ss, toData("1"), attribute, Extractors.newBuilder(ss).build());
         }
 
         @Override
         public Comparable getAttributeValue(String attributeName) throws QueryException {
             return (Comparable) getValue();
-        }
-
-        @Override
-        public AttributeType getAttributeType(String attributeName) {
-            return ReflectionHelper.getAttributeType(getValue().getClass());
         }
     }
 
@@ -376,11 +372,6 @@ public class PredicatesTest extends HazelcastTestSupport {
         }
 
         @Override
-        public AttributeType getAttributeType(String attributeName) {
-            return AttributeType.INTEGER;
-        }
-
-        @Override
         protected Object getTargetObject(boolean key) {
             return null;
         }
@@ -398,7 +389,7 @@ public class PredicatesTest extends HazelcastTestSupport {
     }
 
     private Entry createEntry(final Object key, final Object value) {
-        return new QueryEntry(ss, toData(key), value, Extractors.empty());
+        return new QueryEntry(ss, toData(key), value, Extractors.newBuilder(ss).build());
     }
 
     private void assertPredicateTrue(Predicate p, Comparable comparable) {

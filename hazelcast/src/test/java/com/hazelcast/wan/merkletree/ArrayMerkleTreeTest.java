@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,15 +56,23 @@ public class ArrayMerkleTreeTest {
 
     @Test
     public void testFootprint() {
-        MerkleTree merkleTree1 = new ArrayMerkleTree(3, 10);
-        MerkleTree merkleTree2 = new ArrayMerkleTree(3, 100);
+        MerkleTree merkleTree1 = new ArrayMerkleTree(3);
+        MerkleTree merkleTree2 = new ArrayMerkleTree(3);
+
+        for (int i = 0; i < 10; i++) {
+            merkleTree1.updateAdd(i, i);
+        }
+
+        for (int i = 0; i < 100; i++) {
+            merkleTree2.updateAdd(i, i);
+        }
 
         assertTrue(merkleTree2.footprint() > merkleTree1.footprint());
     }
 
     @Test
     public void testFootprintChanges() {
-        MerkleTree merkleTree = new ArrayMerkleTree(3, 10);
+        MerkleTree merkleTree = new ArrayMerkleTree(3);
 
         long footprintBeforeAdd = merkleTree.footprint();
         for (int i = 0; i < 100; i++) {
@@ -259,6 +267,29 @@ public class ArrayMerkleTreeTest {
         verifyKeysUnderNode(merkleTree, 4, 0xC0000000);
         verifyKeysUnderNode(merkleTree, 5, 0x00000000);
         verifyKeysUnderNode(merkleTree, 6, 0x40000000);
+    }
+
+    @Test
+    public void getNodeKeyCount() {
+        MerkleTree merkleTree = new ArrayMerkleTree(3);
+
+        merkleTree.updateAdd(0x80000000, 1); // leaf 3
+        merkleTree.updateAdd(0xC0000000, 2); // leaf 4
+        merkleTree.updateAdd(0x00000000, 3); // leaf 5
+        merkleTree.updateAdd(0x40000000, 4); // leaf 6
+
+        // level 0
+        assertEquals(4, merkleTree.getNodeKeyCount(0));
+
+        // level 1
+        assertEquals(2, merkleTree.getNodeKeyCount(1));
+        assertEquals(2, merkleTree.getNodeKeyCount(2));
+
+        // level 2 (leaves)
+        assertEquals(1, merkleTree.getNodeKeyCount(3));
+        assertEquals(1, merkleTree.getNodeKeyCount(4));
+        assertEquals(1, merkleTree.getNodeKeyCount(5));
+        assertEquals(1, merkleTree.getNodeKeyCount(6));
     }
 
     @Test

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -662,7 +662,11 @@ public class SqlPredicateTest {
     }
 
     private Map.Entry createEntry(final Object key, final Object value) {
-        return new QueryEntry(serializationService, toData(key), value, Extractors.empty());
+        return new QueryEntry(serializationService, toData(key), value, newExtractor());
+    }
+
+    private Extractors newExtractor() {
+        return Extractors.newBuilder(serializationService).build();
     }
 
     private void assertSqlMatching(String s, Object value) {

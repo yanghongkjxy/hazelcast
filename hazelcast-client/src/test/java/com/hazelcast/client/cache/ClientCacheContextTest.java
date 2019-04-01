@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 package com.hazelcast.client.cache;
 
 import com.hazelcast.cache.CacheContextTest;
-import com.hazelcast.client.HazelcastClientManager;
+import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.cache.impl.HazelcastClientCachingProvider;
 import com.hazelcast.client.test.TestHazelcastFactory;
 import com.hazelcast.test.HazelcastParallelClassRunner;
@@ -47,7 +47,7 @@ public class ClientCacheContextTest extends CacheContextTest {
 
     @After
     public void tearDown() {
-        HazelcastClientManager.shutdownAll();
+        HazelcastClient.shutdownAll();
         driverInstance.shutdown();
         hazelcastInstance1.shutdown();
         hazelcastInstance2.shutdown();

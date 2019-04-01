@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
+import static com.hazelcast.query.impl.predicates.PredicateUtils.estimatedSizeOf;
 import static com.hazelcast.util.FutureUtil.RETHROW_EVERYTHING;
 import static com.hazelcast.util.FutureUtil.returnWithDeadline;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -88,12 +89,13 @@ public class ParallelAccumulationExecutor implements AccumulationExecutor {
     }
 
     private Collection<QueryableEntry>[] split(Collection<QueryableEntry> entries, int chunkCount) {
-        if (entries.size() < chunkCount * 2) {
+        int estimatedSize = estimatedSizeOf(entries);
+        if (estimatedSize < chunkCount * 2) {
             return null;
         }
         int counter = 0;
         Collection<QueryableEntry>[] entriesSplit = new Collection[chunkCount];
-        int entriesPerChunk = entries.size() / chunkCount;
+        int entriesPerChunk = estimatedSize / chunkCount;
         for (int i = 0; i < chunkCount; i++) {
             entriesSplit[i] = new ArrayList<QueryableEntry>(entriesPerChunk);
         }

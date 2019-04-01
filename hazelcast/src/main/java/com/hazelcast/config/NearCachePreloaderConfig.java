@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,8 +28,10 @@ import static com.hazelcast.util.Preconditions.checkNotNull;
 import static com.hazelcast.util.Preconditions.checkPositive;
 
 /**
- * Configuration for eviction.
- * You can set a limit for number of entries or total memory cost of entries.
+ * Configuration for storing and pre-loading Near Cache keys.
+ *
+ * Preloader re-populates Near Cache after client/server restart to provide
+ * fast access.
  *
  * @since 3.8
  */

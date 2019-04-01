@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -151,4 +151,6 @@ public interface ICacheService
      * @since 3.10
      */
     <K, V> void createCacheConfigOnAllMembers(PreJoinCacheConfig<K, V> cacheConfig);
+
+    <K, V> void setTenantControl(CacheConfig<K, V> cacheConfig);
 }

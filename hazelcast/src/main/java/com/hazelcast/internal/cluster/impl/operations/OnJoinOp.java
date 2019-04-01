@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@
 
 package com.hazelcast.internal.cluster.impl.operations;
 
+import com.hazelcast.config.OnJoinPermissionOperationName;
+import com.hazelcast.config.SecurityConfig;
 import com.hazelcast.internal.cluster.impl.ClusterDataSerializerHook;
+import com.hazelcast.internal.management.operation.UpdatePermissionConfigOperation;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
@@ -72,7 +75,12 @@ public class OnJoinOp
     @Override
     public void run() throws Exception {
         if (operations != null && operations.length > 0) {
+            SecurityConfig securityConfig = getNodeEngine().getConfig().getSecurityConfig();
+            boolean runPermissionUpdates = securityConfig.getOnJoinPermissionOperation() == OnJoinPermissionOperationName.RECEIVE;
             for (Operation op : operations) {
+                if ((op instanceof UpdatePermissionConfigOperation) && !runPermissionUpdates) {
+                    continue;
+                }
                 try {
                     // not running via OperationService since we don't want any restrictions like cluster state check etc.
                     op.beforeRun();

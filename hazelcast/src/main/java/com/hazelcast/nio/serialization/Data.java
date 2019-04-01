@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -112,5 +112,13 @@ public interface Data {
      * @return true if source object is <tt>Portable</tt>, false otherwise.
      */
     boolean isPortable();
+
+    /**
+     * Returns true if this Data is created from a {@link com.hazelcast.core.HazelcastJsonValue} object,
+     * false otherwise
+     *
+     * @return true if source object is <tt>HazelcastJsonValue</tt>, false otherwise.
+     */
+    boolean isJson();
 
 }

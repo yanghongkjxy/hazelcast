@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,27 +16,19 @@
 
 package com.hazelcast.client.config;
 
-import com.hazelcast.config.EntryListenerConfig;
-import com.hazelcast.config.EvictionConfig;
+import com.hazelcast.client.util.RandomLB;
+import com.hazelcast.client.util.RoundRobinLB;
+import com.hazelcast.config.CredentialsFactoryConfig;
 import com.hazelcast.config.EvictionPolicy;
-import com.hazelcast.config.GlobalSerializerConfig;
-import com.hazelcast.config.GroupConfig;
 import com.hazelcast.config.InMemoryFormat;
 import com.hazelcast.config.InvalidConfigurationException;
-import com.hazelcast.config.ListenerConfig;
-import com.hazelcast.config.MapIndexConfig;
 import com.hazelcast.config.NearCacheConfig;
-import com.hazelcast.config.QueryCacheConfig;
-import com.hazelcast.config.SSLConfig;
-import com.hazelcast.config.SerializationConfig;
-import com.hazelcast.config.SerializerConfig;
-import com.hazelcast.config.SocketInterceptorConfig;
 import com.hazelcast.config.XMLConfigBuilderTest;
 import com.hazelcast.core.HazelcastException;
 import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.test.HazelcastSerialClassRunner;
-import com.hazelcast.test.HazelcastTestSupport;
 import com.hazelcast.test.annotation.QuickTest;
+import com.hazelcast.topic.TopicOverloadPolicy;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -56,16 +48,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.net.URL;
-import java.nio.ByteOrder;
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 
 import static com.hazelcast.nio.IOUtil.delete;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -75,15 +63,12 @@ import static org.junit.Assert.fail;
 // tests need to be executed sequentially because of system properties being set/unset
 @RunWith(HazelcastSerialClassRunner.class)
 @Category(QuickTest.class)
-public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
+public class XmlClientConfigBuilderTest extends AbstractClientConfigBuilderTest {
 
     static final String HAZELCAST_CLIENT_START_TAG =
             "<hazelcast-client xmlns=\"http://www.hazelcast.com/schema/client-config\">\n";
 
     static final String HAZELCAST_CLIENT_END_TAG = "</hazelcast-client>";
-
-    private ClientConfig fullClientConfig;
-    private ClientConfig defaultClientConfig;
 
     @Before
     public void init() throws Exception {
@@ -100,6 +85,7 @@ public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
         System.clearProperty("hazelcast.client.config");
     }
 
+    @Override
     @Test(expected = InvalidConfigurationException.class)
     public void testInvalidRootElement() {
         String xml = "<hazelcast>"
@@ -111,15 +97,17 @@ public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
         buildConfig(xml);
     }
 
+    @Override
     @Test(expected = HazelcastException.class)
     public void loadingThroughSystemProperty_nonExistingFile() throws IOException {
-        File file = File.createTempFile("foo", "bar");
+        File file = File.createTempFile("foo", ".xml");
         delete(file);
         System.setProperty("hazelcast.client.config", file.getAbsolutePath());
 
         new XmlClientConfigBuilder();
     }
 
+    @Override
     @Test
     public void loadingThroughSystemProperty_existingFile() throws IOException {
         String xml = HAZELCAST_CLIENT_START_TAG
@@ -129,7 +117,7 @@ public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
                 + "    </group>\n"
                 + "</hazelcast-client>";
 
-        File file = File.createTempFile("foo", "bar");
+        File file = File.createTempFile("foo", ".xml");
         file.deleteOnExit();
         PrintWriter writer = new PrintWriter(file, "UTF-8");
         writer.println(xml);
@@ -142,12 +130,14 @@ public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
         assertEquals("foobar", config.getGroupConfig().getName());
     }
 
+    @Override
     @Test(expected = HazelcastException.class)
     public void loadingThroughSystemProperty_nonExistingClasspathResource() throws IOException {
-        System.setProperty("hazelcast.client.config", "classpath:idontexist");
+        System.setProperty("hazelcast.client.config", "classpath:idontexist.xml");
         new XmlClientConfigBuilder();
     }
 
+    @Override
     @Test
     public void loadingThroughSystemProperty_existingClasspathResource() throws IOException {
         System.setProperty("hazelcast.client.config", "classpath:test-hazelcast-client.xml");
@@ -162,180 +152,7 @@ public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
         assertEquals(3, config.getNetworkConfig().getSocketOptions().getLingerSeconds());
     }
 
-    @Test
-    public void testGroupConfig() {
-        final GroupConfig groupConfig = fullClientConfig.getGroupConfig();
-        assertEquals("dev", groupConfig.getName());
-        assertEquals("dev-pass", groupConfig.getPassword());
-    }
-
-    @Test
-    public void testProperties() {
-        assertEquals(6, fullClientConfig.getProperties().size());
-        assertEquals("60000", fullClientConfig.getProperty("hazelcast.client.heartbeat.timeout"));
-    }
-
-    @Test
-    public void testNetworkConfig() {
-        final ClientNetworkConfig networkConfig = fullClientConfig.getNetworkConfig();
-        assertEquals(2, networkConfig.getConnectionAttemptLimit());
-        assertEquals(2, networkConfig.getAddresses().size());
-        assertContains(networkConfig.getAddresses(), "127.0.0.1");
-        assertContains(networkConfig.getAddresses(), "127.0.0.2");
-
-        Collection<String> allowedPorts = networkConfig.getOutboundPortDefinitions();
-        assertEquals(2, allowedPorts.size());
-        assertTrue(allowedPorts.contains("34600"));
-        assertTrue(allowedPorts.contains("34700-34710"));
-
-        assertTrue(networkConfig.isSmartRouting());
-        assertTrue(networkConfig.isRedoOperation());
-
-        final SocketInterceptorConfig socketInterceptorConfig = networkConfig.getSocketInterceptorConfig();
-        assertTrue(socketInterceptorConfig.isEnabled());
-        assertEquals("com.hazelcast.examples.MySocketInterceptor", socketInterceptorConfig.getClassName());
-        assertEquals("bar", socketInterceptorConfig.getProperty("foo"));
-
-        final ClientAwsConfig awsConfig = networkConfig.getAwsConfig();
-        assertTrue(awsConfig.isEnabled());
-        assertTrue(awsConfig.isInsideAws());
-        assertEquals("TEST_ACCESS_KEY", awsConfig.getAccessKey());
-        assertEquals("TEST_ACCESS_KEY", awsConfig.getAccessKey());
-        assertEquals("TEST_SECRET_KEY", awsConfig.getSecretKey());
-        assertEquals("us-east-1", awsConfig.getRegion());
-        assertEquals("ec2.amazonaws.com", awsConfig.getHostHeader());
-        assertEquals("type", awsConfig.getTagKey());
-        assertEquals("hz-nodes", awsConfig.getTagValue());
-        assertEquals(11, awsConfig.getConnectionTimeoutSeconds());
-    }
-
-    @Test
-    public void testSerializationConfig() {
-        final SerializationConfig serializationConfig = fullClientConfig.getSerializationConfig();
-        assertEquals(3, serializationConfig.getPortableVersion());
-
-        final Map<Integer, String> dsClasses = serializationConfig.getDataSerializableFactoryClasses();
-        assertEquals(1, dsClasses.size());
-        assertEquals("com.hazelcast.examples.DataSerializableFactory", dsClasses.get(1));
-
-        final Map<Integer, String> pfClasses = serializationConfig.getPortableFactoryClasses();
-        assertEquals(1, pfClasses.size());
-        assertEquals("com.hazelcast.examples.PortableFactory", pfClasses.get(2));
-
-        final Collection<SerializerConfig> serializerConfigs = serializationConfig.getSerializerConfigs();
-        assertEquals(1, serializerConfigs.size());
-        final SerializerConfig serializerConfig = serializerConfigs.iterator().next();
-
-        assertEquals("com.hazelcast.examples.DummyType", serializerConfig.getTypeClassName());
-        assertEquals("com.hazelcast.examples.SerializerFactory", serializerConfig.getClassName());
-
-        final GlobalSerializerConfig globalSerializerConfig = serializationConfig.getGlobalSerializerConfig();
-        assertEquals("com.hazelcast.examples.GlobalSerializerFactory", globalSerializerConfig.getClassName());
-
-        assertEquals(ByteOrder.BIG_ENDIAN, serializationConfig.getByteOrder());
-        assertTrue(serializationConfig.isCheckClassDefErrors());
-        assertFalse(serializationConfig.isAllowUnsafe());
-        assertFalse(serializationConfig.isEnableCompression());
-        assertTrue(serializationConfig.isEnableSharedObject());
-        assertTrue(serializationConfig.isUseNativeByteOrder());
-    }
-
-    @Test
-    public void testProxyFactories() {
-        final List<ProxyFactoryConfig> pfc = fullClientConfig.getProxyFactoryConfigs();
-        assertEquals(3, pfc.size());
-        assertContains(pfc, new ProxyFactoryConfig("com.hazelcast.examples.ProxyXYZ1", "sampleService1"));
-        assertContains(pfc, new ProxyFactoryConfig("com.hazelcast.examples.ProxyXYZ2", "sampleService1"));
-        assertContains(pfc, new ProxyFactoryConfig("com.hazelcast.examples.ProxyXYZ3", "sampleService3"));
-    }
-
-    @Test
-    public void testNearCacheConfigs() {
-        assertEquals(1, fullClientConfig.getNearCacheConfigMap().size());
-        final NearCacheConfig nearCacheConfig = fullClientConfig.getNearCacheConfig("asd");
-
-        assertEquals(2000, nearCacheConfig.getMaxSize());
-        assertEquals(2000, nearCacheConfig.getEvictionConfig().getSize());
-        assertEquals(90, nearCacheConfig.getTimeToLiveSeconds());
-        assertEquals(100, nearCacheConfig.getMaxIdleSeconds());
-        assertEquals("LFU", nearCacheConfig.getEvictionPolicy());
-        assertEquals(EvictionPolicy.LFU, nearCacheConfig.getEvictionConfig().getEvictionPolicy());
-        assertTrue(nearCacheConfig.isInvalidateOnChange());
-        assertTrue(nearCacheConfig.isSerializeKeys());
-        assertEquals(InMemoryFormat.OBJECT, nearCacheConfig.getInMemoryFormat());
-    }
-
-    @Test
-    public void testSSLConfigs() {
-        SSLConfig sslConfig = fullClientConfig.getNetworkConfig().getSSLConfig();
-        assertNotNull(sslConfig);
-        assertFalse(sslConfig.isEnabled());
-
-        assertEquals("com.hazelcast.nio.ssl.BasicSSLContextFactory", sslConfig.getFactoryClassName());
-        assertEquals(7, sslConfig.getProperties().size());
-        assertEquals("TLS", sslConfig.getProperties().get("protocol"));
-        assertEquals("/opt/hazelcast-client.truststore", sslConfig.getProperties().get("trustStore"));
-        assertEquals("secret.123456", sslConfig.getProperties().get("trustStorePassword"));
-        assertEquals("JKS", sslConfig.getProperties().get("trustStoreType"));
-        assertEquals("/opt/hazelcast-client.keystore", sslConfig.getProperties().get("keyStore"));
-        assertEquals("keystorePassword123", sslConfig.getProperties().get("keyStorePassword"));
-        assertEquals("JKS", sslConfig.getProperties().get("keyStoreType"));
-    }
-
-    @Test
-    public void testNearCacheConfig_withEvictionConfig_withPreloaderConfig() throws IOException {
-        URL schemaResource = XMLConfigBuilderTest.class.getClassLoader().getResource("hazelcast-client-test.xml");
-        ClientConfig clientConfig = new XmlClientConfigBuilder(schemaResource).build();
-
-        assertEquals("MyInstanceName", clientConfig.getInstanceName());
-
-        NearCacheConfig nearCacheConfig = clientConfig.getNearCacheConfig("nearCacheWithEvictionAndPreloader");
-
-        assertEquals(10000, nearCacheConfig.getTimeToLiveSeconds());
-        assertEquals(5000, nearCacheConfig.getMaxIdleSeconds());
-        assertFalse(nearCacheConfig.isInvalidateOnChange());
-        assertEquals(InMemoryFormat.OBJECT, nearCacheConfig.getInMemoryFormat());
-        assertTrue(nearCacheConfig.isCacheLocalEntries());
-
-        assertNotNull(nearCacheConfig.getEvictionConfig());
-        assertEquals(100, nearCacheConfig.getEvictionConfig().getSize());
-        assertEquals(EvictionConfig.MaxSizePolicy.ENTRY_COUNT, nearCacheConfig.getEvictionConfig().getMaximumSizePolicy());
-        assertEquals(EvictionPolicy.LFU, nearCacheConfig.getEvictionConfig().getEvictionPolicy());
-
-        assertNotNull(nearCacheConfig.getPreloaderConfig());
-        assertTrue(nearCacheConfig.getPreloaderConfig().isEnabled());
-        assertEquals("/tmp/myNearCache", nearCacheConfig.getPreloaderConfig().getDirectory());
-        assertEquals(2342, nearCacheConfig.getPreloaderConfig().getStoreInitialDelaySeconds());
-        assertEquals(4223, nearCacheConfig.getPreloaderConfig().getStoreIntervalSeconds());
-    }
-
-    @Test
-    public void testQueryCacheFullConfig() throws Exception {
-        QueryCacheConfig queryCacheConfig = fullClientConfig.getQueryCacheConfigs().get("map-name").get("query-cache-name");
-        EntryListenerConfig entryListenerConfig = queryCacheConfig.getEntryListenerConfigs().get(0);
-
-        assertEquals("query-cache-name", queryCacheConfig.getName());
-        assertTrue(entryListenerConfig.isIncludeValue());
-        assertFalse(entryListenerConfig.isLocal());
-        assertEquals("com.hazelcast.examples.EntryListener", entryListenerConfig.getClassName());
-        assertTrue(queryCacheConfig.isIncludeValue());
-        assertEquals(1, queryCacheConfig.getBatchSize());
-        assertEquals(16, queryCacheConfig.getBufferSize());
-        assertEquals(0, queryCacheConfig.getDelaySeconds());
-        assertEquals(EvictionPolicy.LRU, queryCacheConfig.getEvictionConfig().getEvictionPolicy());
-        assertEquals(EvictionConfig.MaxSizePolicy.ENTRY_COUNT, queryCacheConfig.getEvictionConfig().getMaximumSizePolicy());
-        assertEquals(10000, queryCacheConfig.getEvictionConfig().getSize());
-        assertEquals(InMemoryFormat.BINARY, queryCacheConfig.getInMemoryFormat());
-        assertFalse(queryCacheConfig.isCoalesce());
-        assertTrue(queryCacheConfig.isPopulate());
-        for (MapIndexConfig mapIndexConfig : queryCacheConfig.getIndexConfigs()) {
-            assertEquals("name", mapIndexConfig.getAttribute());
-            assertFalse(mapIndexConfig.isOrdered());
-        }
-
-        assertEquals("com.hazelcast.examples.ExamplePredicate", queryCacheConfig.getPredicateConfig().getClassName());
-    }
-
+    @Override
     @Test
     public void testFlakeIdGeneratorConfig() {
         String xml = HAZELCAST_CLIENT_START_TAG
@@ -351,59 +168,24 @@ public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
         assertEquals(10L, fConfig.getPrefetchValidityMillis());
     }
 
+    @Override
     @Test
-    public void testConnectionStrategyConfig() {
-        ClientConnectionStrategyConfig connectionStrategyConfig = fullClientConfig.getConnectionStrategyConfig();
-        assertTrue(connectionStrategyConfig.isAsyncStart());
-        assertEquals(ClientConnectionStrategyConfig.ReconnectMode.ASYNC, connectionStrategyConfig.getReconnectMode());
-    }
-
-    @Test
-    public void testConnectionStrategyConfig_defaults() {
-        ClientConnectionStrategyConfig connectionStrategyConfig = defaultClientConfig.getConnectionStrategyConfig();
-        assertFalse(connectionStrategyConfig.isAsyncStart());
-        assertEquals(ClientConnectionStrategyConfig.ReconnectMode.ON, connectionStrategyConfig.getReconnectMode());
-    }
-
-    @Test
-    public void testExponentialConnectionRetryConfig() {
-        ClientConnectionStrategyConfig connectionStrategyConfig = fullClientConfig.getConnectionStrategyConfig();
-        ConnectionRetryConfig exponentialRetryConfig = connectionStrategyConfig.getConnectionRetryConfig();
-        assertTrue(exponentialRetryConfig.isEnabled());
-        assertTrue(exponentialRetryConfig.isFailOnMaxBackoff());
-        assertEquals(0.5, exponentialRetryConfig.getJitter(), 0);
-        assertEquals(2000, exponentialRetryConfig.getInitialBackoffMillis());
-        assertEquals(60000, exponentialRetryConfig.getMaxBackoffMillis());
-        assertEquals(3, exponentialRetryConfig.getMultiplier(), 0);
-    }
-
-    @Test
-    public void testExponentialConnectionRetryConfig_defaults() {
-        ClientConnectionStrategyConfig connectionStrategyConfig = defaultClientConfig.getConnectionStrategyConfig();
-        ConnectionRetryConfig exponentialRetryConfig = connectionStrategyConfig.getConnectionRetryConfig();
-        assertFalse(exponentialRetryConfig.isEnabled());
-        assertFalse(exponentialRetryConfig.isFailOnMaxBackoff());
-        assertEquals(0.2, exponentialRetryConfig.getJitter(), 0);
-        assertEquals(1000, exponentialRetryConfig.getInitialBackoffMillis());
-        assertEquals(30000, exponentialRetryConfig.getMaxBackoffMillis());
-        assertEquals(2, exponentialRetryConfig.getMultiplier(), 0);
-    }
-
-    @Test
-    public void testLeftovers() {
-        assertEquals(40, fullClientConfig.getExecutorPoolSize());
-
-        assertEquals("com.hazelcast.security.UsernamePasswordCredentials",
-                fullClientConfig.getSecurityConfig().getCredentialsClassname());
-        assertEquals(40, fullClientConfig.getExecutorPoolSize());
-
-        assertEquals("com.hazelcast.client.util.RandomLB", fullClientConfig.getLoadBalancer().getClass().getName());
-
-        final List<ListenerConfig> listenerConfigs = fullClientConfig.getListenerConfigs();
-        assertEquals(3, listenerConfigs.size());
-        assertContains(listenerConfigs, new ListenerConfig("com.hazelcast.examples.MembershipListener"));
-        assertContains(listenerConfigs, new ListenerConfig("com.hazelcast.examples.InstanceListener"));
-        assertContains(listenerConfigs, new ListenerConfig("com.hazelcast.examples.MigrationListener"));
+    public void testSecurityConfig_onlyFactory() {
+        String xml = HAZELCAST_CLIENT_START_TAG
+                + "  <security>\n"
+                + "        <credentials-factory class-name=\"com.hazelcast.examples.MyCredentialsFactory\">\n"
+                + "            <properties>\n"
+                + "                <property name=\"property\">value</property>\n"
+                + "            </properties>\n"
+                + "        </credentials-factory>\n"
+                + "    </security>"
+                + HAZELCAST_CLIENT_END_TAG;
+        ClientConfig config = buildConfig(xml);
+        ClientSecurityConfig securityConfig = config.getSecurityConfig();
+        CredentialsFactoryConfig credentialsFactoryConfig = securityConfig.getCredentialsFactoryConfig();
+        assertEquals("com.hazelcast.examples.MyCredentialsFactory", credentialsFactoryConfig.getClassName());
+        Properties properties = credentialsFactoryConfig.getProperties();
+        assertEquals("value", properties.getProperty("property"));
     }
 
     @Test
@@ -434,12 +216,14 @@ public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
         buildConfig(xml);
     }
 
+    @Override
     @Test(expected = InvalidConfigurationException.class)
     public void testHazelcastClientTagAppearsTwice() {
         String xml = HAZELCAST_CLIENT_START_TAG + "<hazelcast-client/><hazelcast-client/>";
         buildConfig(xml);
     }
 
+    @Override
     @Test
     public void testNearCacheInMemoryFormatNative_withKeysByReference() {
         String mapName = "testMapNearCacheInMemoryFormatNative";
@@ -457,6 +241,7 @@ public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
         assertTrue(ncConfig.isSerializeKeys());
     }
 
+    @Override
     @Test
     public void testNearCacheEvictionPolicy() {
         String xml = HAZELCAST_CLIENT_START_TAG
@@ -480,6 +265,7 @@ public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
         assertEquals(EvictionPolicy.RANDOM, getNearCacheEvictionPolicy("random", clientConfig));
     }
 
+    @Override
     @Test
     public void testClientUserCodeDeploymentConfig() {
         String xml = HAZELCAST_CLIENT_START_TAG
@@ -495,60 +281,86 @@ public class XmlClientConfigBuilderTest extends HazelcastTestSupport {
                 + HAZELCAST_CLIENT_END_TAG;
         ClientConfig clientConfig = buildConfig(xml);
         ClientUserCodeDeploymentConfig userCodeDeploymentConfig = clientConfig.getUserCodeDeploymentConfig();
-        assertEquals(true, userCodeDeploymentConfig.isEnabled());
+        assertTrue(userCodeDeploymentConfig.isEnabled());
         List<String> classNames = userCodeDeploymentConfig.getClassNames();
         assertEquals(2, classNames.size());
-        assertEquals(true, classNames.contains("test.testClassName"));
-        assertEquals(true, classNames.contains("test.testClassName2"));
+        assertTrue(classNames.contains("test.testClassName"));
+        assertTrue(classNames.contains("test.testClassName2"));
         List<String> jarPaths = userCodeDeploymentConfig.getJarPaths();
         assertEquals(1, jarPaths.size());
-        assertEquals(true, jarPaths.contains("/User/test/test.jar"));
+        assertTrue(jarPaths.contains("/User/test/test.jar"));
     }
 
+    @Override
     @Test
-    public void testClientIcmpPingConfig() {
-        ClientIcmpPingConfig icmpPingConfig = fullClientConfig.getNetworkConfig().getClientIcmpPingConfig();
-        assertEquals(false, icmpPingConfig.isEnabled());
-        assertEquals(2000, icmpPingConfig.getTimeoutMilliseconds());
-        assertEquals(3000, icmpPingConfig.getIntervalMilliseconds());
-        assertEquals(100, icmpPingConfig.getTtl());
-        assertEquals(5, icmpPingConfig.getMaxAttempts());
-        assertEquals(false, icmpPingConfig.isEchoFailFastOnStartup());
+    public void testReliableTopic_defaults() {
+        String xml = HAZELCAST_CLIENT_START_TAG
+                + "<reliable-topic name=\"rel-topic\">"
+                + "</reliable-topic>"
+                + HAZELCAST_CLIENT_END_TAG;
+        ClientConfig config = buildConfig(xml);
+        ClientReliableTopicConfig reliableTopicConfig = config.getReliableTopicConfig("rel-topic");
+        assertEquals("rel-topic", reliableTopicConfig.getName());
+        assertEquals(10, reliableTopicConfig.getReadBatchSize());
+        assertEquals(TopicOverloadPolicy.BLOCK, reliableTopicConfig.getTopicOverloadPolicy());
     }
 
-    @Test
-    public void testClientIcmpPingConfig_defaults() {
-        ClientIcmpPingConfig icmpPingConfig = defaultClientConfig.getNetworkConfig().getClientIcmpPingConfig();
-        assertEquals(false, icmpPingConfig.isEnabled());
-        assertEquals(1000, icmpPingConfig.getTimeoutMilliseconds());
-        assertEquals(1000, icmpPingConfig.getIntervalMilliseconds());
-        assertEquals(255, icmpPingConfig.getTtl());
-        assertEquals(2, icmpPingConfig.getMaxAttempts());
-        assertEquals(true, icmpPingConfig.isEchoFailFastOnStartup());
+    @Override
+    @Test(expected = InvalidConfigurationException.class)
+    public void testQueryCacheBothPredicateDefinedThrows() {
+        String xml = HAZELCAST_CLIENT_START_TAG
+                + "<query-caches>"
+                + "  <query-cache name=\"cache-name\" mapName=\"map-name\">"
+                + "    <predicate type=\"class-name\">com.hazelcast.example.Predicate</predicate>"
+                + "    <predicate type=\"sql\">%age=40</predicate>"
+                + "  </query-cache>"
+                + "</query-caches>"
+                + HAZELCAST_CLIENT_END_TAG;
+
+        buildConfig(xml);
     }
 
-    @Test
-    public void testCloudConfig() {
-        ClientCloudConfig cloudConfig = fullClientConfig.getNetworkConfig().getCloudConfig();
-        assertEquals(false, cloudConfig.isEnabled());
-        assertEquals("EXAMPLE_TOKEN", cloudConfig.getDiscoveryToken());
+    @Override
+    @Test(expected = InvalidConfigurationException.class)
+    public void testQueryCacheNoPredicateDefinedThrows() {
+        String xml = HAZELCAST_CLIENT_START_TAG
+                + "<query-caches>"
+                + "  <query-cache name=\"cache-name\" mapName=\"map-name\">"
+                + "  </query-cache>"
+                + "</query-caches>"
+                + HAZELCAST_CLIENT_END_TAG;
+
+        buildConfig(xml);
     }
 
-    @Test
-    public void testCloudConfig_defaults() {
-        ClientCloudConfig cloudConfig = defaultClientConfig.getNetworkConfig().getCloudConfig();
-        assertEquals(false, cloudConfig.isEnabled());
-        assertEquals(null, cloudConfig.getDiscoveryToken());
+    @Override
+    public void testLoadBalancerRandom() {
+        String xml = HAZELCAST_CLIENT_START_TAG
+                + "<load-balancer type=\"random\" />"
+                + HAZELCAST_CLIENT_END_TAG;
+
+        ClientConfig config = buildConfig(xml);
+
+        assertInstanceOf(RandomLB.class, config.getLoadBalancer());
     }
 
-    private EvictionPolicy getNearCacheEvictionPolicy(String mapName, ClientConfig clientConfig) {
-        return clientConfig.getNearCacheConfig(mapName).getEvictionConfig().getEvictionPolicy();
+    @Override
+    public void testLoadBalancerRoundRobin() {
+        String xml = HAZELCAST_CLIENT_START_TAG
+                + "<load-balancer type=\"round-robin\" />"
+                + HAZELCAST_CLIENT_END_TAG;
+
+        ClientConfig config = buildConfig(xml);
+
+        assertInstanceOf(RoundRobinLB.class, config.getLoadBalancer());
     }
 
     static ClientConfig buildConfig(String xml, Properties properties) {
         ByteArrayInputStream bis = new ByteArrayInputStream(xml.getBytes());
         XmlClientConfigBuilder configBuilder = new XmlClientConfigBuilder(bis);
-        configBuilder.setProperties(properties);
+        if (properties != null) {
+            configBuilder.setProperties(properties);
+        }
         return configBuilder.build();
     }
 

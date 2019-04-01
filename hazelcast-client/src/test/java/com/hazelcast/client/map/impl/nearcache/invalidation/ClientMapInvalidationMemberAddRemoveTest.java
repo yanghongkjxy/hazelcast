@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,9 +103,11 @@ public class ClientMapInvalidationMemberAddRemoveTest extends NearCacheTestSuppo
         for (int i = 0; i < NEAR_CACHE_POPULATE_THREAD_COUNT; i++) {
             Thread populateClientNearCache = new Thread(new Runnable() {
                 public void run() {
+                    int i = 0;
                     while (!stopTest.get()) {
-                        for (int i = 0; i < KEY_COUNT; i++) {
-                            clientMap.get(i);
+                        clientMap.get(i++);
+                        if (i == KEY_COUNT) {
+                            i = 0;
                         }
                     }
                 }

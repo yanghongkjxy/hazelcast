@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import com.hazelcast.transaction.TransactionContext;
 
 import javax.security.auth.Subject;
 import javax.security.auth.login.LoginContext;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 /**
@@ -87,8 +88,8 @@ public interface ClientEndpoint extends Client {
 
     void setLoginContext(LoginContext lc);
 
-    void authenticated(ClientPrincipal principal, Credentials credentials, boolean firstConnection,
-                       String clientVersion, long authCorrelationId);
+    void authenticated(ClientPrincipal principal, Credentials credentials, boolean firstConnection, String clientVersion,
+                       long authCorrelationId, String clientName, Set<String> labels);
 
     void authenticated(ClientPrincipal principal);
 

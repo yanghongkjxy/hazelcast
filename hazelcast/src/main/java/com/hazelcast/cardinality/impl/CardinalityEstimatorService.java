@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import com.hazelcast.cardinality.impl.hyperloglog.HyperLogLog;
 import com.hazelcast.cardinality.impl.operations.MergeOperation;
 import com.hazelcast.cardinality.impl.operations.ReplicationOperation;
 import com.hazelcast.config.CardinalityEstimatorConfig;
-import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.spi.ManagedService;
 import com.hazelcast.spi.MigrationAwareService;
 import com.hazelcast.spi.NodeEngine;
@@ -180,10 +179,6 @@ public class CardinalityEstimatorService
 
     @Override
     public String getQuorumName(String name) {
-        // RU_COMPAT_3_9
-        if (nodeEngine.getClusterService().getClusterVersion().isLessThan(Versions.V3_10)) {
-            return null;
-        }
         Object quorumName = getOrPutSynchronized(quorumConfigCache, name, quorumConfigCacheMutexFactory, quorumConfigConstructor);
         return quorumName == NULL_OBJECT ? null : (String) quorumName;
     }

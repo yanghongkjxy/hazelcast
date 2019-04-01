@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package com.hazelcast.config;
 
+import com.hazelcast.security.jsm.HazelcastRuntimePermission;
 import com.hazelcast.util.StringUtil;
 
 import java.util.Collection;
@@ -63,6 +64,10 @@ public class NetworkConfig {
     private MemberAddressProviderConfig memberAddressProviderConfig = new MemberAddressProviderConfig();
 
     private IcmpFailureDetectorConfig icmpFailureDetectorConfig;
+
+    private RestApiConfig restApiConfig;
+
+    private MemcacheProtocolConfig memcacheProtocolConfig;
 
     public NetworkConfig() {
         String os = StringUtil.lowerCaseInternal(System.getProperty("os.name"));
@@ -311,8 +316,14 @@ public class NetworkConfig {
      *
      * @return the SSLConfig
      * @see #setSSLConfig(SSLConfig)
+     * @throws SecurityException If a security manager exists and the calling method doesn't have corresponding
+     *         {@link HazelcastRuntimePermission}
      */
     public SSLConfig getSSLConfig() {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new HazelcastRuntimePermission("com.hazelcast.config.NetworkConfig.getSSLConfig"));
+        }
         return sslConfig;
     }
 
@@ -322,8 +333,14 @@ public class NetworkConfig {
      * @param sslConfig the SSLConfig
      * @return the updated NetworkConfig
      * @see #getSSLConfig()
+     * @throws SecurityException If a security manager exists and the calling method doesn't have corresponding
+     *         {@link HazelcastRuntimePermission}
      */
     public NetworkConfig setSSLConfig(SSLConfig sslConfig) {
+        SecurityManager sm = System.getSecurityManager();
+        if (sm != null) {
+            sm.checkPermission(new HazelcastRuntimePermission("com.hazelcast.config.NetworkConfig.setSSLConfig"));
+        }
         this.sslConfig = sslConfig;
         return this;
     }
@@ -360,6 +377,24 @@ public class NetworkConfig {
         return icmpFailureDetectorConfig;
     }
 
+    public RestApiConfig getRestApiConfig() {
+        return restApiConfig;
+    }
+
+    public NetworkConfig setRestApiConfig(RestApiConfig restApiConfig) {
+        this.restApiConfig = restApiConfig;
+        return this;
+    }
+
+    public MemcacheProtocolConfig getMemcacheProtocolConfig() {
+        return memcacheProtocolConfig;
+    }
+
+    public NetworkConfig setMemcacheProtocolConfig(MemcacheProtocolConfig memcacheProtocolConfig) {
+        this.memcacheProtocolConfig = memcacheProtocolConfig;
+        return this;
+    }
+
     @Override
     public String toString() {
         return "NetworkConfig{"
@@ -373,6 +408,8 @@ public class NetworkConfig {
                 + ", socketInterceptorConfig=" + socketInterceptorConfig
                 + ", symmetricEncryptionConfig=" + symmetricEncryptionConfig
                 + ", icmpFailureDetectorConfig=" + icmpFailureDetectorConfig
+                + ", restApiConfig=" + restApiConfig
+                + ", memcacheProtocolConfig=" + memcacheProtocolConfig
                 + '}';
     }
 }

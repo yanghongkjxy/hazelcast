@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -217,7 +217,8 @@ public class AnswerTest extends HazelcastTestSupport {
         Data data = serializationService.toData(original);
         assertNotNull("data should not be null", data);
         assertFalse("data should be no proxy class", isProxyClass(data.getClass()));
-        assertEquals("toObject() should return original value", original, serializationService.toObject(data));
+        assertEquals("toObject() should return original value", original,
+                ((Integer) serializationService.toObject(data)).intValue());
 
         SerializationService localSerializationService = new DefaultSerializationServiceBuilder().build();
         Data localData = localSerializationService.toData(original);

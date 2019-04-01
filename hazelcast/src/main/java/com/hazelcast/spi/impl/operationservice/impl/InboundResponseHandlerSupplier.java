@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -109,7 +109,9 @@ public class InboundResponseHandlerSupplier implements MetricsProvider, Supplier
             throw new IllegalArgumentException(RESPONSE_THREAD_COUNT.getName() + " can't be smaller than 0");
         }
 
-        logger.info("Running with " + responseThreadCount + " response threads");
+        if (logger.isFineEnabled()) {
+            logger.fine("Running with " + responseThreadCount + " response threads");
+        }
 
         this.responseThreads = new ResponseThread[responseThreadCount];
         if (responseThreadCount == 0) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package com.hazelcast.cardinality;
 
 import com.hazelcast.core.DistributedObject;
 import com.hazelcast.core.ICompletableFuture;
-import com.hazelcast.spi.annotation.Beta;
 
 /**
  * CardinalityEstimator is a redundant and highly available distributed data-structure used
@@ -29,7 +28,6 @@ import com.hazelcast.spi.annotation.Beta;
  * <p>
  * Supports Quorum {@link com.hazelcast.config.QuorumConfig} since 3.10 in cluster versions 3.10 and higher.
  */
-@Beta
 public interface CardinalityEstimator extends DistributedObject {
 
     /**

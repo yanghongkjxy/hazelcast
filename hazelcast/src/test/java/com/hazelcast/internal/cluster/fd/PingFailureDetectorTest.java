@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -121,7 +121,10 @@ public class PingFailureDetectorTest {
 
     private static Member newMember(int port) {
         MemberVersion memberVersion = MemberVersion.of(BuildInfoProvider.getBuildInfo().getVersion());
-        return new MemberImpl(newAddress(port), memberVersion, false, newUnsecureUuidString());
+        return new MemberImpl.Builder(newAddress(port))
+                .version(memberVersion)
+                .uuid(newUnsecureUuidString())
+                .build();
     }
 
     private static Address newAddress(int port) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -44,7 +44,8 @@ public class ParallelPartitionScanExecutor implements PartitionScanExecutor {
     private final ManagedExecutorService executor;
     private final int timeoutInMillis;
 
-    public ParallelPartitionScanExecutor(PartitionScanRunner partitionScanRunner, ManagedExecutorService executor,
+    public ParallelPartitionScanExecutor(PartitionScanRunner partitionScanRunner,
+                                         ManagedExecutorService executor,
                                          int timeoutInMillis) {
         this.partitionScanRunner = partitionScanRunner;
         this.executor = executor;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,16 @@ public final class GroupConfig {
     }
 
     /**
+     * Copy constructor
+     *
+     * @param groupConfig to copy
+     */
+    public GroupConfig(GroupConfig groupConfig) {
+        name = groupConfig.name;
+        password = groupConfig.password;
+    }
+
+    /**
      * Gets the group name of the group.
      *
      * @return the name of the group
@@ -91,7 +101,10 @@ public final class GroupConfig {
      * Gets the password of the group.
      *
      * @return the password of the group
+     * @deprecated since 3.11, password check is removed. Passwords are only checked in default LoginModule when Hazelcast
+     * {@link SecurityConfig security} is enabled (Enterprise edition only).
      */
+    @Deprecated
     public String getPassword() {
         return password;
     }
@@ -102,7 +115,10 @@ public final class GroupConfig {
      * @param password the password to set for the group
      * @return the updated GroupConfig
      * @throws IllegalArgumentException if password is {@code null}
+     * @deprecated since 3.11, password check is removed. Passwords are only checked in default LoginModule when Hazelcast
+     * {@link SecurityConfig security} is enabled (Enterprise edition only).
      */
+    @Deprecated
     public GroupConfig setPassword(final String password) {
         this.password = isNotNull(password, "group password");
         return this;

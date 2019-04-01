@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,21 @@ import java.util.Map;
 public interface MemberState extends JsonSerializable {
 
     String getAddress();
+
+    /**
+     * Returns the UUID of this member.
+     *
+     * @return the UUID of this member.
+     */
+    String getUuid();
+
+    /**
+     * Returns the local CP member's UUID if this Hazelcast
+     * member is part of the CP subsystem, returns null otherwise.
+     *
+     * @return local CP member's UUID if available, null otherwise
+     */
+    String getCpMemberUuid();
 
     Map<String, Long> getRuntimeProps();
 

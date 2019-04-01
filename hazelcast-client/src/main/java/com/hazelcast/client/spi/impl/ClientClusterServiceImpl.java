@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ package com.hazelcast.client.spi.impl;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.connection.ClientConnectionManager;
 import com.hazelcast.client.connection.nio.ClientConnection;
+import com.hazelcast.client.impl.ClientImpl;
 import com.hazelcast.client.impl.client.ClientPrincipal;
-import com.hazelcast.client.impl.clientside.ClientImpl;
 import com.hazelcast.client.impl.clientside.HazelcastClientInstanceImpl;
 import com.hazelcast.client.spi.ClientClusterService;
 import com.hazelcast.config.ListenerConfig;
@@ -64,9 +64,11 @@ public class ClientClusterServiceImpl implements ClientClusterService {
     private final AtomicReference<Map<Address, Member>> members = new AtomicReference<Map<Address, Member>>();
     private final ConcurrentMap<String, MembershipListener> listeners = new ConcurrentHashMap<String, MembershipListener>();
     private final Object initialMembershipListenerMutex = new Object();
+    private final Set<String> labels;
 
     public ClientClusterServiceImpl(HazelcastClientInstanceImpl client) {
         this.client = client;
+        labels = Collections.unmodifiableSet(client.getClientConfig().getLabels());
         ILogger logger = client.getLoggingService().getLogger(ClientClusterService.class);
         ClientConfig clientConfig = getClientConfig();
         List<ListenerConfig> listenerConfigs = client.getClientConfig().getListenerConfigs();
@@ -146,7 +148,7 @@ public class ClientClusterServiceImpl implements ClientClusterService {
         InetSocketAddress inetSocketAddress = connection != null ? connection.getLocalSocketAddress() : null;
         ClientPrincipal principal = cm.getPrincipal();
         final String uuid = principal != null ? principal.getUuid() : null;
-        return new ClientImpl(uuid, inetSocketAddress);
+        return new ClientImpl(uuid, inetSocketAddress, client.getName(), labels);
     }
 
     @Override
@@ -172,6 +174,11 @@ public class ClientClusterServiceImpl implements ClientClusterService {
         if (listener instanceof InitialMembershipListener) {
             Cluster cluster = client.getCluster();
             Collection<Member> memberCollection = members.get().values();
+            if (memberCollection.isEmpty()) {
+                //if members are empty,it means initial event did not arrive yet
+                //it will be redirected to listeners when it arrives see #handleInitialMembershipEvent
+                return;
+            }
             LinkedHashSet<Member> members = new LinkedHashSet<Member>(memberCollection);
             InitialMembershipEvent event = new InitialMembershipEvent(cluster, members);
             ((InitialMembershipListener) listener).init(event);
@@ -251,4 +258,10 @@ public class ClientClusterServiceImpl implements ClientClusterService {
     public void shutdown() {
     }
 
+    public void reset() {
+        clientMembershipListener.clearMembers();
+        synchronized (initialMembershipListenerMutex) {
+            members.set(Collections.<Address, Member>emptyMap());
+        }
+    }
 }

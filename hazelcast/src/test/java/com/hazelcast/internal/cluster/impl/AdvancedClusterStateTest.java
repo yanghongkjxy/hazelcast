@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -175,10 +175,13 @@ public class AdvancedClusterStateTest extends HazelcastTestSupport {
 
     private void lockClusterState(HazelcastInstance hz) {
         final Node node = getNode(hz);
+        ClusterServiceImpl clusterService = node.getClusterService();
+        int memberListVersion = clusterService.getMemberListVersion();
         int partitionStateVersion = node.getPartitionService().getPartitionStateVersion();
         long timeoutInMillis = TimeUnit.SECONDS.toMillis(60);
-        ClusterStateManager clusterStateManager = node.clusterService.getClusterStateManager();
-        clusterStateManager.lockClusterState(ClusterStateChange.from(ClusterState.FROZEN), node.getThisAddress(), "fakeTxn", timeoutInMillis, partitionStateVersion);
+        ClusterStateManager clusterStateManager = clusterService.getClusterStateManager();
+        clusterStateManager.lockClusterState(ClusterStateChange.from(ClusterState.FROZEN), node.getThisAddress(), "fakeTxn",
+                timeoutInMillis, memberListVersion, partitionStateVersion);
     }
 
     @Test

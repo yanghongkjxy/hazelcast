@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -130,7 +130,7 @@ public class RawProtocolAuthenticationTest {
         final ByteBuffer initData = ByteBuffer.wrap("CB2".getBytes());
         channel.write(initData);
 
-        String username = GroupConfig.DEFAULT_GROUP_NAME;
+        String username = "TheInvalidName";
         String pass = "TheInvalidPassword";
 
         final ClientMessage authMessage = ClientAuthenticationCodec

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,6 +61,13 @@ public class DefaultSubscriberSequencerProvider implements SubscriberSequencerPr
     public void reset(int partitionId) {
         PartitionSequencer sequence = getOrCreateSequence(partitionId);
         sequence.reset();
+    }
+
+    @Override
+    public void resetAll() {
+        for (PartitionSequencer partitionSequencer : partitionSequences.values()) {
+            partitionSequencer.reset();
+        }
     }
 
     private PartitionSequencer getOrCreateSequence(int partitionId) {

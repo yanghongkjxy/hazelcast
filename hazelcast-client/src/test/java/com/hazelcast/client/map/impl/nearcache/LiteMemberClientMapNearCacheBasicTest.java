@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -123,7 +123,10 @@ public class LiteMemberClientMapNearCacheBasicTest extends AbstractNearCacheBasi
     }
 
     protected ClientConfig getClientConfig() {
-        return new ClientConfig();
+        ClientConfig clientConfig = new ClientConfig();
+        clientConfig.setProperty(NearCache.PROP_EXPIRATION_TASK_INITIAL_DELAY_SECONDS, "0");
+        clientConfig.setProperty(NearCache.PROP_EXPIRATION_TASK_PERIOD_SECONDS, "1");
+        return clientConfig;
     }
 
     private <K, V> NearCacheTestContextBuilder<K, V, Data, String> createNearCacheContextBuilder(IMapMapStore mapStore) {

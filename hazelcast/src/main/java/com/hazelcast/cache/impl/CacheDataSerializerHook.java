@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,6 +70,7 @@ import com.hazelcast.cache.impl.operation.CacheSizeOperationFactory;
 import com.hazelcast.cache.impl.operation.OnJoinCacheOperation;
 import com.hazelcast.cache.impl.record.CacheDataRecord;
 import com.hazelcast.cache.impl.record.CacheObjectRecord;
+import com.hazelcast.cache.impl.tenantcontrol.CacheDestroyEventContext;
 import com.hazelcast.client.impl.protocol.task.cache.CacheAssignAndGetUuidsOperation;
 import com.hazelcast.client.impl.protocol.task.cache.CacheAssignAndGetUuidsOperationFactory;
 import com.hazelcast.internal.management.request.GetCacheEntryRequest;
@@ -164,8 +165,9 @@ public final class CacheDataSerializerHook
     public static final int SET_EXPIRY_POLICY = 67;
     public static final int SET_EXPIRY_POLICY_BACKUP = 68;
     public static final int EXPIRE_BATCH_BACKUP = 69;
+    public static final int CACHE_DESTROY_EVENT_CONTEXT = 70;
 
-    private static final int LEN = EXPIRE_BATCH_BACKUP + 1;
+    private static final int LEN = CACHE_DESTROY_EVENT_CONTEXT + 1;
 
     public int getFactoryId() {
         return F_ID;
@@ -524,6 +526,12 @@ public final class CacheDataSerializerHook
             @Override
             public IdentifiedDataSerializable createNew(Integer arg) {
                 return new CacheExpireBatchBackupOperation();
+            }
+        };
+        constructors[CACHE_DESTROY_EVENT_CONTEXT] = new ConstructorFunction<Integer, IdentifiedDataSerializable>() {
+            @Override
+            public IdentifiedDataSerializable createNew(Integer arg) {
+                return new CacheDestroyEventContext();
             }
         };
 

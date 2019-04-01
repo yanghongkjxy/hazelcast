@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,39 +18,37 @@ package com.hazelcast.client.spi.impl;
 
 import com.hazelcast.client.config.ClientNetworkConfig;
 import com.hazelcast.client.connection.AddressProvider;
+import com.hazelcast.client.connection.Addresses;
 import com.hazelcast.client.util.AddressHelper;
-import com.hazelcast.nio.Address;
 
-import java.util.Collection;
-import java.util.LinkedList;
 import java.util.List;
 
 /**
  * Default address provider of Hazelcast.
- *
+ * <p>
  * Loads addresses from the Hazelcast configuration.
  */
 public class DefaultAddressProvider implements AddressProvider {
 
-    private ClientNetworkConfig networkConfig;
-    private boolean noOtherAddressProviderExist;
+    private final ClientNetworkConfig networkConfig;
 
-    public DefaultAddressProvider(ClientNetworkConfig networkConfig, boolean noOtherAddressProviderExist) {
+    public DefaultAddressProvider(ClientNetworkConfig networkConfig) {
         this.networkConfig = networkConfig;
-        this.noOtherAddressProviderExist = noOtherAddressProviderExist;
     }
 
     @Override
-    public Collection<Address> loadAddresses() {
-        final List<String> addresses = networkConfig.getAddresses();
-        if (addresses.isEmpty() && noOtherAddressProviderExist) {
-            addresses.add("127.0.0.1");
-        }
-        final List<Address> possibleAddresses = new LinkedList<Address>();
+    public Addresses loadAddresses() {
+        List<String> configuredAddresses = networkConfig.getAddresses();
 
-        for (String address : addresses) {
-            possibleAddresses.addAll(AddressHelper.getSocketAddresses(address));
+        if (configuredAddresses.isEmpty()) {
+            configuredAddresses.add("127.0.0.1");
         }
-        return possibleAddresses;
+
+        Addresses addresses = new Addresses();
+        for (String address : configuredAddresses) {
+            addresses.addAll(AddressHelper.getSocketAddresses(address));
+        }
+
+        return addresses;
     }
 }

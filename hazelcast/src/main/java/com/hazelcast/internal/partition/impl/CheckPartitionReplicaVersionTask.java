@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package com.hazelcast.internal.partition.impl;
 
 import com.hazelcast.core.ExecutionCallback;
 import com.hazelcast.internal.partition.InternalPartition;
-import com.hazelcast.nio.Address;
+import com.hazelcast.internal.partition.PartitionReplica;
 import com.hazelcast.spi.ServiceNamespace;
 import com.hazelcast.spi.impl.NodeEngineImpl;
 
@@ -53,7 +53,7 @@ final class CheckPartitionReplicaVersionTask extends AbstractPartitionPrimaryRep
         }
 
         Collection<ServiceNamespace> namespaces = retainAndGetNamespaces();
-        Address target = partition.getReplicaAddress(replicaIndex);
+        PartitionReplica target = partition.getReplica(replicaIndex);
         if (target == null) {
             callback.onResponse(false);
             return;

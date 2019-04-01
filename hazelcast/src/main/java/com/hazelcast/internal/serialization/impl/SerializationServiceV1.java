@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import com.hazelcast.internal.serialization.PortableContext;
 import com.hazelcast.internal.serialization.impl.ConstantSerializers.BooleanSerializer;
 import com.hazelcast.internal.serialization.impl.ConstantSerializers.ByteSerializer;
 import com.hazelcast.internal.serialization.impl.ConstantSerializers.StringArraySerializer;
+import com.hazelcast.core.HazelcastJsonValue;
 import com.hazelcast.nio.BufferObjectDataInput;
 import com.hazelcast.nio.ClassNameFilter;
 import com.hazelcast.nio.ObjectDataInput;
@@ -73,6 +74,7 @@ import static com.hazelcast.internal.serialization.impl.JavaDefaultSerializers.C
 import static com.hazelcast.internal.serialization.impl.JavaDefaultSerializers.DateSerializer;
 import static com.hazelcast.internal.serialization.impl.JavaDefaultSerializers.EnumSerializer;
 import static com.hazelcast.internal.serialization.impl.JavaDefaultSerializers.JavaSerializer;
+import static com.hazelcast.internal.serialization.impl.JavaDefaultSerializers.HazelcastJsonValueSerializer;
 import static com.hazelcast.internal.serialization.impl.SerializationUtil.createSerializerAdapter;
 import static com.hazelcast.util.MapUtil.createHashMap;
 
@@ -179,6 +181,7 @@ public class SerializationServiceV1 extends AbstractSerializationService {
 
         safeRegister(Serializable.class, javaSerializerAdapter);
         safeRegister(Externalizable.class, javaExternalizableAdapter);
+        safeRegister(HazelcastJsonValue.class, new HazelcastJsonValueSerializer());
     }
 
     public void registerClassDefinitions(Collection<ClassDefinition> classDefinitions, boolean checkClassDefErrors) {

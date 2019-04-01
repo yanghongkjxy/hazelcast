@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,10 +61,10 @@ public final class OperatingSystemMetricSet {
         registerMethod(metricsRegistry, mxBean, "getMaxFileDescriptorCount", "os.maxFileDescriptorCount");
         registerMethod(metricsRegistry, mxBean, "getOpenFileDescriptorCount", "os.openFileDescriptorCount");
 
-        // value will be between 0.0 and 1.0
+        // value will be between 0.0 and 1.0 or a negative value, if not available
         registerMethod(metricsRegistry, mxBean, "getProcessCpuLoad", "os.processCpuLoad", PERCENTAGE_MULTIPLIER);
 
-        // value will between 0.0 and 1.0
+        // value will be between 0.0 and 1.0 or a negative value, if not available
         registerMethod(metricsRegistry, mxBean, "getSystemCpuLoad", "os.systemCpuLoad", PERCENTAGE_MULTIPLIER);
 
         metricsRegistry.register(mxBean, "os.systemLoadAverage", MANDATORY,

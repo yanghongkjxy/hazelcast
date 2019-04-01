@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,6 @@ import com.hazelcast.core.Member;
 import com.hazelcast.internal.journal.EventJournalInitialSubscriberState;
 import com.hazelcast.internal.journal.EventJournalReader;
 import com.hazelcast.nio.serialization.Data;
-import com.hazelcast.projection.Projection;
 import com.hazelcast.ringbuffer.ReadResultSet;
 import com.hazelcast.spi.EventFilter;
 import com.hazelcast.spi.EventRegistration;
@@ -37,6 +36,7 @@ import com.hazelcast.spi.InternalCompletableFuture;
 import com.hazelcast.spi.NodeEngine;
 import com.hazelcast.spi.Operation;
 import com.hazelcast.spi.OperationService;
+import com.hazelcast.util.function.Function;
 import com.hazelcast.util.function.Predicate;
 
 import javax.cache.CacheException;
@@ -48,7 +48,6 @@ import javax.cache.processor.EntryProcessor;
 import javax.cache.processor.EntryProcessorException;
 import javax.cache.processor.EntryProcessorResult;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -353,11 +352,6 @@ public class CacheProxy<K, V> extends AbstractCacheProxy<K, V>
     }
 
     @Override
-    public void setExpiryPolicy(K key, ExpiryPolicy expiryPolicy) {
-        setExpiryPolicy(Collections.singleton(key), expiryPolicy);
-    }
-
-    @Override
     public String addPartitionLostListener(CachePartitionLostListener listener) {
         checkNotNull(listener, "CachePartitionLostListener can't be null");
 
@@ -391,7 +385,7 @@ public class CacheProxy<K, V> extends AbstractCacheProxy<K, V>
             int maxSize,
             int partitionId,
             Predicate<? super EventJournalCacheEvent<K, V>> predicate,
-            Projection<? super EventJournalCacheEvent<K, V>, ? extends T> projection
+            Function<? super EventJournalCacheEvent<K, V>, ? extends T> projection
     ) {
         if (maxSize < minSize) {
             throw new IllegalArgumentException("maxSize " + maxSize

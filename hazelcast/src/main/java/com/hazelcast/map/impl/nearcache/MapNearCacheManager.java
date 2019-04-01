@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,7 +62,8 @@ public class MapNearCacheManager extends DefaultNearCacheManager {
 
     public MapNearCacheManager(MapServiceContext mapServiceContext) {
         super(mapServiceContext.getNodeEngine().getSerializationService(),
-                mapServiceContext.getNodeEngine().getExecutionService().getGlobalTaskScheduler(), null);
+                mapServiceContext.getNodeEngine().getExecutionService().getGlobalTaskScheduler(),
+                null, mapServiceContext.getNodeEngine().getProperties());
         this.nodeEngine = mapServiceContext.getNodeEngine();
         this.mapServiceContext = mapServiceContext;
         this.partitionService = new MemberMinimalPartitionService(nodeEngine.getPartitionService());

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -80,7 +80,7 @@ public abstract class AbstractGracefulShutdownCorrectnessTest extends PartitionC
             shutdownNodes(shutdownNodeCount);
             size -= shutdownNodeCount;
 
-            assertSizeAndData();
+            assertSizeAndDataEventually();
         }
     }
 
@@ -106,7 +106,7 @@ public abstract class AbstractGracefulShutdownCorrectnessTest extends PartitionC
             addresses = shutdownNodes(shutdownNodeCount);
             size -= shutdownNodeCount;
 
-            assertSizeAndData();
+            assertSizeAndDataEventually();
         }
     }
 

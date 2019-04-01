@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ public class JoinMastershipClaimOp extends AbstractJoinOperation {
             TcpIpJoiner tcpIpJoiner = (TcpIpJoiner) joiner;
             final Address endpoint = getCallerAddress();
             final Address masterAddress = clusterService.getMasterAddress();
-            approvedAsMaster = !tcpIpJoiner.isClaimingMaster() && !clusterService.isMaster()
+            approvedAsMaster = !tcpIpJoiner.isClaimingMastership() && !clusterService.isMaster()
                     && (masterAddress == null || masterAddress.equals(endpoint));
         } else {
             approvedAsMaster = false;

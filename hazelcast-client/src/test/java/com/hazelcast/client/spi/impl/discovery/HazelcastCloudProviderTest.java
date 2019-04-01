@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ public class HazelcastCloudProviderTest {
 
     @Test
     public void testLoadAddresses() {
-        Collection<Address> addresses = provider.loadAddresses();
+        Collection<Address> addresses = provider.loadAddresses().primary();
 
         assertEquals(3, addresses.size());
         for (Address address : expectedAddresses.keySet()) {
@@ -76,7 +76,7 @@ public class HazelcastCloudProviderTest {
     public void testLoadAddresses_whenExceptionIsThrown() {
         when(hazelcastCloudDiscovery.discoverNodes()).thenThrow(new IllegalStateException("Expected exception"));
 
-        Collection<Address> addresses = provider.loadAddresses();
+        Collection<Address> addresses = provider.loadAddresses().primary();
 
         assertEquals("Expected that no addresses are loaded", 0, addresses.size());
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,12 @@ public interface EventJournalDataStructureAdapter<K, V, EJ_TYPE> extends EventJo
     V put(K key, V value);
 
     V put(K key, V value, long ttl, TimeUnit timeunit);
+
+    void putAll(Map<K, V> map);
+
+    void load(K key);
+
+    void loadAll(Set<K> keys);
 
     ObjectNamespace getNamespace();
 

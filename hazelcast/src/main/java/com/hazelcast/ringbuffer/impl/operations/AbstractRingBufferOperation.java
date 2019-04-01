@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,6 @@ public abstract class AbstractRingBufferOperation extends Operation implements N
         PartitionAwareOperation, ServiceNamespaceAware {
 
     protected String name;
-    private RingbufferContainer ringbuffer;
 
     public AbstractRingBufferOperation() {
     }
@@ -75,9 +74,6 @@ public abstract class AbstractRingBufferOperation extends Operation implements N
      * @return the ringbuffer container
      */
     RingbufferContainer getRingBufferContainer() {
-        if (ringbuffer != null) {
-            return ringbuffer;
-        }
         final RingbufferService service = getService();
         final ObjectNamespace ns = RingbufferService.getRingbufferNamespace(name);
 
@@ -87,7 +83,6 @@ public abstract class AbstractRingBufferOperation extends Operation implements N
         }
 
         ringbuffer.cleanup();
-        this.ringbuffer = ringbuffer;
         return ringbuffer;
     }
 

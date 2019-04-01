@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,8 @@ import com.hazelcast.internal.networking.Networking;
 import com.hazelcast.internal.networking.nio.NioNetworking;
 import com.hazelcast.internal.networking.nio.NioThread;
 import com.hazelcast.logging.ILogger;
-import com.hazelcast.nio.ConnectionManager;
-import com.hazelcast.nio.tcp.TcpIpConnectionManager;
+import com.hazelcast.nio.NetworkingService;
+import com.hazelcast.nio.tcp.TcpIpNetworkingService;
 import com.hazelcast.spi.impl.NodeEngineImpl;
 import com.hazelcast.spi.properties.HazelcastProperties;
 import com.hazelcast.spi.properties.HazelcastProperty;
@@ -70,11 +70,11 @@ public class NetworkingImbalancePlugin extends DiagnosticsPlugin {
     }
 
     private static Networking getThreadingModel(NodeEngineImpl nodeEngine) {
-        ConnectionManager connectionManager = nodeEngine.getNode().getConnectionManager();
-        if (!(connectionManager instanceof TcpIpConnectionManager)) {
+        NetworkingService networkingService = nodeEngine.getNode().getNetworkingService();
+        if (!(networkingService instanceof TcpIpNetworkingService)) {
             return null;
         }
-        return ((TcpIpConnectionManager) connectionManager).getNetworking();
+        return ((TcpIpNetworkingService) networkingService).getNetworking();
     }
 
     @Override
@@ -144,7 +144,14 @@ public class NetworkingImbalancePlugin extends DiagnosticsPlugin {
     }
 
     private String toPercentage(long amount, long total) {
-        double percentage = (HUNDRED * amount) / total;
+        final double percentage;
+        if (amount == 0L) {
+            percentage = 0D;
+        } else if (total == 0L) {
+            percentage = Double.NaN;
+        } else {
+            percentage = (HUNDRED * amount) / total;
+        }
         return String.format("%1$,.2f", percentage) + " %";
     }
 }

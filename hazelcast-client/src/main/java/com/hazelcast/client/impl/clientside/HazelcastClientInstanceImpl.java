@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,18 +22,22 @@ import com.hazelcast.cardinality.impl.CardinalityEstimatorService;
 import com.hazelcast.client.ClientExtension;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.LoadBalancer;
-import com.hazelcast.client.config.ClientAwsConfig;
-import com.hazelcast.client.config.ClientCloudConfig;
 import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.client.config.ClientFailoverConfig;
 import com.hazelcast.client.config.ClientNetworkConfig;
-import com.hazelcast.client.config.ClientSecurityConfig;
 import com.hazelcast.client.connection.AddressProvider;
-import com.hazelcast.client.connection.AddressTranslator;
 import com.hazelcast.client.connection.ClientConnectionManager;
+import com.hazelcast.client.connection.ClientConnectionStrategy;
 import com.hazelcast.client.connection.nio.ClientConnectionManagerImpl;
+import com.hazelcast.client.connection.nio.ClusterConnectorService;
+import com.hazelcast.client.connection.nio.ClusterConnectorServiceImpl;
+import com.hazelcast.client.connection.nio.DefaultClientConnectionStrategy;
+import com.hazelcast.client.cp.internal.CPSubsystemImpl;
+import com.hazelcast.client.cp.internal.session.ClientProxySessionManager;
 import com.hazelcast.client.impl.client.DistributedObjectInfo;
 import com.hazelcast.client.impl.protocol.ClientMessage;
 import com.hazelcast.client.impl.protocol.codec.ClientGetDistributedObjectsCodec;
+import com.hazelcast.client.impl.querycache.ClientQueryCacheContext;
 import com.hazelcast.client.impl.statistics.Statistics;
 import com.hazelcast.client.proxy.ClientClusterProxy;
 import com.hazelcast.client.proxy.PartitionServiceProxy;
@@ -46,27 +50,17 @@ import com.hazelcast.client.spi.ClientPartitionService;
 import com.hazelcast.client.spi.ClientTransactionManagerService;
 import com.hazelcast.client.spi.ProxyManager;
 import com.hazelcast.client.spi.impl.AbstractClientInvocationService;
-import com.hazelcast.client.spi.impl.AwsAddressProvider;
-import com.hazelcast.client.spi.impl.AwsAddressTranslator;
 import com.hazelcast.client.spi.impl.ClientClusterServiceImpl;
 import com.hazelcast.client.spi.impl.ClientExecutionServiceImpl;
 import com.hazelcast.client.spi.impl.ClientInvocation;
 import com.hazelcast.client.spi.impl.ClientPartitionServiceImpl;
 import com.hazelcast.client.spi.impl.ClientTransactionManagerServiceImpl;
 import com.hazelcast.client.spi.impl.ClientUserCodeDeploymentService;
-import com.hazelcast.client.spi.impl.DefaultAddressProvider;
-import com.hazelcast.client.spi.impl.DefaultAddressTranslator;
 import com.hazelcast.client.spi.impl.NonSmartClientInvocationService;
 import com.hazelcast.client.spi.impl.SmartClientInvocationService;
-import com.hazelcast.client.spi.impl.discovery.DiscoveryAddressProvider;
-import com.hazelcast.client.spi.impl.discovery.DiscoveryAddressTranslator;
-import com.hazelcast.client.spi.impl.discovery.HazelcastCloudAddressProvider;
-import com.hazelcast.client.spi.impl.discovery.HazelcastCloudAddressTranslator;
-import com.hazelcast.client.spi.impl.discovery.HazelcastCloudDiscovery;
 import com.hazelcast.client.spi.impl.listener.AbstractClientListenerService;
 import com.hazelcast.client.spi.impl.listener.NonSmartClientListenerService;
 import com.hazelcast.client.spi.impl.listener.SmartClientListenerService;
-import com.hazelcast.client.spi.properties.ClientProperty;
 import com.hazelcast.client.util.RoundRobinLB;
 import com.hazelcast.collection.impl.list.ListService;
 import com.hazelcast.collection.impl.queue.QueueService;
@@ -78,7 +72,6 @@ import com.hazelcast.concurrent.idgen.IdGeneratorService;
 import com.hazelcast.concurrent.lock.LockServiceImpl;
 import com.hazelcast.concurrent.semaphore.SemaphoreService;
 import com.hazelcast.config.Config;
-import com.hazelcast.config.DiscoveryConfig;
 import com.hazelcast.config.GroupConfig;
 import com.hazelcast.core.Client;
 import com.hazelcast.core.ClientService;
@@ -102,6 +95,7 @@ import com.hazelcast.core.LifecycleService;
 import com.hazelcast.core.MultiMap;
 import com.hazelcast.core.PartitionService;
 import com.hazelcast.core.ReplicatedMap;
+import com.hazelcast.cp.CPSubsystem;
 import com.hazelcast.crdt.pncounter.PNCounter;
 import com.hazelcast.crdt.pncounter.PNCounterService;
 import com.hazelcast.durableexecutor.DurableExecutorService;
@@ -142,17 +136,9 @@ import com.hazelcast.ringbuffer.Ringbuffer;
 import com.hazelcast.ringbuffer.impl.RingbufferService;
 import com.hazelcast.scheduledexecutor.IScheduledExecutorService;
 import com.hazelcast.scheduledexecutor.impl.DistributedScheduledExecutorService;
-import com.hazelcast.security.Credentials;
-import com.hazelcast.security.UsernamePasswordCredentials;
-import com.hazelcast.spi.discovery.impl.DefaultDiscoveryServiceProvider;
-import com.hazelcast.spi.discovery.integration.DiscoveryMode;
-import com.hazelcast.spi.discovery.integration.DiscoveryService;
-import com.hazelcast.spi.discovery.integration.DiscoveryServiceProvider;
-import com.hazelcast.spi.discovery.integration.DiscoveryServiceSettings;
 import com.hazelcast.spi.impl.SerializationServiceSupport;
 import com.hazelcast.spi.properties.GroupProperty;
 import com.hazelcast.spi.properties.HazelcastProperties;
-import com.hazelcast.spi.serialization.SerializationService;
 import com.hazelcast.topic.impl.TopicService;
 import com.hazelcast.topic.impl.reliable.ReliableTopicService;
 import com.hazelcast.transaction.HazelcastXAResource;
@@ -164,9 +150,9 @@ import com.hazelcast.transaction.impl.xa.XAService;
 import com.hazelcast.util.ServiceLoader;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -174,9 +160,10 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.hazelcast.client.spi.properties.ClientProperty.HAZELCAST_CLOUD_DISCOVERY_TOKEN;
+import static com.hazelcast.util.EmptyStatement.ignore;
 import static com.hazelcast.util.ExceptionUtil.rethrow;
 import static com.hazelcast.util.Preconditions.checkNotNull;
+import static com.hazelcast.util.StringUtil.isNullOrEmpty;
 import static java.lang.System.currentTimeMillis;
 
 public class HazelcastClientInstanceImpl implements HazelcastInstance, SerializationServiceSupport {
@@ -187,6 +174,7 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
     private final HazelcastProperties properties;
     private final int id = CLIENT_ID.getAndIncrement();
     private final String instanceName;
+    private final ClientFailoverConfig clientFailoverConfig;
     private final ClientConfig config;
     private final LifecycleServiceImpl lifecycleService;
     private final ClientConnectionManagerImpl connectionManager;
@@ -201,22 +189,34 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
     private final ConcurrentMap<String, Object> userContext;
     private final LoadBalancer loadBalancer;
     private final ClientExtension clientExtension;
-    private final Credentials credentials;
-    private final DiscoveryService discoveryService;
+    private final ClusterConnectorService clusterConnectorService;
+    private final ClientConnectionStrategy clientConnectionStrategy;
     private final LoggingService loggingService;
     private final MetricsRegistryImpl metricsRegistry;
     private final Statistics statistics;
     private final Diagnostics diagnostics;
-    private final SerializationService serializationService;
+    private final InternalSerializationService serializationService;
     private final ClientICacheManager hazelcastCacheManager;
+    private final ClientQueryCacheContext queryCacheContext;
     private final ClientLockReferenceIdGenerator lockReferenceIdGenerator;
     private final ClientExceptionFactory clientExceptionFactory;
     private final ClientUserCodeDeploymentService userCodeDeploymentService;
+    private final ClientDiscoveryService clientDiscoveryService;
+    private final ClientProxySessionManager proxySessionManager;
+    private final CPSubsystemImpl cpSubsystem;
 
-    public HazelcastClientInstanceImpl(ClientConfig config,
+    public HazelcastClientInstanceImpl(ClientConfig clientConfig,
+                                       ClientFailoverConfig clientFailoverConfig,
                                        ClientConnectionManagerFactory clientConnectionManagerFactory,
                                        AddressProvider externalAddressProvider) {
-        this.config = config;
+        assert clientConfig != null || clientFailoverConfig != null : "At most one type of config can be provided";
+        assert clientConfig == null || clientFailoverConfig == null : "At least one config should be provided ";
+        if (clientConfig != null) {
+            this.config = clientConfig;
+        } else {
+            this.config = clientFailoverConfig.getClientConfigs().get(0);
+        }
+        this.clientFailoverConfig = clientFailoverConfig;
         if (config.getInstanceName() != null) {
             instanceName = config.getInstanceName();
         } else {
@@ -227,50 +227,77 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
         String loggingType = config.getProperty(GroupProperty.LOGGING_TYPE.getName());
         loggingService = new ClientLoggingService(groupConfig.getName(),
                 loggingType, BuildInfoProvider.getBuildInfo(), instanceName);
+        logGroupPasswordInfo();
         ClassLoader classLoader = config.getClassLoader();
         clientExtension = createClientInitializer(classLoader);
         clientExtension.beforeStart(this);
-
-        credentials = initCredentials(config);
         lifecycleService = new LifecycleServiceImpl(this);
         properties = new HazelcastProperties(config.getProperties());
-
         metricsRegistry = initMetricsRegistry();
         serializationService = clientExtension.createSerializationService((byte) -1);
-        metricsRegistry.collectMetrics(clientExtension);
-
         proxyManager = new ProxyManager(this);
         executionService = initExecutionService();
-        metricsRegistry.collectMetrics(executionService);
         loadBalancer = initLoadBalancer(config);
         transactionManager = new ClientTransactionManagerServiceImpl(this, loadBalancer);
         partitionService = new ClientPartitionServiceImpl(this);
-        discoveryService = initDiscoveryService(config);
-        Collection<AddressProvider> addressProviders = createAddressProviders(externalAddressProvider);
-        AddressTranslator addressTranslator = createAddressTranslator();
-        connectionManager = (ClientConnectionManagerImpl) clientConnectionManagerFactory
-                .createConnectionManager(this, addressTranslator, addressProviders);
+        clientDiscoveryService = initClientDiscoveryService(externalAddressProvider);
+        clientConnectionStrategy = initializeStrategy();
+        connectionManager = (ClientConnectionManagerImpl) clientConnectionManagerFactory.createConnectionManager(this);
+        clusterConnectorService = initClusterConnectorService();
         clusterService = new ClientClusterServiceImpl(this);
-
-
         invocationService = initInvocationService();
         listenerService = initListenerService();
         userContext = new ConcurrentHashMap<String, Object>();
+        userContext.putAll(config.getUserContext());
         diagnostics = initDiagnostics();
-
         hazelcastCacheManager = new ClientICacheManager(this);
-
+        queryCacheContext = new ClientQueryCacheContext(this);
         lockReferenceIdGenerator = new ClientLockReferenceIdGenerator();
         nearCacheManager = clientExtension.createNearCacheManager();
         clientExceptionFactory = initClientExceptionFactory();
         statistics = new Statistics(this);
         userCodeDeploymentService = new ClientUserCodeDeploymentService(config.getUserCodeDeploymentConfig(), classLoader);
+        proxySessionManager = new ClientProxySessionManager(this);
+        cpSubsystem = new CPSubsystemImpl(this);
     }
 
-    private int getConnectionTimeoutMillis() {
-        ClientNetworkConfig networkConfig = config.getNetworkConfig();
-        int connTimeout = networkConfig.getConnectionTimeout();
-        return connTimeout == 0 ? Integer.MAX_VALUE : connTimeout;
+    private ClusterConnectorService initClusterConnectorService() {
+        ClusterConnectorServiceImpl service = new ClusterConnectorServiceImpl(this, connectionManager,
+                clientConnectionStrategy, clientDiscoveryService);
+        connectionManager.addConnectionListener(service);
+        return service;
+    }
+
+    private ClientConnectionStrategy initializeStrategy() {
+        ClientConnectionStrategy strategy;
+        //internal property
+        String className = properties.get("hazelcast.client.connection.strategy.classname");
+        if (className != null) {
+            try {
+                ClassLoader configClassLoader = config.getClassLoader();
+                return ClassLoaderUtil.newInstance(configClassLoader, className);
+            } catch (Exception e) {
+                throw rethrow(e);
+            }
+        } else {
+            strategy = new DefaultClientConnectionStrategy();
+        }
+        return strategy;
+    }
+
+    private ClientDiscoveryService initClientDiscoveryService(AddressProvider externalAddressProvider) {
+        int tryCount;
+        List<ClientConfig> configs;
+        if (clientFailoverConfig == null) {
+            tryCount = 0;
+            configs = Collections.singletonList(config);
+        } else {
+            tryCount = clientFailoverConfig.getTryCount();
+            configs = clientFailoverConfig.getClientConfigs();
+        }
+        ClientDiscoveryServiceBuilder builder = new ClientDiscoveryServiceBuilder(tryCount, configs, loggingService,
+                externalAddressProvider, properties, clientExtension);
+        return builder.build();
     }
 
     private Diagnostics initDiagnostics() {
@@ -283,6 +310,10 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
         ProbeLevel probeLevel = properties.getEnum(Diagnostics.METRICS_LEVEL, ProbeLevel.class);
         ILogger logger = loggingService.getLogger(MetricsRegistryImpl.class);
         MetricsRegistryImpl metricsRegistry = new MetricsRegistryImpl(getName(), logger, probeLevel);
+        return metricsRegistry;
+    }
+
+    private void startMetrics() {
         RuntimeMetricSet.register(metricsRegistry);
         GarbageCollectionMetricSet.register(metricsRegistry);
         OperatingSystemMetricSet.register(metricsRegistry);
@@ -290,156 +321,8 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
         ClassLoadingMetricSet.register(metricsRegistry);
         FileMetricSet.register(metricsRegistry);
         metricsRegistry.scanAndRegister(clientExtension.getMemoryStats(), "memory");
-        return metricsRegistry;
-    }
-
-    private Collection<AddressProvider> createAddressProviders(AddressProvider externalAddressProvider) {
-        ClientNetworkConfig networkConfig = getClientConfig().getNetworkConfig();
-        Collection<AddressProvider> addressProviders = new LinkedList<AddressProvider>();
-
-        if (externalAddressProvider != null) {
-            addressProviders.add(externalAddressProvider);
-        }
-
-        if (discoveryService != null) {
-            addressProviders.add(new DiscoveryAddressProvider(discoveryService, loggingService));
-        }
-
-        ClientAwsConfig awsConfig = networkConfig.getAwsConfig();
-        AwsAddressProvider awsAddressProvider = initAwsAddressProvider(awsConfig);
-        if (awsAddressProvider != null) {
-            addressProviders.add(awsAddressProvider);
-        }
-
-        ClientCloudConfig cloudConfig = networkConfig.getCloudConfig();
-        HazelcastCloudAddressProvider cloudAddressProvider = initCloudAddressProvider(cloudConfig);
-        if (cloudAddressProvider != null) {
-            addressProviders.add(cloudAddressProvider);
-        }
-
-        addressProviders.add(new DefaultAddressProvider(networkConfig, addressProviders.isEmpty()));
-        return addressProviders;
-    }
-
-    private HazelcastCloudAddressProvider initCloudAddressProvider(ClientCloudConfig cloudConfig) {
-        if (cloudConfig.isEnabled()) {
-            String discoveryToken = cloudConfig.getDiscoveryToken();
-            String urlEndpoint = HazelcastCloudDiscovery.createUrlEndpoint(getProperties(), discoveryToken);
-            return new HazelcastCloudAddressProvider(urlEndpoint, getConnectionTimeoutMillis(), loggingService);
-        }
-
-        String cloudToken = properties.getString(ClientProperty.HAZELCAST_CLOUD_DISCOVERY_TOKEN);
-        if (cloudToken != null) {
-            String urlEndpoint = HazelcastCloudDiscovery.createUrlEndpoint(getProperties(), cloudToken);
-            return new HazelcastCloudAddressProvider(urlEndpoint, getConnectionTimeoutMillis(), loggingService);
-        }
-        return null;
-    }
-
-    private AwsAddressProvider initAwsAddressProvider(ClientAwsConfig awsConfig) {
-        if (awsConfig != null && awsConfig.isEnabled()) {
-            try {
-                return new AwsAddressProvider(awsConfig, loggingService);
-            } catch (NoClassDefFoundError e) {
-                ILogger logger = loggingService.getLogger(HazelcastClient.class);
-                logger.warning("hazelcast-aws.jar might be missing!");
-                throw e;
-            }
-        }
-        return null;
-    }
-
-    private AddressTranslator createAddressTranslator() {
-        ClientNetworkConfig networkConfig = getClientConfig().getNetworkConfig();
-        ClientAwsConfig awsConfig = networkConfig.getAwsConfig();
-        ClientCloudConfig cloudConfig = networkConfig.getCloudConfig();
-
-        List<String> addresses = networkConfig.getAddresses();
-        boolean addressListProvided = addresses.size() != 0;
-        boolean awsDiscoveryEnabled = awsConfig != null && awsConfig.isEnabled();
-        boolean discoverySpiEnabled = discoveryService != null;
-        String cloudDiscoveryToken = properties.getString(HAZELCAST_CLOUD_DISCOVERY_TOKEN);
-        if (cloudDiscoveryToken != null && cloudConfig.isEnabled()) {
-            throw new IllegalStateException("Ambiguous hazelcast.cloud configuration. "
-                    + "Both property based and client configuration based settings are provided for "
-                    + "Hazelcast cloud discovery together. Use only one.");
-        }
-        boolean hazelcastCloudEnabled = cloudDiscoveryToken != null || cloudConfig.isEnabled();
-        isDiscoveryConfigurationConsistent(addressListProvided, awsDiscoveryEnabled,
-                discoverySpiEnabled, hazelcastCloudEnabled);
-
-        if (awsDiscoveryEnabled) {
-            try {
-                return new AwsAddressTranslator(awsConfig, loggingService);
-            } catch (NoClassDefFoundError e) {
-                ILogger logger = loggingService.getLogger(HazelcastClient.class);
-                logger.warning("hazelcast-aws.jar might be missing!");
-                throw e;
-            }
-        } else if (discoverySpiEnabled) {
-            return new DiscoveryAddressTranslator(discoveryService,
-                    getProperties().getBoolean(ClientProperty.DISCOVERY_SPI_PUBLIC_IP_ENABLED));
-        } else if (hazelcastCloudEnabled) {
-            String discoveryToken;
-            if (cloudConfig.isEnabled()) {
-                discoveryToken = cloudConfig.getDiscoveryToken();
-            } else {
-                discoveryToken = cloudDiscoveryToken;
-            }
-            String urlEndpoint = HazelcastCloudDiscovery.createUrlEndpoint(getProperties(), discoveryToken);
-            return new HazelcastCloudAddressTranslator(urlEndpoint, getConnectionTimeoutMillis(), loggingService);
-        }
-
-        return new DefaultAddressTranslator();
-    }
-
-    @SuppressWarnings("checkstyle:booleanexpressioncomplexity")
-    private void isDiscoveryConfigurationConsistent(boolean addressListProvided, boolean awsDiscoveryEnabled,
-                                                    boolean discoverySpiEnabled, boolean hazelcastCloudEnabled) {
-        int count = 0;
-        if (addressListProvided) {
-            count++;
-        }
-        if (awsDiscoveryEnabled) {
-            count++;
-        }
-        if (discoverySpiEnabled) {
-            count++;
-        }
-        if (hazelcastCloudEnabled) {
-            count++;
-        }
-        if (count > 1) {
-            throw new IllegalStateException("Only one discovery method can be enabled at a time. "
-                    + "cluster members given explicitly : " + addressListProvided
-                    + ", aws discovery enabled : " + awsDiscoveryEnabled
-                    + ", discovery spi enabled : " + discoverySpiEnabled
-                    + ", hazelcast.cloud enabled : " + hazelcastCloudEnabled);
-        }
-    }
-
-    private DiscoveryService initDiscoveryService(ClientConfig config) {
-        // Prevent confusing behavior where the DiscoveryService is started
-        // and strategies are resolved but the AddressProvider is never registered
-        if (!properties.getBoolean(ClientProperty.DISCOVERY_SPI_ENABLED)) {
-            return null;
-        }
-
-        ILogger logger = loggingService.getLogger(DiscoveryService.class);
-        ClientNetworkConfig networkConfig = config.getNetworkConfig();
-        DiscoveryConfig discoveryConfig = networkConfig.getDiscoveryConfig().getAsReadOnly();
-
-        DiscoveryServiceProvider factory = discoveryConfig.getDiscoveryServiceProvider();
-        if (factory == null) {
-            factory = new DefaultDiscoveryServiceProvider();
-        }
-
-        DiscoveryServiceSettings settings = new DiscoveryServiceSettings().setConfigClassLoader(config.getClassLoader())
-                .setLogger(logger).setDiscoveryMode(DiscoveryMode.Client).setDiscoveryConfig(discoveryConfig);
-
-        DiscoveryService discoveryService = factory.newDiscoveryService(settings);
-        discoveryService.start();
-        return discoveryService;
+        metricsRegistry.collectMetrics(clientExtension);
+        metricsRegistry.collectMetrics(executionService);
     }
 
     private LoadBalancer initLoadBalancer(ClientConfig config) {
@@ -448,26 +331,6 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
             lb = new RoundRobinLB();
         }
         return lb;
-    }
-
-    private Credentials initCredentials(ClientConfig config) {
-        final GroupConfig groupConfig = config.getGroupConfig();
-        final ClientSecurityConfig securityConfig = config.getSecurityConfig();
-        Credentials c = securityConfig.getCredentials();
-        if (c == null) {
-            final String credentialsClassname = securityConfig.getCredentialsClassname();
-            if (credentialsClassname != null) {
-                try {
-                    c = ClassLoaderUtil.newInstance(config.getClassLoader(), credentialsClassname);
-                } catch (Exception e) {
-                    throw rethrow(e);
-                }
-            }
-        }
-        if (c == null) {
-            c = new UsernamePasswordCredentials(groupConfig.getName(), groupConfig.getPassword());
-        }
-        return c;
     }
 
     @SuppressWarnings("checkstyle:illegaltype")
@@ -502,14 +365,9 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
 
     @SuppressWarnings("checkstyle:illegaltype")
     private AbstractClientListenerService initListenerService() {
-        int eventQueueCapacity = properties.getInteger(ClientProperty.EVENT_QUEUE_CAPACITY);
-        int eventThreadCount = properties.getInteger(ClientProperty.EVENT_THREAD_COUNT);
-        final ClientNetworkConfig networkConfig = config.getNetworkConfig();
-        if (networkConfig.isSmartRouting()) {
-            return new SmartClientListenerService(this, eventThreadCount, eventQueueCapacity);
-        } else {
-            return new NonSmartClientListenerService(this, eventThreadCount, eventQueueCapacity);
-        }
+        return config.getNetworkConfig().isSmartRouting()
+                ? new SmartClientListenerService(this)
+                : new NonSmartClientListenerService(this);
     }
 
     private ClientExecutionServiceImpl initExecutionService() {
@@ -517,48 +375,67 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
                 config.getClassLoader(), properties, config.getExecutorPoolSize(), loggingService);
     }
 
-    public void start() {
-        lifecycleService.setStarted();
-        invocationService.start();
-        clusterService.start();
-        ClientContext clientContext = new ClientContext(this);
-        try {
-            userCodeDeploymentService.start();
-            connectionManager.start(clientContext);
-        } catch (Exception e) {
-            throw rethrow(e);
+    private void logGroupPasswordInfo() {
+        if (!isNullOrEmpty(config.getGroupConfig().getPassword())) {
+            ILogger logger = loggingService.getLogger(HazelcastClient.class);
+            logger.info("A non-empty group password is configured for the Hazelcast client."
+                    + " Starting with Hazelcast version 3.11, clients with the same group name,"
+                    + " but with different group passwords (that do not use authentication) will be accepted to a cluster."
+                    + " The group password configuration will be removed completely in a future release.");
         }
+    }
 
-        diagnostics.start();
+    public void start() {
+        try {
+            lifecycleService.start();
+            startMetrics();
+            invocationService.start();
+            clusterService.start();
+            ClientContext clientContext = new ClientContext(this);
+            userCodeDeploymentService.start();
+            connectionManager.start();
+            clientConnectionStrategy.init(clientContext);
+            clientConnectionStrategy.start();
 
-        // static loggers at beginning of file
-        diagnostics.register(
-                new BuildInfoPlugin(loggingService.getLogger(BuildInfoPlugin.class)));
-        diagnostics.register(
-                new ConfigPropertiesPlugin(loggingService.getLogger(ConfigPropertiesPlugin.class), properties));
-        diagnostics.register(
-                new SystemPropertiesPlugin(loggingService.getLogger(SystemPropertiesPlugin.class)));
+            diagnostics.start();
 
-        // periodic loggers
-        diagnostics.register(
-                new MetricsPlugin(loggingService.getLogger(MetricsPlugin.class), metricsRegistry, properties));
-        diagnostics.register(
-                new SystemLogPlugin(properties, connectionManager, this, loggingService.getLogger(SystemLogPlugin.class)));
-        diagnostics.register(
-                new NetworkingImbalancePlugin(properties, connectionManager.getNetworking(),
-                        loggingService.getLogger(NetworkingImbalancePlugin.class)));
-        diagnostics.register(
-                new EventQueuePlugin(loggingService.getLogger(EventQueuePlugin.class), listenerService.getEventExecutor(),
-                        properties));
+            // static loggers at beginning of file
+            diagnostics.register(
+                    new BuildInfoPlugin(loggingService.getLogger(BuildInfoPlugin.class)));
+            diagnostics.register(
+                    new ConfigPropertiesPlugin(loggingService.getLogger(ConfigPropertiesPlugin.class), properties));
+            diagnostics.register(
+                    new SystemPropertiesPlugin(loggingService.getLogger(SystemPropertiesPlugin.class)));
 
-        metricsRegistry.collectMetrics(listenerService);
+            // periodic loggers
+            diagnostics.register(
+                    new MetricsPlugin(loggingService.getLogger(MetricsPlugin.class), metricsRegistry, properties));
+            diagnostics.register(
+                    new SystemLogPlugin(properties, connectionManager, this, loggingService.getLogger(SystemLogPlugin.class)));
+            diagnostics.register(
+                    new NetworkingImbalancePlugin(properties, connectionManager.getNetworking(),
+                            loggingService.getLogger(NetworkingImbalancePlugin.class)));
+            diagnostics.register(
+                    new EventQueuePlugin(loggingService.getLogger(EventQueuePlugin.class), listenerService.getEventExecutor(),
+                            properties));
 
-        proxyManager.init(config, clientContext);
-        listenerService.start();
-        loadBalancer.init(getCluster(), config);
-        partitionService.start();
-        statistics.start();
-        clientExtension.afterStart(this);
+            metricsRegistry.collectMetrics(listenerService);
+
+            proxyManager.init(config, clientContext);
+            listenerService.start();
+            loadBalancer.init(getCluster(), config);
+            partitionService.start();
+            statistics.start();
+            clientExtension.afterStart(this);
+            cpSubsystem.init(clientContext);
+        } catch (Throwable e) {
+            try {
+                lifecycleService.terminate();
+            } catch (Throwable t) {
+               ignore(t);
+            }
+            rethrow(e);
+        }
     }
 
     public void onClusterConnect(Connection ownerConnection) throws Exception {
@@ -834,6 +711,11 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
     }
 
     @Override
+    public CPSubsystem getCPSubsystem() {
+        return cpSubsystem;
+    }
+
+    @Override
     public ConcurrentMap<String, Object> getUserContext() {
         return userContext;
     }
@@ -843,12 +725,16 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
     }
 
     @Override
-    public SerializationService getSerializationService() {
+    public InternalSerializationService getSerializationService() {
         return serializationService;
     }
 
     public ClientUserCodeDeploymentService getUserCodeDeploymentService() {
         return userCodeDeploymentService;
+    }
+
+    public ClientProxySessionManager getProxySessionManager() {
+        return proxySessionManager;
     }
 
     public ProxyManager getProxyManager() {
@@ -891,10 +777,6 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
         return clientExtension;
     }
 
-    public Credentials getCredentials() {
-        return credentials;
-    }
-
     public short getProtocolVersion() {
         return PROTOCOL_VERSION;
     }
@@ -904,22 +786,25 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
         getLifecycleService().shutdown();
     }
 
-    public void doShutdown() {
+    public void doShutdown(boolean isGraceful) {
+        if (isGraceful) {
+            proxySessionManager.shutdown();
+        }
         proxyManager.destroy();
         connectionManager.shutdown();
+        clientConnectionStrategy.shutdown();
+        clusterConnectorService.shutdown();
+        clientDiscoveryService.shutdown();
         clusterService.shutdown();
-        partitionService.stop();
+        partitionService.reset();
         transactionManager.shutdown();
         invocationService.shutdown();
         executionService.shutdown();
         listenerService.shutdown();
         nearCacheManager.destroyAllNearCaches();
-        if (discoveryService != null) {
-            discoveryService.destroy();
-        }
         metricsRegistry.shutdown();
         diagnostics.shutdown();
-        ((InternalSerializationService) serializationService).dispose();
+        serializationService.dispose();
     }
 
     public ClientLockReferenceIdGenerator getLockReferenceIdGenerator() {
@@ -933,5 +818,25 @@ public class HazelcastClientInstanceImpl implements HazelcastInstance, Serializa
 
     public ClientExceptionFactory getClientExceptionFactory() {
         return clientExceptionFactory;
+    }
+
+    public ClusterConnectorService getClusterConnectorService() {
+        return clusterConnectorService;
+    }
+
+    public ClientDiscoveryService getClientDiscoveryService() {
+        return clientDiscoveryService;
+    }
+
+    public ClientConnectionStrategy getConnectionStrategy() {
+        return clientConnectionStrategy;
+    }
+
+    public ClientFailoverConfig getFailoverConfig() {
+        return clientFailoverConfig;
+    }
+
+    public ClientQueryCacheContext getQueryCacheContext() {
+        return queryCacheContext;
     }
 }

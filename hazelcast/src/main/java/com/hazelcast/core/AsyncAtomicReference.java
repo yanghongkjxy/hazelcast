@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 
 package com.hazelcast.core;
 
-import com.hazelcast.spi.annotation.Beta;
-
 /**
  * A {@link IAtomicReference} that exposes its operations using a
  * {@link ICompletableFuture} so it can be used in the reactive programming
@@ -30,7 +28,6 @@ import com.hazelcast.spi.annotation.Beta;
  * @param <E> the type of object referred to by this reference
  * @since 3.2
  */
-@Beta
 @Deprecated
 public interface AsyncAtomicReference<E> extends IAtomicReference<E> {
 

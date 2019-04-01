@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,14 +102,14 @@ public class LockMBeanTest extends HazelcastTestSupport {
 
     @Test
     public void testMBeanHasLeaseTime_whenLockedWithLeaseTime_mustHaveRemainingLeaseBeforeItExpires() throws Exception {
-        lock.lock(1000, TimeUnit.MILLISECONDS);
+        lock.lock(10000, TimeUnit.MILLISECONDS);
         long startTime = Clock.currentTimeMillis();
 
         long remainingLeaseTime = getLongAttribute("remainingLeaseTime");
         long timePassed = Clock.currentTimeMillis() - startTime;
         boolean hasLeaseRemaining = remainingLeaseTime > 0;
 
-        assertTrue(hasLeaseRemaining || timePassed >= 1000);
+        assertTrue(hasLeaseRemaining || timePassed >= 10000);
     }
 
     @Test

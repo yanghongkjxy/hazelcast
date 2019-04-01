@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,6 +64,18 @@ public class NativeMemoryConfig {
     private int minBlockSize = DEFAULT_MIN_BLOCK_SIZE;
     private int pageSize = DEFAULT_PAGE_SIZE;
     private float metadataSpacePercentage = DEFAULT_METADATA_SPACE_PERCENTAGE;
+
+    public NativeMemoryConfig() {
+    }
+
+    public NativeMemoryConfig(NativeMemoryConfig nativeMemoryConfig) {
+        enabled = nativeMemoryConfig.enabled;
+        size = nativeMemoryConfig.size;
+        allocatorType = nativeMemoryConfig.allocatorType;
+        minBlockSize = nativeMemoryConfig.minBlockSize;
+        pageSize = nativeMemoryConfig.pageSize;
+        metadataSpacePercentage = nativeMemoryConfig.metadataSpacePercentage;
+    }
 
     /**
      * Returns size of the native memory region.

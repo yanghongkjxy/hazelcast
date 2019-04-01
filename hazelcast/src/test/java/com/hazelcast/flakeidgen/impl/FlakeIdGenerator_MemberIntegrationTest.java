@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,8 +36,6 @@ import org.junit.runner.RunWith;
 
 import java.util.Map;
 
-import static com.hazelcast.instance.BuildInfoProvider.HAZELCAST_INTERNAL_OVERRIDE_VERSION;
-import static com.hazelcast.internal.cluster.Versions.V3_9;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -73,16 +71,7 @@ public class FlakeIdGenerator_MemberIntegrationTest extends HazelcastTestSupport
     }
 
     @Test
-    public void when_310MemberJoinsWith39Mode_flakeIdGeneratorDoesNotWork() {
-        System.setProperty(HAZELCAST_INTERNAL_OVERRIDE_VERSION, V3_9.toString());
-        HazelcastInstance instance = factory.newHazelcastInstance();
 
-        FlakeIdGenerator gen = instance.getFlakeIdGenerator("gen");
-        exception.expect(UnsupportedOperationException.class);
-        gen.newId();
-    }
-
-    @Test
     public void statistics() {
         HazelcastInstance instance = factory.newHazelcastInstance();
 

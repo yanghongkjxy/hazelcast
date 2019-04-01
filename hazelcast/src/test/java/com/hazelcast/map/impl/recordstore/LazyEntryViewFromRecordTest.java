@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import com.hazelcast.config.MapConfig;
 import com.hazelcast.core.EntryView;
 import com.hazelcast.core.PartitioningStrategy;
 import com.hazelcast.internal.serialization.impl.DefaultSerializationServiceBuilder;
-import com.hazelcast.map.impl.record.AbstractRecord;
 import com.hazelcast.map.impl.record.DataRecordFactory;
 import com.hazelcast.map.impl.record.Record;
 import com.hazelcast.nio.serialization.Data;
@@ -65,8 +64,7 @@ public class LazyEntryViewFromRecordTest {
         SerializationService serializationService = new DefaultSerializationServiceBuilder().build();
         DataRecordFactory dataRecordFactory
                 = new DataRecordFactory(mapConfig, serializationService, mockPartitioningStrategy);
-        recordInstance = dataRecordFactory.newRecord(value);
-        ((AbstractRecord) recordInstance).setKey(serializationService.toData(key));
+        recordInstance = dataRecordFactory.newRecord(serializationService.toData(key), value);
         return new LazyEntryViewFromRecord(recordInstance, serializationService);
     }
 

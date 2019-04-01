@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import com.hazelcast.internal.networking.OutboundFrame;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.Connection;
+import com.hazelcast.nio.ConnectionLifecycleListener;
 import com.hazelcast.nio.ConnectionType;
 import com.hazelcast.nio.IOService;
 
@@ -31,6 +32,10 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.channels.CancelledKeyException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+
+import static com.hazelcast.nio.ConnectionType.MEMBER;
+import static com.hazelcast.nio.ConnectionType.NONE;
 
 /**
  * The Tcp/Ip implementation of the {@link com.hazelcast.nio.Connection}.
@@ -41,13 +46,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @see Networking
  */
 @SuppressWarnings("checkstyle:methodcount")
-public class TcpIpConnection implements Connection {
+public class TcpIpConnection
+        implements Connection {
 
     private final Channel channel;
 
-    private final TcpIpConnectionManager connectionManager;
+    private final TcpIpEndpointManager endpointManager;
 
     private final AtomicBoolean alive = new AtomicBoolean(true);
+
+    // indicate whether connection bind exchange is in progress/done (true) or not yet initiated (when false)
+    private final AtomicBoolean binding = new AtomicBoolean();
 
     private final ILogger logger;
 
@@ -59,18 +68,22 @@ public class TcpIpConnection implements Connection {
 
     private TcpIpConnectionErrorHandler errorHandler;
 
-    private volatile ConnectionType type = ConnectionType.NONE;
+    private volatile ConnectionType type = NONE;
+
+    private volatile ConnectionLifecycleListener lifecycleListener;
 
     private volatile Throwable closeCause;
 
     private volatile String closeReason;
 
-    public TcpIpConnection(TcpIpConnectionManager connectionManager,
+    public TcpIpConnection(TcpIpEndpointManager endpointManager,
+                           ConnectionLifecycleListener lifecycleListener,
                            int connectionId,
                            Channel channel) {
         this.connectionId = connectionId;
-        this.connectionManager = connectionManager;
-        this.ioService = connectionManager.getIoService();
+        this.endpointManager = endpointManager;
+        this.lifecycleListener = lifecycleListener;
+        this.ioService = endpointManager.getNetworkingService().getIoService();
         this.logger = ioService.getLoggingService().getLogger(TcpIpConnection.class);
         this.channel = channel;
         channel.attributeMap().put(TcpIpConnection.class, this);
@@ -87,8 +100,14 @@ public class TcpIpConnection implements Connection {
 
     @Override
     public void setType(ConnectionType type) {
-        if (this.type == ConnectionType.NONE) {
-            this.type = type;
+        if (this.type != NONE) {
+            return;
+        }
+
+        this.type = type;
+        if (type == MEMBER) {
+            logger.info("Initialized new cluster connection between "
+                        + channel.localSocketAddress() + " and " + channel.remoteSocketAddress());
         }
     }
 
@@ -98,8 +117,8 @@ public class TcpIpConnection implements Connection {
         return t == null ? -1 : t.ordinal();
     }
 
-    public TcpIpConnectionManager getConnectionManager() {
-        return connectionManager;
+    public TcpIpEndpointManager getEndpointManager() {
+        return endpointManager;
     }
 
     @Override
@@ -152,7 +171,7 @@ public class TcpIpConnection implements Connection {
     @Override
     public boolean isClient() {
         ConnectionType t = type;
-        return t != null && t != ConnectionType.NONE && t.isClient();
+        return t != null && t != NONE && t.isClient();
     }
 
     @Override
@@ -202,14 +221,23 @@ public class TcpIpConnection implements Connection {
             logger.warning(e);
         }
 
-        connectionManager.onConnectionClose(this);
+        lifecycleListener.onConnectionClose(this, null, false);
         ioService.onDisconnect(endPoint, cause);
         if (cause != null && errorHandler != null) {
             errorHandler.onError(cause);
         }
     }
 
+    public boolean setBinding() {
+        return binding.compareAndSet(false, true);
+    }
+
     private void logClose() {
+        Level logLevel = resolveLogLevelOnClose();
+        if (!logger.isLoggable(logLevel)) {
+            return;
+        }
+
         String message = toString() + " closed. Reason: ";
         if (closeReason != null) {
             message += closeReason;
@@ -219,18 +247,29 @@ public class TcpIpConnection implements Connection {
             message += "Socket explicitly closed";
         }
 
-        if (ioService.isActive()) {
-            if (closeCause == null || closeCause instanceof EOFException || closeCause instanceof CancelledKeyException) {
-                logger.info(message);
+        if (Level.FINEST.equals(logLevel)) {
+            logger.log(logLevel, message, closeCause);
+        } else if (closeCause == null || closeCause instanceof EOFException || closeCause instanceof CancelledKeyException) {
+            logger.log(logLevel, message);
+        } else {
+            logger.log(logLevel, message, closeCause);
+        }
+    }
+
+    private Level resolveLogLevelOnClose() {
+        if (!ioService.isActive()) {
+            return Level.FINEST;
+        }
+
+        if (closeCause == null || closeCause instanceof EOFException || closeCause instanceof CancelledKeyException) {
+            if (type == ConnectionType.REST_CLIENT || type == ConnectionType.MEMCACHE_CLIENT) {
+                // text-based clients are expected to come and go frequently.
+                return Level.FINE;
             } else {
-                logger.warning(message, closeCause);
+                return Level.INFO;
             }
         } else {
-            if (closeCause == null) {
-                logger.finest(message);
-            } else {
-                logger.finest(message, closeCause);
-            }
+            return Level.WARNING;
         }
     }
 
@@ -252,6 +291,7 @@ public class TcpIpConnection implements Connection {
     public String toString() {
         return "Connection[id=" + connectionId
                 + ", " + channel.localSocketAddress() + "->" + channel.remoteSocketAddress()
+                + ", qualifier=" + endpointManager.getEndpointQualifier()
                 + ", endpoint=" + endPoint
                 + ", alive=" + alive
                 + ", type=" + type

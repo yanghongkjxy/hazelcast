@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.hazelcast.aggregation.impl;
 
 import com.hazelcast.aggregation.Aggregator;
+import com.hazelcast.internal.json.NonTerminalJsonValue;
 import com.hazelcast.query.impl.Extractable;
 import com.hazelcast.query.impl.getters.MultiResult;
 
@@ -73,7 +74,7 @@ public abstract class AbstractAggregator<I, E, R> extends Aggregator<I, R> {
                 }
                 accumulateExtracted(entry, results.get(i));
             }
-        } else {
+        } else if (extractedValue != NonTerminalJsonValue.INSTANCE) {
             accumulateExtracted(entry, extractedValue);
         }
     }

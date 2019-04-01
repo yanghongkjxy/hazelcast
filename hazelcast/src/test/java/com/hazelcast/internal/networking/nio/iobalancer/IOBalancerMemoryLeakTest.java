@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ import com.hazelcast.instance.HazelcastInstanceFactory;
 import com.hazelcast.internal.ascii.HTTPCommunicator;
 import com.hazelcast.internal.networking.nio.NioNetworking;
 import com.hazelcast.nio.Address;
+import com.hazelcast.nio.NetworkingService;
 import com.hazelcast.nio.Protocols;
-import com.hazelcast.nio.tcp.TcpIpConnectionManager;
 import com.hazelcast.spi.properties.GroupProperty;
 import com.hazelcast.test.AssertTask;
 import com.hazelcast.test.HazelcastSerialClassRunner;
@@ -60,11 +60,10 @@ public class IOBalancerMemoryLeakTest extends HazelcastTestSupport {
 
         HazelcastInstance instance = Hazelcast.newHazelcastInstance(config);
         HTTPCommunicator communicator = new HTTPCommunicator(instance);
-        TcpIpConnectionManager connectionManager = (TcpIpConnectionManager) getConnectionManager(instance);
         for (int i = 0; i < 100; i++) {
             communicator.getClusterInfo();
         }
-        final IOBalancer ioBalancer = getIoBalancer(connectionManager);
+        final IOBalancer ioBalancer = getIoBalancer(instance);
         assertTrueEventually(new AssertTask() {
             @Override
             public void run() {
@@ -110,8 +109,7 @@ public class IOBalancerMemoryLeakTest extends HazelcastTestSupport {
 
         assertJoinable(threads);
 
-        TcpIpConnectionManager connectionManager = (TcpIpConnectionManager) getConnectionManager(instance);
-        final IOBalancer ioBalancer = getIoBalancer(connectionManager);
+        final IOBalancer ioBalancer = getIoBalancer(instance);
         assertTrueEventually(new AssertTask() {
             @Override
             public void run() {
@@ -133,8 +131,9 @@ public class IOBalancerMemoryLeakTest extends HazelcastTestSupport {
         });
     }
 
-    private static IOBalancer getIoBalancer(TcpIpConnectionManager connectionManager) {
-        NioNetworking threadingModel = (NioNetworking) connectionManager.getNetworking();
+    private static IOBalancer getIoBalancer(HazelcastInstance instance) {
+        NetworkingService ns = getNode(instance).getNetworkingService();
+        NioNetworking threadingModel = (NioNetworking) ns.getNetworking();
         return threadingModel.getIOBalancer();
     }
 }

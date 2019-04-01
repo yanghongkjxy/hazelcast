@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import com.hazelcast.cache.impl.CacheService;
 import com.hazelcast.client.cache.impl.nearcache.invalidation.ClientCacheInvalidationMetaDataFetcher;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.connection.ClientConnectionManager;
+import com.hazelcast.client.connection.nio.ClusterConnectorService;
 import com.hazelcast.client.impl.clientside.HazelcastClientInstanceImpl;
 import com.hazelcast.client.impl.querycache.ClientQueryCacheContext;
 import com.hazelcast.client.map.impl.nearcache.invalidation.ClientMapInvalidationMetaDataFetcher;
@@ -29,12 +30,12 @@ import com.hazelcast.internal.nearcache.NearCacheManager;
 import com.hazelcast.internal.nearcache.impl.invalidation.InvalidationMetaDataFetcher;
 import com.hazelcast.internal.nearcache.impl.invalidation.MinimalPartitionService;
 import com.hazelcast.internal.nearcache.impl.invalidation.RepairingTask;
+import com.hazelcast.internal.serialization.InternalSerializationService;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.logging.LoggingService;
 import com.hazelcast.map.impl.MapService;
 import com.hazelcast.nio.serialization.Data;
 import com.hazelcast.spi.properties.HazelcastProperties;
-import com.hazelcast.spi.serialization.SerializationService;
 import com.hazelcast.util.ConstructorFunction;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,16 +47,17 @@ import static java.lang.String.format;
 /**
  * Context holding all the required services, managers and the configuration for a Hazelcast client.
  */
-public final class ClientContext {
+public class ClientContext {
 
     private String localUuid;
-    private final SerializationService serializationService;
+    private final InternalSerializationService serializationService;
     private final ClientClusterService clusterService;
     private final ClientPartitionService partitionService;
     private final ClientInvocationService invocationService;
     private final ClientExecutionService executionService;
     private final ClientListenerService listenerService;
     private final ClientConnectionManager clientConnectionManager;
+    private final ClusterConnectorService clusterConnectorService;
     private final LifecycleService lifecycleService;
     private final ClientTransactionManagerService transactionManager;
     private final ProxyManager proxyManager;
@@ -84,6 +86,7 @@ public final class ClientContext {
         this.executionService = client.getClientExecutionService();
         this.listenerService = client.getListenerService();
         this.clientConnectionManager = client.getConnectionManager();
+        this.clusterConnectorService = client.getClusterConnectorService();
         this.lifecycleService = client.getLifecycleService();
         this.proxyManager = client.getProxyManager();
         this.clientConfig = client.getClientConfig();
@@ -93,7 +96,7 @@ public final class ClientContext {
         this.properties = client.getProperties();
         this.localUuid = client.getLocalEndpoint().getUuid();
         this.minimalPartitionService = new ClientMinimalPartitionService();
-        this.queryCacheContext = new ClientQueryCacheContext(this);
+        this.queryCacheContext = client.getQueryCacheContext();
     }
 
     public ClientQueryCacheContext getQueryCacheContext() {
@@ -156,11 +159,15 @@ public final class ClientContext {
         }
     }
 
+    public ClusterConnectorService getClusterConnectorService() {
+        return clusterConnectorService;
+    }
+
     public HazelcastInstance getHazelcastInstance() {
         return proxyManager.getHazelcastInstance();
     }
 
-    public SerializationService getSerializationService() {
+    public InternalSerializationService getSerializationService() {
         return serializationService;
     }
 

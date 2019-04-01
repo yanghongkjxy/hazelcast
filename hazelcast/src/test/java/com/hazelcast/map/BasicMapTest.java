@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.hazelcast.map;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.MapConfig;
 import com.hazelcast.core.EntryAdapter;
@@ -27,6 +26,8 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IBiFunction;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.MapEvent;
+import com.hazelcast.internal.json.Json;
+import com.hazelcast.core.HazelcastJsonValue;
 import com.hazelcast.query.PagingPredicate;
 import com.hazelcast.query.Predicate;
 import com.hazelcast.test.AssertTask;
@@ -34,6 +35,8 @@ import com.hazelcast.test.ChangeLoggingRule;
 import com.hazelcast.test.HazelcastParallelClassRunner;
 import com.hazelcast.test.HazelcastTestSupport;
 import com.hazelcast.test.TestHazelcastInstanceFactory;
+import com.hazelcast.test.annotation.ConfigureParallelRunnerWith;
+import com.hazelcast.test.annotation.HeavilyMultiThreadedTestLimiter;
 import com.hazelcast.test.annotation.ParallelTest;
 import com.hazelcast.test.annotation.QuickTest;
 import com.hazelcast.test.annotation.SlowTest;
@@ -46,7 +49,10 @@ import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 
 import java.io.Serializable;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -59,6 +65,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -73,6 +80,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 @RunWith(HazelcastParallelClassRunner.class)
+@ConfigureParallelRunnerWith(HeavilyMultiThreadedTestLimiter.class)
 @Category({QuickTest.class, ParallelTest.class})
 public class BasicMapTest extends HazelcastTestSupport {
 
@@ -602,60 +610,59 @@ public class BasicMapTest extends HazelcastTestSupport {
     }
 
     @Test
-    public void testMapLockAndUnlockAndTryLock() throws Exception {
-        final int timeout = 10; //seconds
+    public void testMapTryLock() throws Exception {
+        final IMap<Object, Object> map = getInstance().getMap("testMapTryLock");
+        final String key = "key";
+        map.lock(key);
 
-        final IMap<Object, Object> map = getInstance().getMap("testMapLockAndUnlockAndTryLock");
-        map.lock("key0");
-        map.lock("key1");
-        map.lock("key2");
-        map.lock("key3");
+        final CountDownLatch latch = new CountDownLatch(1);
+        Future<Object> f = spawn(new Callable<Object>() {
+            public Object call() throws Exception {
+                assertFalse("Should NOT be able to acquire lock!", map.tryLock(key));
+                latch.countDown();
 
-        final AtomicBoolean check1 = new AtomicBoolean(false);
-        final AtomicBoolean check2 = new AtomicBoolean(false);
-        final CountDownLatch latch0 = new CountDownLatch(1);
-        final CountDownLatch latch1 = new CountDownLatch(1);
-        final CountDownLatch latch2 = new CountDownLatch(1);
-        final CountDownLatch latch3 = new CountDownLatch(1);
-        final CountDownLatch latch4 = new CountDownLatch(1);
-
-        Thread thread = new Thread(new Runnable() {
-            public void run() {
-                try {
-                    check1.set(map.tryLock("key0"));
-                    latch0.countDown();
-
-                    check2.set(map.tryLock("key0", timeout, SECONDS));
-                    latch1.countDown();
-
-                    map.put("key1", "value1");
-                    latch2.countDown();
-
-                    map.put("key2", "value2");
-                    latch3.countDown();
-
-                    map.put("key3", "value3");
-                    latch4.countDown();
-                } catch (Exception e) {
-                    fail(e.getMessage());
-                }
+                assertTrue("Should be able to acquire lock!", map.tryLock(key, 60, SECONDS));
+                return null;
             }
         });
-        thread.start();
 
-        assertTrue(latch0.await(timeout, SECONDS));
-        map.unlock("key0");
+        assertOpenEventually(latch);
+        map.unlock(key);
+        f.get();
+    }
 
-        assertTrue(latch1.await(timeout, SECONDS));
-        assertFalse(check1.get());
-        assertTrue(check2.get());
+    @Test
+    public void testMapPut_whenKeyLocked() throws Exception {
+        final IMap<Object, Object> map = getInstance().getMap("testMapPut_whenKeyLocked");
+        final String key = "key";
+        final String invalidValue = "valuex";
+        final String value = "value";
+        map.lock(key);
 
-        map.unlock("key1");
-        assertTrue(latch2.await(timeout, SECONDS));
-        map.unlock("key2");
-        assertTrue(latch3.await(timeout, SECONDS));
-        map.unlock("key3");
-        assertTrue(latch4.await(timeout, SECONDS));
+        Future f1 = spawn(new Runnable() {
+            @Override
+            public void run() {
+                assertFalse(map.tryPut(key, invalidValue, 1, SECONDS));
+            }
+        });
+
+        Future f2 = spawn(new Runnable() {
+            @Override
+            public void run() {
+                map.put(key, value);
+            }
+        });
+
+        f1.get();
+        try {
+            f2.get(1, SECONDS);
+            fail("Should not be able to put entry when key is locked!");
+        } catch (TimeoutException ignored) {
+        }
+        map.unlock(key);
+
+        f2.get();
+        assertEquals(value, map.get(key));
     }
 
     @Test
@@ -979,15 +986,19 @@ public class BasicMapTest extends HazelcastTestSupport {
         map.put("key", "value");
         map.put("key", "value2");
         map.remove("key");
-        sleepSeconds(1);
 
-        assertEquals(addedKey[0], "key");
-        assertEquals(addedValue[0], "value");
-        assertEquals(updatedKey[0], "key");
-        assertEquals(oldValue[0], "value");
-        assertEquals(newValue[0], "value2");
-        assertEquals(removedKey[0], "key");
-        assertEquals(removedValue[0], "value2");
+        assertTrueEventually(new AssertTask() {
+            @Override
+            public void run() {
+                assertEquals(addedKey[0], "key");
+                assertEquals(addedValue[0], "value");
+                assertEquals(updatedKey[0], "key");
+                assertEquals(oldValue[0], "value");
+                assertEquals(newValue[0], "value2");
+                assertEquals(removedKey[0], "key");
+                assertEquals(removedValue[0], "value2");
+            }
+        });
     }
 
     @Test
@@ -1132,15 +1143,19 @@ public class BasicMapTest extends HazelcastTestSupport {
         map.remove("keyx");
         map.remove("key");
         map.remove("keyz");
-        sleepSeconds(1);
 
-        assertEquals(addedKey[0], "key");
-        assertEquals(addedValue[0], "value");
-        assertEquals(updatedKey[0], "key");
-        assertEquals(oldValue[0], "value");
-        assertEquals(newValue[0], "value2");
-        assertEquals(removedKey[0], "key");
-        assertEquals(removedValue[0], "value2");
+        assertTrueEventually(new AssertTask() {
+            @Override
+            public void run() throws Exception {
+                assertEquals(addedKey[0], "key");
+                assertEquals(addedValue[0], "value");
+                assertEquals(updatedKey[0], "key");
+                assertEquals(oldValue[0], "value");
+                assertEquals(newValue[0], "value2");
+                assertEquals(removedKey[0], "key");
+                assertEquals(removedValue[0], "value2");
+            }
+        });
     }
 
     @Test
@@ -1192,15 +1207,19 @@ public class BasicMapTest extends HazelcastTestSupport {
         map.put("key", "value");
         map.put("key", "value2");
         map.remove("key");
-        sleepSeconds(1);
 
-        assertEquals(addedKey[0], "key");
-        assertEquals(addedValue[0], null);
-        assertEquals(updatedKey[0], "key");
-        assertEquals(oldValue[0], null);
-        assertEquals(newValue[0], null);
-        assertEquals(removedKey[0], "key");
-        assertEquals(removedValue[0], null);
+        assertTrueEventually(new AssertTask() {
+            @Override
+            public void run() {
+                assertEquals(addedKey[0], "key");
+                assertEquals(addedValue[0], null);
+                assertEquals(updatedKey[0], "key");
+                assertEquals(oldValue[0], null);
+                assertEquals(newValue[0], null);
+                assertEquals(removedKey[0], "key");
+                assertEquals(removedValue[0], null);
+            }
+        });
     }
 
     @Test
@@ -1218,11 +1237,33 @@ public class BasicMapTest extends HazelcastTestSupport {
     }
 
     @Test
+    public void testSetTtlReturnsTrue() {
+        final IMap<String, String> map = getInstance().getMap(randomString());
+
+        map.put("key", "value");
+        assertTrue(map.setTtl("key", 10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void testSetTtlReturnsFalse_whenKeyDoesNotExist() {
+        final IMap<String, String> map = getInstance().getMap(randomString());
+        assertFalse(map.setTtl("key", 10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void testSetTtlReturnsFalse_whenKeyIsAlreadyExpired() {
+        final IMap<String, String> map = getInstance().getMap(randomString());
+        map.put("key", "value", 1, TimeUnit.SECONDS);
+        sleepAtLeastSeconds(5);
+        assertFalse(map.setTtl("key", 10, TimeUnit.SECONDS));
+    }
+
+    @Test
     public void testAlterTTLOfAnEternalKey() {
         final IMap<String, String> map = getInstance().getMap("testSetTTL");
 
         map.put("key", "value");
-        map.setTTL("key", 1, TimeUnit.SECONDS);
+        map.setTtl("key", 1, TimeUnit.SECONDS);
 
         sleepAtLeastMillis(2000);
 
@@ -1237,7 +1278,7 @@ public class BasicMapTest extends HazelcastTestSupport {
 
         sleepAtLeastMillis(SECONDS.toMillis(1));
         //Make the entry eternal
-        map.setTTL("key", 0, TimeUnit.DAYS);
+        map.setTtl("key", 0, TimeUnit.DAYS);
 
         sleepAtLeastMillis(SECONDS.toMillis(15));
 
@@ -1248,9 +1289,20 @@ public class BasicMapTest extends HazelcastTestSupport {
     public void testSetTTLConfiguresMapPolicyIfTTLIsNegative() {
         final IMap<String, String> map = getInstance().getMap("mapWithTTL");
         map.put("tempKey", "tempValue", 10, TimeUnit.SECONDS);
-        map.setTTL("tempKey", -1, TimeUnit.SECONDS);
+        map.setTtl("tempKey", -1, TimeUnit.SECONDS);
         sleepAtLeastMillis(1000);
         assertNull(map.get("tempKey"));
+    }
+
+    @Test
+    public void testJsonPutGet() {
+        final IMap<String, HazelcastJsonValue> map = getInstance().getMap(randomMapName());
+        HazelcastJsonValue value = new HazelcastJsonValue("{ \"age\": 4 }");
+        map.put("item1", value);
+        HazelcastJsonValue retrieved = map.get("item1");
+
+        assertEquals(value, retrieved);
+        assertEquals(4, Json.parse(retrieved.toString()).asObject().get("age").asInt());
     }
 
     @Test
@@ -1294,13 +1346,15 @@ public class BasicMapTest extends HazelcastTestSupport {
         // always run map.values on a map proxy backed by the current-version instance otherwise, when running as compatibility
         // test, the TestPagingPredicate will be proxied and fail with a NullPointerException during serialization
         IMap<Integer, Integer> test = instances[instances.length - 1].getMap("github_11489");
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 100; i++) {
             test.put(i, i);
         }
 
-        ObjectMapper objectMapper = new ObjectMapper();
-        String result = objectMapper.writeValueAsString(test.values(new TestPagingPredicate(1000)));
-        assertNotNull(result);
+        Collection<Integer> values = test.values(new TestPagingPredicate(100));
+        Type genericSuperClass = values.getClass().getGenericSuperclass();
+        Type actualType = ((ParameterizedType) genericSuperClass).getActualTypeArguments()[0];
+        // Raw class is expected. ParameterizedType-s cause troubles to Jackson serializer.
+        assertInstanceOf(Class.class, actualType);
     }
 
     private static class TestPagingPredicate extends PagingPredicate {

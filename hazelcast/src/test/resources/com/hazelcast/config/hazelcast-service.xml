@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  ~ Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+  ~ Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
   ~
   ~ Licensed under the Apache License, Version 2.0 (the "License");
   ~ you may not use this file except in compliance with the License.
@@ -51,6 +51,9 @@
                     <s:string-prop>prop1</s:string-prop>
                     <s:int-prop>123</s:int-prop>
                     <s:bool-prop>true</s:bool-prop>
+                    <s:complex-prop an-attribute="attr-value">
+                        <s:nested-prop>nested-prop-value</s:nested-prop>
+                    </s:complex-prop>
                 </s:my-service>
             </configuration>
         </service>

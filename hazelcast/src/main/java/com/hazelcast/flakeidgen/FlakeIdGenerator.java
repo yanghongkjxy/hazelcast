@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 
 package com.hazelcast.flakeidgen;
 
+import com.hazelcast.core.HazelcastException;
 import com.hazelcast.core.IdGenerator;
-import com.hazelcast.flakeidgen.impl.NodeIdOutOfRangeException;
 import com.hazelcast.internal.cluster.ClusterService;
 
 /**
@@ -64,7 +64,7 @@ public interface FlakeIdGenerator extends IdGenerator {
      *
      * @return new cluster-wide unique ID
      *
-     * @throws NodeIdOutOfRangeException if node ID for all members in the cluster is out of valid range.
+     * @throws HazelcastException if node ID for all members in the cluster is out of valid range.
      *      See "Node ID overflow" in {@link FlakeIdGenerator class documentation} for more details.
      * @throws UnsupportedOperationException if the cluster version is below 3.10
      */

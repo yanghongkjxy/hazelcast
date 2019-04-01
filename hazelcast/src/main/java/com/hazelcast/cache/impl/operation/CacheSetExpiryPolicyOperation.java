@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ public class CacheSetExpiryPolicyOperation extends CacheOperation
 
     private List<Data> keys;
     private Data expiryPolicy;
+    private transient boolean response;
 
     public CacheSetExpiryPolicyOperation() {
 
@@ -50,7 +51,7 @@ public class CacheSetExpiryPolicyOperation extends CacheOperation
         if (recordStore == null) {
             return;
         }
-        recordStore.setExpiryPolicy(keys, expiryPolicy, getCallerUuid());
+        response = recordStore.setExpiryPolicy(keys, expiryPolicy, getCallerUuid());
     }
 
     @Override
@@ -62,6 +63,11 @@ public class CacheSetExpiryPolicyOperation extends CacheOperation
                 publishWanUpdate(key, record);
             }
         }
+    }
+
+    @Override
+    public Object getResponse() {
+        return response;
     }
 
     @Override

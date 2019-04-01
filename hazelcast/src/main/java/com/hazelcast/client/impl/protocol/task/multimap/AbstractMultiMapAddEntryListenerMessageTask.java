@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.hazelcast.client.impl.protocol.task.multimap;
 
 import com.hazelcast.client.impl.protocol.ClientMessage;
 import com.hazelcast.client.impl.protocol.task.AbstractCallableMessageTask;
+import com.hazelcast.client.impl.protocol.task.ListenerMessageTask;
 import com.hazelcast.core.EntryAdapter;
 import com.hazelcast.core.EntryEvent;
 import com.hazelcast.core.EntryEventType;
@@ -32,7 +33,8 @@ import com.hazelcast.security.permission.MultiMapPermission;
 
 import java.security.Permission;
 
-public abstract class AbstractMultiMapAddEntryListenerMessageTask<P> extends AbstractCallableMessageTask<P> {
+public abstract class AbstractMultiMapAddEntryListenerMessageTask<P> extends AbstractCallableMessageTask<P>
+        implements ListenerMessageTask {
 
     public AbstractMultiMapAddEntryListenerMessageTask(ClientMessage clientMessage, Node node, Connection connection) {
         super(clientMessage, node, connection);

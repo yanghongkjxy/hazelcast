@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ import java.util.concurrent.TimeUnit;
 import static com.hazelcast.util.ThreadUtil.createThreadPoolName;
 import static java.lang.Thread.currentThread;
 
-@SuppressWarnings("checkstyle:classfanoutcomplexity")
+@SuppressWarnings({"checkstyle:classfanoutcomplexity", "checkstyle:methodcount"})
 public final class ExecutionServiceImpl implements InternalExecutionService {
 
     private static final int CORE_POOL_SIZE = 3;
@@ -66,6 +66,7 @@ public final class ExecutionServiceImpl implements InternalExecutionService {
     private static final long AWAIT_TIME = 3;
     private static final int POOL_MULTIPLIER = 2;
     private static final int QUEUE_MULTIPLIER = 100000;
+    private static final int ASYNC_QUEUE_CAPACITY = 100000;
     private static final int OFFLOADABLE_QUEUE_CAPACITY = 100000;
 
     private final NodeEngineImpl nodeEngine;
@@ -90,7 +91,7 @@ public final class ExecutionServiceImpl implements InternalExecutionService {
                 public ManagedExecutorService createNew(String name) {
                     ExecutorConfig config = nodeEngine.getConfig().findExecutorConfig(name);
                     int queueCapacity = config.getQueueCapacity() <= 0 ? Integer.MAX_VALUE : config.getQueueCapacity();
-                    return createExecutor(name, config.getPoolSize(), queueCapacity, ExecutorType.CACHED);
+                    return createExecutor(name, config.getPoolSize(), queueCapacity, ExecutorType.CACHED, null);
                 }
             };
 
@@ -99,7 +100,7 @@ public final class ExecutionServiceImpl implements InternalExecutionService {
                 @Override
                 public ManagedExecutorService createNew(String name) {
                     DurableExecutorConfig cfg = nodeEngine.getConfig().findDurableExecutorConfig(name);
-                    return createExecutor(name, cfg.getPoolSize(), Integer.MAX_VALUE, ExecutorType.CACHED);
+                    return createExecutor(name, cfg.getPoolSize(), Integer.MAX_VALUE, ExecutorType.CACHED, null);
                 }
             };
 
@@ -108,7 +109,7 @@ public final class ExecutionServiceImpl implements InternalExecutionService {
                 @Override
                 public ManagedExecutorService createNew(String name) {
                     ScheduledExecutorConfig cfg = nodeEngine.getConfig().findScheduledExecutorConfig(name);
-                    return createExecutor(name, cfg.getPoolSize(), Integer.MAX_VALUE, ExecutorType.CACHED);
+                    return createExecutor(name, cfg.getPoolSize(), Integer.MAX_VALUE, ExecutorType.CACHED, null);
                 }
             };
 
@@ -143,10 +144,11 @@ public final class ExecutionServiceImpl implements InternalExecutionService {
                 singleExecutorThreadFactory,
                 nodeEngine.getProperties().getBoolean(GroupProperty.TASK_SCHEDULER_REMOVE_ON_CANCEL));
 
-        int coreSize = RuntimeAvailableProcessors.get();
+        int coreSize = Math.max(RuntimeAvailableProcessors.get(), 2);
         // default executors
         register(SYSTEM_EXECUTOR, coreSize, Integer.MAX_VALUE, ExecutorType.CACHED);
         register(SCHEDULED_EXECUTOR, coreSize * POOL_MULTIPLIER, coreSize * QUEUE_MULTIPLIER, ExecutorType.CACHED);
+        register(ASYNC_EXECUTOR, coreSize, ASYNC_QUEUE_CAPACITY, ExecutorType.CONCRETE);
         register(OFFLOADABLE_EXECUTOR, coreSize, OFFLOADABLE_QUEUE_CAPACITY, ExecutorType.CACHED);
         this.globalTaskScheduler = getTaskScheduler(SCHEDULED_EXECUTOR);
 
@@ -162,6 +164,18 @@ public final class ExecutionServiceImpl implements InternalExecutionService {
 
     @Override
     public ManagedExecutorService register(String name, int defaultPoolSize, int defaultQueueCapacity, ExecutorType type) {
+        return register(name, defaultPoolSize, defaultQueueCapacity, type, null);
+    }
+
+    @Override
+    public ManagedExecutorService register(String name, int defaultPoolSize,
+                                           int defaultQueueCapacity, ThreadFactory threadFactory) {
+        return register(name, defaultPoolSize, defaultQueueCapacity, ExecutorType.CONCRETE, threadFactory);
+    }
+
+    private ManagedExecutorService register(String name, int defaultPoolSize,
+                                            int defaultQueueCapacity, ExecutorType type, ThreadFactory threadFactory) {
+
         ExecutorConfig config = nodeEngine.getConfig().getExecutorConfigs().get(name);
 
         int poolSize = defaultPoolSize;
@@ -175,27 +189,33 @@ public final class ExecutionServiceImpl implements InternalExecutionService {
             }
         }
 
-        ManagedExecutorService executor = createExecutor(name, poolSize, queueCapacity, type);
+        ManagedExecutorService executor = createExecutor(name, poolSize, queueCapacity, type, threadFactory);
         if (executors.putIfAbsent(name, executor) != null) {
             throw new IllegalArgumentException("ExecutorService['" + name + "'] already exists!");
         }
 
-        metricsRegistry.scanAndRegister(executor, "internal-executor" + name + "]");
+        metricsRegistry.scanAndRegister(executor, "internal-executor[" + name + "]");
 
         return executor;
     }
 
-    private ManagedExecutorService createExecutor(String name, int poolSize, int queueCapacity, ExecutorType type) {
+    private ManagedExecutorService createExecutor(String name, int poolSize, int queueCapacity,
+                                                  ExecutorType type, ThreadFactory threadFactory) {
         ManagedExecutorService executor;
         if (type == ExecutorType.CACHED) {
+            if (threadFactory != null) {
+                throw new IllegalArgumentException("Cached executor can not be used with external thread factory");
+            }
             executor = new CachedExecutorServiceDelegate(nodeEngine, name, cachedExecutorService, poolSize, queueCapacity);
         } else if (type == ExecutorType.CONCRETE) {
-            Node node = nodeEngine.getNode();
-            ClassLoader classLoader = nodeEngine.getConfigClassLoader();
-            String hzName = node.getNodeEngine().getHazelcastInstance().getName();
-            String internalName = name.startsWith("hz:") ? name.substring(BEGIN_INDEX) : name;
-            String threadNamePrefix = createThreadPoolName(hzName, internalName);
-            PoolExecutorThreadFactory threadFactory = new PoolExecutorThreadFactory(threadNamePrefix, classLoader);
+            if (threadFactory == null) {
+                ClassLoader classLoader = nodeEngine.getConfigClassLoader();
+                String hzName = nodeEngine.getHazelcastInstance().getName();
+                String internalName = name.startsWith("hz:") ? name.substring(BEGIN_INDEX) : name;
+                String threadNamePrefix = createThreadPoolName(hzName, internalName);
+                threadFactory = new PoolExecutorThreadFactory(threadNamePrefix, classLoader);
+            }
+
             NamedThreadPoolExecutor pool = new NamedThreadPoolExecutor(name, poolSize, poolSize,
                     KEEP_ALIVE_TIME, TimeUnit.SECONDS,
                     new LinkedBlockingQueue<Runnable>(queueCapacity),

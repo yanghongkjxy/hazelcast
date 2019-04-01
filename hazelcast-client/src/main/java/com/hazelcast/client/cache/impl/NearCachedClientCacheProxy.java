@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -322,6 +322,17 @@ public class NearCachedClientCacheProxy<K, V> extends ClientCacheProxy<K, V> {
     }
 
     @Override
+    protected boolean setExpiryPolicyInternal(K key, ExpiryPolicy expiryPolicy) {
+        boolean result = super.setExpiryPolicyInternal(key, expiryPolicy);
+        if (serializeKeys) {
+            invalidateNearCache(toData(key));
+        } else {
+            invalidateNearCache(key);
+        }
+        return result;
+    }
+
+    @Override
     protected void putAllInternal(Map<? extends K, ? extends V> map, ExpiryPolicy expiryPolicy, Map<Object, Data> keyMap,
                                   List<Map.Entry<Data, Data>>[] entriesPerPartition, long startNanos) {
         try {
@@ -338,11 +349,11 @@ public class NearCachedClientCacheProxy<K, V> extends ClientCacheProxy<K, V> {
 
     private void invalidate(Set<? extends K> keys, Set<Data> keysData) {
         if (serializeKeys) {
-            for (Data key: keysData) {
+            for (Data key : keysData) {
                 invalidateNearCache(key);
             }
         } else {
-            for (K key: keys) {
+            for (K key : keys) {
                 invalidateNearCache(key);
             }
         }
@@ -500,8 +511,7 @@ public class NearCachedClientCacheProxy<K, V> extends ClientCacheProxy<K, V> {
     @SuppressWarnings("unchecked")
     private void cacheOrInvalidate(Object key, Data keyData, V value, Data valueData) {
         if (cacheOnUpdate) {
-            V valueToStore = (V) nearCache.selectToSave(valueData, value);
-            nearCache.put(key, keyData, valueToStore);
+            nearCache.put(key, keyData, value, valueData);
         } else {
             invalidateNearCache(key);
         }
@@ -549,7 +559,7 @@ public class NearCachedClientCacheProxy<K, V> extends ClientCacheProxy<K, V> {
 
     private void releaseRemainingReservedKeys(Map<Object, Long> reservedKeys) {
         for (Object key : reservedKeys.keySet()) {
-            nearCache.remove(key);
+            nearCache.invalidate(key);
         }
     }
 

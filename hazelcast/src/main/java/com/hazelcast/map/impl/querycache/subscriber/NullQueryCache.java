@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import com.hazelcast.core.IMap;
 import com.hazelcast.map.listener.MapListener;
 import com.hazelcast.query.Predicate;
 import com.hazelcast.query.impl.Indexes;
+import com.hazelcast.query.impl.getters.Extractors;
 
 import java.util.Collection;
 import java.util.Map;
@@ -29,6 +30,7 @@ import java.util.Set;
 /**
  * Object for neutral {@code InternalQueryCache} implementation.
  */
+@SuppressWarnings("checkstyle:methodcount")
 public final class NullQueryCache implements InternalQueryCache {
 
     /**
@@ -40,11 +42,16 @@ public final class NullQueryCache implements InternalQueryCache {
     }
 
     @Override
-    public void setInternal(Object key, Object value, boolean callDelegate, EntryEventType eventType) {
+    public void set(Object key, Object value, EntryEventType eventType) {
     }
 
     @Override
-    public void deleteInternal(Object key, boolean callDelegate, EntryEventType eventType) {
+    public void prepopulate(Object key, Object value) {
+
+    }
+
+    @Override
+    public void delete(Object key, EntryEventType eventType) {
     }
 
     @Override
@@ -72,8 +79,28 @@ public final class NullQueryCache implements InternalQueryCache {
     }
 
     @Override
+    public String getPublisherListenerId() {
+        return null;
+    }
+
+    @Override
     public String getCacheId() {
         return null;
+    }
+
+    @Override
+    public boolean reachedMaxCapacity() {
+        return false;
+    }
+
+    @Override
+    public Extractors getExtractors() {
+        return null;
+    }
+
+    @Override
+    public void recreate() {
+
     }
 
     @Override

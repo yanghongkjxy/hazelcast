@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,36 +17,29 @@
 package com.hazelcast.client.spi.impl.discovery;
 
 import com.hazelcast.client.connection.AddressProvider;
-import com.hazelcast.logging.ILogger;
-import com.hazelcast.logging.LoggingService;
-import com.hazelcast.nio.Address;
+import com.hazelcast.client.connection.Addresses;
 import com.hazelcast.spi.discovery.DiscoveryNode;
 import com.hazelcast.spi.discovery.integration.DiscoveryService;
-
-import java.util.ArrayList;
-import java.util.Collection;
 
 import static com.hazelcast.util.Preconditions.checkNotNull;
 
 public class DiscoveryAddressProvider
         implements AddressProvider {
 
-    private final ILogger logger;
     private final DiscoveryService discoveryService;
 
-    public DiscoveryAddressProvider(DiscoveryService discoveryService, LoggingService loggingService) {
+    public DiscoveryAddressProvider(DiscoveryService discoveryService) {
         this.discoveryService = discoveryService;
-        logger = loggingService.getLogger(DiscoveryAddressProvider.class);
     }
 
     @Override
-    public Collection<Address> loadAddresses() {
+    public Addresses loadAddresses() {
         Iterable<DiscoveryNode> discoveredNodes = checkNotNull(discoveryService.discoverNodes(),
                 "Discovered nodes cannot be null!");
 
-        Collection<Address> possibleMembers = new ArrayList<Address>();
+        Addresses possibleMembers = new Addresses();
         for (DiscoveryNode discoveryNode : discoveredNodes) {
-            possibleMembers.add(discoveryNode.getPrivateAddress());
+            possibleMembers.primary().add(discoveryNode.getPrivateAddress());
         }
         return possibleMembers;
     }

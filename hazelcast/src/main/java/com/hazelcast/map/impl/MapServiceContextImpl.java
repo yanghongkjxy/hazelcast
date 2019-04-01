@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,12 +20,15 @@ import com.hazelcast.cluster.ClusterState;
 import com.hazelcast.config.InMemoryFormat;
 import com.hazelcast.config.MapConfig;
 import com.hazelcast.config.MergePolicyConfig;
+import com.hazelcast.config.MetadataPolicy;
 import com.hazelcast.config.PartitioningStrategyConfig;
 import com.hazelcast.core.PartitioningStrategy;
 import com.hazelcast.internal.eviction.ExpirationManager;
 import com.hazelcast.internal.serialization.InternalSerializationService;
 import com.hazelcast.internal.util.InvocationUtil;
 import com.hazelcast.internal.util.LocalRetryableExecution;
+import com.hazelcast.internal.util.comparators.ValueComparator;
+import com.hazelcast.internal.util.comparators.ValueComparatorUtil;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.map.MapInterceptor;
 import com.hazelcast.map.impl.event.MapEventPublisher;
@@ -46,8 +49,8 @@ import com.hazelcast.map.impl.query.AggregationResult;
 import com.hazelcast.map.impl.query.AggregationResultProcessor;
 import com.hazelcast.map.impl.query.CallerRunsAccumulationExecutor;
 import com.hazelcast.map.impl.query.CallerRunsPartitionScanExecutor;
-import com.hazelcast.map.impl.query.MapQueryEngine;
-import com.hazelcast.map.impl.query.MapQueryEngineImpl;
+import com.hazelcast.map.impl.query.QueryEngine;
+import com.hazelcast.map.impl.query.QueryEngineImpl;
 import com.hazelcast.map.impl.query.ParallelAccumulationExecutor;
 import com.hazelcast.map.impl.query.ParallelPartitionScanExecutor;
 import com.hazelcast.map.impl.query.PartitionScanExecutor;
@@ -58,12 +61,10 @@ import com.hazelcast.map.impl.query.QueryRunner;
 import com.hazelcast.map.impl.query.ResultProcessorRegistry;
 import com.hazelcast.map.impl.querycache.NodeQueryCacheContext;
 import com.hazelcast.map.impl.querycache.QueryCacheContext;
-import com.hazelcast.map.impl.record.DataRecordComparator;
-import com.hazelcast.map.impl.record.ObjectRecordComparator;
 import com.hazelcast.map.impl.record.Record;
-import com.hazelcast.map.impl.record.RecordComparator;
 import com.hazelcast.map.impl.recordstore.DefaultRecordStore;
-import com.hazelcast.map.impl.recordstore.EventJournalUpdaterRecordStoreMutationObserver;
+import com.hazelcast.map.impl.recordstore.EventJournalWriterRecordStoreMutationObserver;
+import com.hazelcast.map.impl.recordstore.JsonMetadataRecordStoreMutationObserver;
 import com.hazelcast.map.impl.recordstore.RecordStore;
 import com.hazelcast.map.impl.recordstore.RecordStoreMutationObserver;
 import com.hazelcast.map.listener.MapPartitionLostListener;
@@ -93,7 +94,6 @@ import com.hazelcast.util.function.Predicate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -130,8 +130,6 @@ class MapServiceContextImpl implements MapServiceContext {
     protected final AtomicReference<Collection<Integer>> ownedPartitions = new AtomicReference<Collection<Integer>>();
     protected final IndexProvider indexProvider = new DefaultIndexProvider();
     protected final ContextMutexFactory contextMutexFactory = new ContextMutexFactory();
-    protected final Map<InMemoryFormat, RecordComparator> recordComparatorMap
-            = new HashMap<InMemoryFormat, RecordComparator>();
 
     /**
      * Per node global write behind queue item counter.
@@ -150,7 +148,7 @@ class MapServiceContextImpl implements MapServiceContext {
     protected final MapNearCacheManager mapNearCacheManager;
     protected final LocalMapStatsProvider localMapStatsProvider;
     protected final MergePolicyProvider mergePolicyProvider;
-    protected final MapQueryEngine mapQueryEngine;
+    protected final QueryEngine queryEngine;
     protected final QueryRunner mapQueryRunner;
     protected final PartitionScanRunner partitionScanRunner;
     protected final QueryOptimizer queryOptimizer;
@@ -172,7 +170,7 @@ class MapServiceContextImpl implements MapServiceContext {
         this.mapConstructor = createMapConstructor();
         this.queryCacheContext = new NodeQueryCacheContext(this);
         this.partitionContainers = createPartitionContainers();
-        this.clearExpiredRecordsTask = new MapClearExpiredRecordsTask(nodeEngine, partitionContainers);
+        this.clearExpiredRecordsTask = new MapClearExpiredRecordsTask(partitionContainers, nodeEngine);
         this.expirationManager = new ExpirationManager(clearExpiredRecordsTask, nodeEngine);
         this.mapNearCacheManager = createMapNearCacheManager();
         this.localMapStatsProvider = createLocalMapStatsProvider();
@@ -182,14 +180,12 @@ class MapServiceContextImpl implements MapServiceContext {
         this.queryOptimizer = newOptimizer(nodeEngine.getProperties());
         this.resultProcessorRegistry = createResultProcessorRegistry(serializationService);
         this.partitionScanRunner = createPartitionScanRunner();
-        this.mapQueryEngine = createMapQueryEngine();
+        this.queryEngine = createMapQueryEngine();
         this.mapQueryRunner = createMapQueryRunner(nodeEngine, queryOptimizer, resultProcessorRegistry, partitionScanRunner);
         this.eventService = nodeEngine.getEventService();
         this.operationProviders = createOperationProviders();
         this.partitioningStrategyFactory = new PartitioningStrategyFactory(nodeEngine.getConfigClassLoader());
         this.logger = nodeEngine.getLogger(getClass());
-
-        initRecordComparators();
     }
 
     ConstructorFunction<String, MapContainer> createMapConstructor() {
@@ -217,12 +213,6 @@ class MapServiceContextImpl implements MapServiceContext {
         return new MapEventPublisherImpl(this);
     }
 
-    // this method is overridden in another context
-    void initRecordComparators() {
-        recordComparatorMap.put(InMemoryFormat.OBJECT, new ObjectRecordComparator(serializationService));
-        recordComparatorMap.put(InMemoryFormat.BINARY, new DataRecordComparator(serializationService));
-    }
-
     private MapEventJournal createEventJournal() {
         return new RingbufferMapEventJournalImpl(getNodeEngine(), this);
     }
@@ -231,8 +221,8 @@ class MapServiceContextImpl implements MapServiceContext {
         return new LocalMapStatsProvider(this);
     }
 
-    private MapQueryEngineImpl createMapQueryEngine() {
-        return new MapQueryEngineImpl(this);
+    private QueryEngineImpl createMapQueryEngine() {
+        return new QueryEngineImpl(this);
     }
 
     private PartitionScanRunner createPartitionScanRunner() {
@@ -283,11 +273,6 @@ class MapServiceContextImpl implements MapServiceContext {
     private PartitionContainer[] createPartitionContainers() {
         int partitionCount = nodeEngine.getPartitionService().getPartitionCount();
         return new PartitionContainer[partitionCount];
-    }
-
-    @Override
-    public RecordComparator getRecordComparator(InMemoryFormat inMemoryFormat) {
-        return recordComparatorMap.get(inMemoryFormat);
     }
 
     @Override
@@ -463,6 +448,7 @@ class MapServiceContextImpl implements MapServiceContext {
         removeAllRecordStoresOfAllMaps(true, false);
         mapNearCacheManager.shutdown();
         mapContainers.clear();
+        expirationManager.onShutdown();
     }
 
     @Override
@@ -547,8 +533,8 @@ class MapServiceContextImpl implements MapServiceContext {
     }
 
     @Override
-    public MapQueryEngine getMapQueryEngine(String mapName) {
-        return mapQueryEngine;
+    public QueryEngine getQueryEngine(String mapName) {
+        return queryEngine;
     }
 
     @Override
@@ -867,15 +853,31 @@ class MapServiceContextImpl implements MapServiceContext {
     public Collection<RecordStoreMutationObserver<Record>> createRecordStoreMutationObservers(String mapName, int partitionId) {
         Collection<RecordStoreMutationObserver<Record>> observers = new LinkedList<RecordStoreMutationObserver<Record>>();
         addEventJournalUpdaterObserver(observers, mapName, partitionId);
+        addMetadataInitializerObserver(observers, mapName, partitionId);
 
         return observers;
     }
 
+    protected void addMetadataInitializerObserver(Collection<RecordStoreMutationObserver<Record>> observers,
+                                                  String mapName, int partitionId) {
+        MapContainer mapContainer = getMapContainer(mapName);
+        MetadataPolicy policy = mapContainer.getMapConfig().getMetadataPolicy();
+        if (policy == MetadataPolicy.CREATE_ON_UPDATE) {
+            RecordStoreMutationObserver<Record> observer = new JsonMetadataRecordStoreMutationObserver(serializationService,
+                    JsonMetadataInitializer.INSTANCE);
+            observers.add(observer);
+        }
+    }
+
     private void addEventJournalUpdaterObserver(Collection<RecordStoreMutationObserver<Record>> observers, String mapName, int
             partitionId) {
-        RecordStoreMutationObserver<Record> observer = new EventJournalUpdaterRecordStoreMutationObserver(getEventJournal(),
+        RecordStoreMutationObserver<Record> observer = new EventJournalWriterRecordStoreMutationObserver(getEventJournal(),
                 getMapContainer(mapName), partitionId);
         observers.add(observer);
     }
 
+    @Override
+    public ValueComparator getValueComparatorOf(InMemoryFormat inMemoryFormat) {
+        return ValueComparatorUtil.getValueComparatorOf(inMemoryFormat);
+    }
 }

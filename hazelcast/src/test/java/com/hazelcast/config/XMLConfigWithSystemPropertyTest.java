@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,10 +34,11 @@ import static com.hazelcast.config.XMLConfigBuilderTest.HAZELCAST_END_TAG;
 import static com.hazelcast.config.XMLConfigBuilderTest.HAZELCAST_START_TAG;
 import static java.io.File.createTempFile;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
 
 /**
  * These tests manipulate system properties, therefore they must be run in serial mode.
+ *
+ * @see YamlConfigWithSystemPropertyTest
  */
 @RunWith(HazelcastSerialClassRunner.class)
 @Category(QuickTest.class)
@@ -52,7 +53,6 @@ public class XMLConfigWithSystemPropertyTest {
     @Test
     public void testConfigurationWithFile() throws Exception {
         URL url = getClass().getClassLoader().getResource("hazelcast-default.xml");
-        assertNotNull(url);
         String decodedURL = URLDecoder.decode(url.getFile(), "UTF-8");
         System.setProperty("hazelcast.config", decodedURL);
         Config config = new XmlConfigBuilder().build();
@@ -64,7 +64,7 @@ public class XMLConfigWithSystemPropertyTest {
     @Test(expected = HazelcastException.class)
     @SuppressWarnings("ResultOfMethodCallIgnored")
     public void loadingThroughSystemProperty_nonExistingFile() throws Exception {
-        File file = createTempFile("foo", "bar");
+        File file = createTempFile("foo", ".xml");
         file.delete();
         System.setProperty("hazelcast.config", file.getAbsolutePath());
         new XmlConfigBuilder();
@@ -79,7 +79,7 @@ public class XMLConfigWithSystemPropertyTest {
                 + "    </group>"
                 + HAZELCAST_END_TAG;
 
-        File file = createTempFile("foo", "bar");
+        File file = createTempFile("foo", ".xml");
         file.deleteOnExit();
         PrintWriter writer = new PrintWriter(file, "UTF-8");
         writer.println(xml);
@@ -94,7 +94,7 @@ public class XMLConfigWithSystemPropertyTest {
 
     @Test(expected = HazelcastException.class)
     public void loadingThroughSystemProperty_nonExistingClasspathResource() {
-        System.setProperty("hazelcast.config", "classpath:idontexist");
+        System.setProperty("hazelcast.config", "classpath:idontexist.xml");
         new XmlConfigBuilder();
     }
 

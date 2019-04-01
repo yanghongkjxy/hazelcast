@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static com.hazelcast.config.ConfigAccessor.getActiveMemberNetworkConfig;
 import static com.hazelcast.util.EmptyStatement.ignore;
 
 public final class MulticastService implements Runnable {
@@ -85,7 +86,7 @@ public final class MulticastService implements Runnable {
         this.sendOutput = node.getSerializationService().createObjectDataOutput(SEND_OUTPUT_SIZE);
 
         Config config = node.getConfig();
-        MulticastConfig multicastConfig = config.getNetworkConfig().getJoin().getMulticastConfig();
+        MulticastConfig multicastConfig = getActiveMemberNetworkConfig(config).getJoin().getMulticastConfig();
         this.datagramPacketSend = new DatagramPacket(new byte[0], 0, InetAddress.getByName(multicastConfig.getMulticastGroup()),
                 multicastConfig.getMulticastPort());
         this.datagramPacketReceive = new DatagramPacket(new byte[DATAGRAM_BUFFER_SIZE], DATAGRAM_BUFFER_SIZE);
@@ -96,7 +97,7 @@ public final class MulticastService implements Runnable {
     }
 
     public static MulticastService createMulticastService(Address bindAddress, Node node, Config config, ILogger logger) {
-        JoinConfig join = config.getNetworkConfig().getJoin();
+        JoinConfig join = getActiveMemberNetworkConfig(config).getJoin();
         MulticastConfig multicastConfig = join.getMulticastConfig();
         if (!multicastConfig.isEnabled()) {
             return null;
@@ -122,7 +123,7 @@ public final class MulticastService implements Runnable {
                     // bind address, then we rely on Default Network Interface.
                     logger.warning("Hazelcast is bound to " + bindAddress.getHost() + " and loop-back mode is disabled in "
                             + "the configuration. This could cause multicast auto-discovery issues and render it unable to work. "
-                            + "Check you network connectivity, try to enable the loopback mode and/or "
+                            + "Check your network connectivity, try to enable the loopback mode and/or "
                             + "force -Djava.net.preferIPv4Stack=true on your JVM.");
                 }
             } catch (Exception e) {
@@ -283,7 +284,14 @@ public final class MulticastService implements Runnable {
                 multicastSocket.send(datagramPacketSend);
                 out.clear();
             } catch (IOException e) {
-                logger.warning("You probably have too long Hazelcast configuration!", e);
+                // usually catching EPERM errno
+                // see https://github.com/hazelcast/hazelcast/issues/7198
+                // For details about the causes look at the following discussion:
+                // https://groups.google.com/forum/#!msg/comp.protocols.tcp-ip/Qou9Sfgr77E/mVQAPaeI-VUJ
+                logger.warning("Sending multicast datagram failed. Exception message saying the operation is not permitted "
+                        + "usually means the underlying OS is not able to send packets at a given pace. "
+                        + "It can be caused by starting several hazelcast members in parallel when the members send "
+                        + "their join message nearly at the same time.", e);
             }
         }
     }

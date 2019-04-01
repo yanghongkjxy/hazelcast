@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import static com.hazelcast.util.Preconditions.checkNotNull;
  */
 @SuppressWarnings("WeakerAccess")
 public abstract class AbstractBasicConfig<T extends AbstractBasicConfig>
-        implements SplitBrainMergeTypeProvider, IdentifiedDataSerializable {
+        implements SplitBrainMergeTypeProvider, IdentifiedDataSerializable, NamedConfig {
 
     protected String name;
     protected String quorumName;

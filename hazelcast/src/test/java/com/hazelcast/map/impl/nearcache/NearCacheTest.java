@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -132,6 +132,8 @@ public class NearCacheTest extends NearCacheTestSupport {
     protected Config getConfig() {
         Config config = super.getConfig();
         config.setProperty(GroupProperty.MAP_INVALIDATION_MESSAGE_BATCH_ENABLED.getName(), valueOf(batchInvalidationEnabled));
+        config.setProperty(NearCache.PROP_EXPIRATION_TASK_INITIAL_DELAY_SECONDS, "0");
+        config.setProperty(NearCache.PROP_EXPIRATION_TASK_PERIOD_SECONDS, "1");
         return config;
     }
 

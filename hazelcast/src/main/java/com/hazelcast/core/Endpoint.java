@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,9 +28,9 @@ import java.net.SocketAddress;
 public interface Endpoint {
 
     /**
-     * Returns the unique UUID for this endpoint.
+     * Returns the UUID of this endpoint
      *
-     * @return the unique UUID for this endpoint
+     * @return the UUID of this endpoint
      */
     String getUuid();
 
@@ -40,4 +40,5 @@ public interface Endpoint {
      * @return the socket address for this endpoint
      */
     SocketAddress getSocketAddress();
+
 }

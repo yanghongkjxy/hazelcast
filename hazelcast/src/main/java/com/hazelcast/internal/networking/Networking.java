@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package com.hazelcast.internal.networking;
 
+import com.hazelcast.instance.EndpointQualifier;
 import com.hazelcast.internal.networking.nio.NioNetworking;
 
 import java.io.IOException;
@@ -45,13 +46,17 @@ public interface Networking {
      * In the future we need to think about passing the socket channel because
      * it binds Networking to tcp and this is not desirable.
      *
-     * @param socketChannel the socketChannel to register
-     * @param clientMode    if the channel is made in clientMode or server mode
+     * @param endpointQualifier          the endpoint qualifier for this server socket
+     * @param channelInitializerProvider the class used for initializing the Channel after creation
+     * @param socketChannel              the socketChannel to register
+     * @param clientMode                 if the channel is made in clientMode or server mode
      * @return the created Channel
      * @throws IOException when something failed while registering the
      *                     socketChannel
      */
-    Channel register(SocketChannel socketChannel, boolean clientMode) throws IOException;
+    Channel register(EndpointQualifier endpointQualifier, ChannelInitializerProvider channelInitializerProvider,
+                     SocketChannel socketChannel,
+                     boolean clientMode) throws IOException;
 
     /**
      * Starts Networking.

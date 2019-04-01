@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,6 @@
 
 package com.hazelcast.internal.serialization.impl;
 
-import com.hazelcast.nio.ClassLoaderUtil;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.serialization.DataSerializable;
 import com.hazelcast.nio.serialization.impl.Versioned;
@@ -67,7 +66,7 @@ import static org.mockito.Mockito.when;
  * in.getVersion.isUnknownOrLessThan(CURRENT).
  */
 @RunWith(PowerMockRunner.class)
-@PowerMockIgnore({"javax.net.ssl.*", "javax.security.*"})
+@PowerMockIgnore({"javax.net.ssl.*", "javax.security.*", "javax.management.*"})
 @PrepareForTest(Version.class)
 @Category({QuickTest.class, ParallelTest.class})
 public class VersionedInCurrentVersionTest {
@@ -132,7 +131,7 @@ public class VersionedInCurrentVersionTest {
 
     private <T extends Versioned> T createInstance(Class<T> klass) {
         try {
-            return ClassLoaderUtil.newInstance(klass, null, klass.getName());
+            return klass.newInstance();
         } catch (Exception e) {
             return null;
         }

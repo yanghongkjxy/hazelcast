@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import com.hazelcast.test.ChangeLoggingRule;
 import com.hazelcast.test.HazelcastSerialClassRunner;
 import com.hazelcast.test.annotation.ParallelTest;
 import com.hazelcast.test.annotation.QuickTest;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
@@ -89,7 +90,7 @@ public class MigrationInvocationsSafetyTest extends PartitionCorrectnessTestSupp
         dropOperationsBetween(nextMaster, singletonList(initialMaster), F_ID, singletonList(ASSIGN_PARTITIONS));
         dropOperationsBetween(slave1, singletonList(initialMaster), F_ID, singletonList(ASSIGN_PARTITIONS));
 
-        warmUpPartitions(initialMaster, slave2, slave3);
+        ensurePartitionsInitialized(initialMaster, slave2, slave3);
 
         final int initialPartitionStateVersion = getPartitionService(initialMaster).getPartitionStateVersion();
         assertEquals(initialPartitionStateVersion, getPartitionService(slave2).getPartitionStateVersion());
@@ -139,7 +140,7 @@ public class MigrationInvocationsSafetyTest extends PartitionCorrectnessTestSupp
         dropOperationsBetween(nextMaster, singletonList(initialMaster), F_ID, singletonList(ASSIGN_PARTITIONS));
         dropOperationsBetween(slave1, singletonList(initialMaster), F_ID, singletonList(ASSIGN_PARTITIONS));
 
-        warmUpPartitions(initialMaster, slave2, slave3);
+        ensurePartitionsInitialized(initialMaster, slave2, slave3);
 
         final int initialPartitionStateVersion = getPartitionService(initialMaster).getPartitionStateVersion();
         assertEquals(initialPartitionStateVersion, getPartitionService(slave2).getPartitionStateVersion());
@@ -274,6 +275,11 @@ public class MigrationInvocationsSafetyTest extends PartitionCorrectnessTestSupp
         // intercept migration complete on destination and drop commit response
         getPartitionServiceImpl(destination).setInternalMigrationListener(new InternalMigrationListener() {
             final AtomicReference<MigrationInfo> committedMigrationInfoRef = new AtomicReference<MigrationInfo>();
+
+            @Override
+            public void onMigrationStart(MigrationParticipant participant, MigrationInfo migrationInfo) {
+               assertClusterStateEventually(ClusterState.ACTIVE, destination);
+            }
 
             @Override
             public void onMigrationCommit(MigrationParticipant participant, MigrationInfo migrationInfo) {
@@ -451,10 +457,26 @@ public class MigrationInvocationsSafetyTest extends PartitionCorrectnessTestSupp
         TestMigrationAwareService service = getNodeEngineImpl(hz).getService(TestMigrationAwareService.SERVICE_NAME);
         List<PartitionMigrationEvent> events = service.getBeforeEvents();
         Set<PartitionMigrationEvent> uniqueEvents = new HashSet<PartitionMigrationEvent>(events);
-        assertEquals(uniqueEvents.size(), events.size());
+        assertEquals("Node: " + getAddress(hz) + ", Events: " + events, uniqueEvents.size(), events.size());
     }
 
     private static InternalPartitionServiceImpl getPartitionServiceImpl(HazelcastInstance hz) {
         return getNode(hz).partitionService;
+    }
+
+    private static void ensurePartitionsInitialized(HazelcastInstance... instances) {
+        warmUpPartitions(instances);
+        for (HazelcastInstance instance : instances) {
+            assertPartitionStateVersionInitialized(instance);
+        }
+    }
+
+    private static void assertPartitionStateVersionInitialized(final HazelcastInstance instance) {
+        assertTrueEventually(new AssertTask() {
+            @Override
+            public void run() {
+                assertThat(getPartitionService(instance).getPartitionStateVersion(), Matchers.greaterThan(0));
+            }
+        });
     }
 }

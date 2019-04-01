@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,15 @@
 
 package com.hazelcast.util;
 
+import com.hazelcast.internal.json.Json;
 import com.hazelcast.internal.json.JsonArray;
 import com.hazelcast.internal.json.JsonObject;
 import com.hazelcast.internal.json.JsonValue;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Map;
 
 /**
  * Utility class to deal with Json.
@@ -276,6 +282,37 @@ public final class JsonUtil {
     }
 
     /**
+     * Transforms the provided {@link JsonObject} int a map of name/value pairs.
+     *
+     * @param object the JSON object
+     * @return map from JSON name to value
+     */
+    public static Map<String, Comparable> fromJsonObject(JsonObject object) {
+        if (object == null || object.isNull() || object.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, Comparable> map = MapUtil.createHashMap(object.size());
+        for (String propertyName : object.names()) {
+            map.put(propertyName, object.get(propertyName).asString());
+        }
+        return map;
+    }
+
+    /**
+     * Transforms the provided map of name/value pairs into a {@link JsonObject}.
+     *
+     * @param map map of JSON name-value pairs
+     * @return the JSON object
+     */
+    public static JsonObject toJsonObject(Map<String, ?> map) {
+        JsonObject properties = new JsonObject();
+        for (Map.Entry<String, ?> property : map.entrySet()) {
+            properties.add(property.getKey(), Json.value(property.getValue().toString()));
+        }
+        return properties;
+    }
+
+    /**
      * Throws IllegalArgumentException if the Json field is not found.
      */
     private static void throwExceptionIfNull(JsonValue value, String field) {
@@ -284,4 +321,50 @@ public final class JsonUtil {
         }
     }
 
+    /**
+     * Returns the JSON representation of the provided {@code value}
+     *
+     * @param value the value to serialize to JSON
+     * @return the serialized value
+     */
+    public static String toJson(Object value) {
+        if (value instanceof String) {
+            return '"' + (String) value + '"';
+        } else if (value instanceof Collection) {
+            return "[" + toJsonCollection((Collection) value) + "]";
+        } else {
+            throw new IllegalArgumentException("Unable to convert " + value + " to JSON");
+        }
+    }
+
+    /**
+     * Serializes a collection of objects into its JSON representation.
+     *
+     * @param objects collection of items to be serialized into JSON
+     * @return the serialized JSON
+     */
+    private static String toJsonCollection(Collection objects) {
+        Iterator iterator = objects.iterator();
+        if (!iterator.hasNext()) {
+            return "";
+        }
+        final Object first = iterator.next();
+        if (!iterator.hasNext()) {
+            return toJson(first);
+        }
+
+        final StringBuilder buf = new StringBuilder();
+        if (first != null) {
+            buf.append(toJson(first));
+        }
+
+        while (iterator.hasNext()) {
+            buf.append(',');
+            final Object obj = iterator.next();
+            if (obj != null) {
+                buf.append(toJson(obj));
+            }
+        }
+        return buf.toString();
+    }
 }

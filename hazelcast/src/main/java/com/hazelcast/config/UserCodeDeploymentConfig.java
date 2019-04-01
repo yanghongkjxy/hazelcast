@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,11 @@
 
 package com.hazelcast.config;
 
-import com.hazelcast.spi.annotation.Beta;
-
 /**
  * Configuration of User Code Deployment. When enabled it allows Hazelcast members to load classes from other cluster
  * members. This simplifies deployment as you do not have to deploy your domain classes into classpath of all
  * cluster members.
  */
-@Beta
 public class UserCodeDeploymentConfig {
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package com.hazelcast.client.impl.operations;
 
 import com.hazelcast.client.impl.ClientDataSerializerHook;
 import com.hazelcast.client.impl.ClientEndpointImpl;
-import com.hazelcast.client.impl.ClientEngineImpl;
+import com.hazelcast.client.impl.ClientEngine;
 import com.hazelcast.core.Client;
 import com.hazelcast.core.ClientType;
 import com.hazelcast.spi.ReadonlyOperation;
@@ -38,7 +38,7 @@ public class GetConnectedClientsOperation extends AbstractClientOperation implem
 
     @Override
     public void run() throws Exception {
-        ClientEngineImpl service = getService();
+        ClientEngine service = getService();
         final Collection<Client> serviceClients = service.getClients();
         this.clients = createHashMap(serviceClients.size());
         for (Client clientEndpoint : serviceClients) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -171,6 +171,7 @@ public class ProxyServiceImpl
         waitWithDeadline(calls, DESTROY_TIMEOUT_SECONDS, TimeUnit.SECONDS, destroyProxyExceptionHandler);
     }
 
+    @Override
     public void destroyLocalDistributedObject(String serviceName, String name, boolean fireEvent) {
         ProxyRegistry registry = registries.get(serviceName);
         if (registry != null) {

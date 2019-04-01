@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -115,7 +115,9 @@ public class MemberMapTest {
     @Test(expected = IllegalArgumentException.class)
     public void create_failsWithDuplicateUuid() {
         MemberImpl member1 = newMember(5000);
-        MemberImpl member2 = new MemberImpl(newAddress(5001), VERSION, false, member1.getUuid());
+        MemberImpl member2 = new MemberImpl.Builder(newAddress(5001))
+                .version(VERSION)
+                .uuid(member1.getUuid()).build();
         MemberMap.createNew(member1, member2);
     }
 
@@ -124,8 +126,14 @@ public class MemberMapTest {
         MemberImpl[] members = newMembers(6);
 
         MemberImpl exclude0 = members[0];
-        MemberImpl exclude1 = new MemberImpl(newAddress(6000), VERSION, false, members[1].getUuid());
-        MemberImpl exclude2 = new MemberImpl(members[2].getAddress(), VERSION, false, newUnsecureUuidString());
+        MemberImpl exclude1 = new MemberImpl.Builder(newAddress(6000))
+                .version(VERSION)
+                .uuid(members[1].getUuid())
+                .build();
+        MemberImpl exclude2 = new MemberImpl.Builder(members[2].getAddress())
+                .version(VERSION)
+                .uuid(newUnsecureUuidString())
+                .build();
 
         MemberMap map = MemberMap.cloneExcluding(MemberMap.createNew(members), exclude0, exclude1, exclude2);
 
@@ -193,7 +201,10 @@ public class MemberMapTest {
     public void cloneAdding_failsWithDuplicateUuid() {
         MemberImpl[] members = newMembers(3);
 
-        MemberImpl member = new MemberImpl(newAddress(6000), VERSION, false, members[1].getUuid());
+        MemberImpl member = new MemberImpl.Builder(newAddress(6000))
+                .version(VERSION)
+                .uuid(members[1].getUuid())
+                .build();
         MemberMap.cloneAdding(MemberMap.createNew(members), member);
     }
 
@@ -368,7 +379,10 @@ public class MemberMapTest {
     }
 
     static MemberImpl newMember(int port) {
-        return new MemberImpl(newAddress(port), VERSION, false, newUnsecureUuidString());
+        return new MemberImpl.Builder(newAddress(port))
+                .version(VERSION)
+                .uuid(newUnsecureUuidString())
+                .build();
     }
 
     private static Address newAddress(int port) {

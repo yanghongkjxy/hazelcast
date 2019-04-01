@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -211,6 +211,32 @@ public class ConfiguredBehaviourTest extends ClientTestSupport {
         assertOpenEventually(connectedLatch);
 
         client.getMap(randomMapName());
+    }
+
+    @Test
+    public void testReconnectModeASYNC_clusterDown_clientGetsOfflineExcption() {
+        HazelcastInstance member1 = hazelcastFactory.newHazelcastInstance();
+        HazelcastInstance member2 = hazelcastFactory.newHazelcastInstance();
+
+        ClientConfig clientConfig = new ClientConfig();
+        clientConfig.getNetworkConfig().setConnectionAttemptLimit(Integer.MAX_VALUE);
+        clientConfig.getConnectionStrategyConfig().setReconnectMode(ASYNC);
+        HazelcastInstance client = hazelcastFactory.newHazelcastClient(clientConfig);
+        IMap<Object, Object> map = client.getMap(randomMapName());
+
+        member1.shutdown();
+        member2.shutdown();
+
+        assertTrue(client.getLifecycleService().isRunning());
+        for (int i = 0; i < 100; i++) {
+            try {
+                map.get(randomString());
+                assertTrue("map.get should throw HazelcastClientOfflineException", false);
+            } catch (HazelcastClientOfflineException e) {
+
+            }
+        }
+
     }
 
     @Test

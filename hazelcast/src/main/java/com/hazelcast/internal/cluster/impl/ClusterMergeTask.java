@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -103,11 +103,12 @@ class ClusterMergeTask implements Runnable {
         // reset node and membership state from now on this node won't be joined and won't have a master address
         node.reset();
         node.getClusterService().reset();
+        node.getNodeExtension().getInternalHotRestartService().resetService(true);
         // stop the connection-manager:
         // - all socket connections will be closed
         // - connection listening thread will stop
         // - no new connection will be established
-        node.connectionManager.stop();
+        node.networkingService.stop();
 
         // clear waiting operations in queue and notify invocations to retry
         node.nodeEngine.reset();
@@ -147,7 +148,7 @@ class ClusterMergeTask implements Runnable {
 
     private void rejoin() {
         // start connection-manager to setup and accept new connections
-        node.connectionManager.start();
+        node.networkingService.start();
         // re-join to the target cluster
         node.join();
     }

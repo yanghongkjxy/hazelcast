@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,12 @@
 
 package com.hazelcast.map.impl.querycache.subscriber;
 
+import com.hazelcast.config.QueryCacheConfig;
 import com.hazelcast.core.EntryEventType;
 import com.hazelcast.core.IMap;
 import com.hazelcast.map.QueryCache;
 import com.hazelcast.query.impl.Indexes;
+import com.hazelcast.query.impl.getters.Extractors;
 
 /**
  * Internal interface which adds some internally used methods
@@ -30,9 +32,15 @@ import com.hazelcast.query.impl.Indexes;
  */
 public interface InternalQueryCache<K, V> extends QueryCache<K, V> {
 
-    void setInternal(K key, V value, boolean callDelegate, EntryEventType eventType);
+    void set(K key, V value, EntryEventType eventType);
 
-    void deleteInternal(Object key, boolean callDelegate, EntryEventType eventType);
+    /**
+     * Used during initial population of query cache. Initially fetched data
+     * from cluster will be written to query cache by the help of this method.
+     */
+    void prepopulate(K key, V value);
+
+    void delete(Object key, EntryEventType eventType);
 
     /**
      * Scans all entries in this {@link QueryCache} to remove matching ones
@@ -50,8 +58,37 @@ public interface InternalQueryCache<K, V> extends QueryCache<K, V> {
 
     void setPublisherListenerId(String publisherListenerId);
 
+    String getPublisherListenerId();
+
     /**
      * @return internally used ID for this query cache
      */
     String getCacheId();
+
+    /**
+     * Used to quit pre-population when max size is reached.
+     *
+     * @return {@code true} if this query cache is at its max capacity,
+     * otherwise return {@code false}
+     * @see QueryCacheConfig#isPopulate()
+     */
+    boolean reachedMaxCapacity();
+
+    /**
+     * @return extractors of this query cache instance.
+     */
+    Extractors getExtractors();
+
+    /**
+     * Recreates this query cache.
+     *
+     * Recreation steps are:
+     * <ul>
+     * <li>Reset local subscribers' state, clear all cache entries so far.</li>
+     * <li>Recreate/reset publisher (server) side
+     * resources by using this subscribers'metadata e.g. on
+     * server restart we can recreate server side resources.</li>
+     * </ul>
+     */
+    void recreate();
 }

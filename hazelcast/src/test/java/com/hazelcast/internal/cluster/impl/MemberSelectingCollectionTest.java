@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,14 +68,17 @@ public class MemberSelectingCollectionTest extends HazelcastTestSupport {
     @Before
     public void before()
             throws Exception {
+        MemberVersion version = MemberVersion.of("3.8.0");
         thisMember
-                = new MemberImpl(new Address("localhost", 5701), MemberVersion.of("3.8.0"), true, newUnsecureUuidString(), null, true);
+                = new MemberImpl.Builder(new Address("localhost", 5701)).version(version).localMember(true)
+                .uuid(newUnsecureUuidString()).liteMember(true).build();
         liteMember
-                = new MemberImpl(new Address("localhost", 5702), MemberVersion.of("3.8.0"), false, newUnsecureUuidString(), null, true);
+                = new MemberImpl.Builder(new Address("localhost", 5702)).version(version).uuid(newUnsecureUuidString())
+                .liteMember(true).build();
         dataMember
-                = new MemberImpl(new Address("localhost", 5704), MemberVersion.of("3.8.0"), false, newUnsecureUuidString(), null, false);
+                = new MemberImpl.Builder(new Address("localhost", 5704)).version(version).uuid(newUnsecureUuidString()).build();
         nonExistingMember
-                = new MemberImpl(new Address("localhost", 5705), MemberVersion.of("3.8.0"), false, newUnsecureUuidString(), null, false);
+                = new MemberImpl.Builder(new Address("localhost", 5705)).version(version).uuid(newUnsecureUuidString()).build();
 
         members = createMembers();
     }

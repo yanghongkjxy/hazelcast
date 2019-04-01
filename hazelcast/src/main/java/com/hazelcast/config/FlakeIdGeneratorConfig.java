@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -118,7 +118,7 @@ public class FlakeIdGeneratorConfig implements IdentifiedDataSerializable {
      * @see #setPrefetchCount(int)
      */
     public int getPrefetchCount() {
-        return Math.max(1, prefetchCount);
+        return prefetchCount;
     }
 
     /**
@@ -156,11 +156,10 @@ public class FlakeIdGeneratorConfig implements IdentifiedDataSerializable {
      * This setting pertains only to {@link FlakeIdGenerator#newId newId} calls made on the member
      * that configured it.
      *
-     * @param prefetchValidityMs the desired ID validity or unlimited, if configured to 0.
+     * @param prefetchValidityMs the desired ID validity or unlimited, if &lt;=0
      * @return this instance for fluent API
      */
     public FlakeIdGeneratorConfig setPrefetchValidityMillis(long prefetchValidityMs) {
-        checkNotNegative(prefetchValidityMs, "prefetchValidityMs must be non negative");
         this.prefetchValidityMillis = prefetchValidityMs;
         return this;
     }
@@ -207,10 +206,9 @@ public class FlakeIdGeneratorConfig implements IdentifiedDataSerializable {
      * You create cluster B and for some time both will generate IDs and you want to have them unique.
      * In this case, configure node ID offset for generators on cluster B.
      *
-     * @see FlakeIdGenerator for the node id logic
-     *
      * @param nodeIdOffset the value added to the node id
      * @return this instance for fluent API
+     * @see FlakeIdGenerator for the node id logic
      */
     public FlakeIdGeneratorConfig setNodeIdOffset(long nodeIdOffset) {
         checkNotNegative(nodeIdOffset, "node id offset must be non-negative");
@@ -230,7 +228,7 @@ public class FlakeIdGeneratorConfig implements IdentifiedDataSerializable {
      * {@link LocalFlakeIdGeneratorStats}.
      *
      * @param statisticsEnabled {@code true} if statistics gathering is enabled
-     *        (which is also the default), {@code false} otherwise
+     *                          (which is also the default), {@code false} otherwise
      * @return this instance for fluent API
      */
     public FlakeIdGeneratorConfig setStatisticsEnabled(boolean statisticsEnabled) {
@@ -259,7 +257,7 @@ public class FlakeIdGeneratorConfig implements IdentifiedDataSerializable {
 
     @Override
     public int hashCode() {
-        return Arrays.hashCode(new Object[] { name, prefetchCount, prefetchValidityMillis, idOffset, statisticsEnabled });
+        return Arrays.hashCode(new Object[]{name, prefetchCount, prefetchValidityMillis, idOffset, statisticsEnabled});
     }
 
     @Override

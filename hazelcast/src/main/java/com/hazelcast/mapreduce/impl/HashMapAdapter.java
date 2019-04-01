@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,9 @@ import com.hazelcast.nio.serialization.IdentifiedDataSerializable;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 
-import static com.hazelcast.util.MapUtil.createHashMap;
+import static com.hazelcast.internal.serialization.impl.SerializationUtil.readMap;
+import static com.hazelcast.internal.serialization.impl.SerializationUtil.writeMap;
 
 /**
  * Simple HashMap adapter class to implement DataSerializable serialization semantics
@@ -67,25 +67,14 @@ public class HashMapAdapter<K, V>
     public void writeData(ObjectDataOutput out)
             throws IOException {
 
-        Set<Map.Entry<K, V>> entrySet = entrySet();
-        out.writeInt(entrySet.size());
-        for (Map.Entry<K, V> entry : entrySet) {
-            out.writeObject(entry.getKey());
-            out.writeObject(entry.getValue());
-        }
+        writeMap(this, out);
     }
 
     @Override
     public void readData(ObjectDataInput in)
             throws IOException {
 
-        int size = in.readInt();
-        Map<K, V> map = createHashMap(size);
-        for (int i = 0; i < size; i++) {
-            K key = in.readObject();
-            V value = in.readObject();
-            map.put(key, value);
-        }
+        Map<K, V> map = readMap(in);
         putAll(map);
     }
 }

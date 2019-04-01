@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,19 +25,22 @@ import com.hazelcast.client.impl.protocol.ClientMessage;
 import com.hazelcast.client.impl.protocol.MessageTaskFactory;
 import com.hazelcast.client.impl.protocol.task.AuthenticationCustomCredentialsMessageTask;
 import com.hazelcast.client.impl.protocol.task.AuthenticationMessageTask;
+import com.hazelcast.client.impl.protocol.task.BlockingMessageTask;
 import com.hazelcast.client.impl.protocol.task.GetPartitionsMessageTask;
+import com.hazelcast.client.impl.protocol.task.ListenerMessageTask;
 import com.hazelcast.client.impl.protocol.task.MessageTask;
 import com.hazelcast.client.impl.protocol.task.PingMessageTask;
+import com.hazelcast.client.impl.protocol.task.TransactionalMessageTask;
 import com.hazelcast.client.impl.protocol.task.map.AbstractMapQueryMessageTask;
-import com.hazelcast.config.Config;
 import com.hazelcast.core.Client;
 import com.hazelcast.core.ClientListener;
 import com.hazelcast.core.ClientType;
 import com.hazelcast.core.Member;
-import com.hazelcast.instance.MemberImpl;
+import com.hazelcast.instance.EndpointQualifier;
 import com.hazelcast.instance.Node;
 import com.hazelcast.internal.cluster.ClusterService;
 import com.hazelcast.internal.util.RuntimeAvailableProcessors;
+import com.hazelcast.internal.util.executor.UnblockablePoolExecutorThreadFactory;
 import com.hazelcast.logging.ILogger;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.Connection;
@@ -58,13 +61,13 @@ import com.hazelcast.spi.OperationService;
 import com.hazelcast.spi.PreJoinAwareService;
 import com.hazelcast.spi.ProxyService;
 import com.hazelcast.spi.UrgentSystemOperation;
+import com.hazelcast.spi.exception.TargetNotMemberException;
 import com.hazelcast.spi.impl.NodeEngineImpl;
 import com.hazelcast.spi.impl.PartitionSpecificRunnable;
 import com.hazelcast.spi.impl.executionservice.InternalExecutionService;
 import com.hazelcast.spi.impl.operationservice.InternalOperationService;
 import com.hazelcast.spi.partition.IPartitionService;
 import com.hazelcast.spi.properties.GroupProperty;
-import com.hazelcast.spi.serialization.SerializationService;
 import com.hazelcast.transaction.TransactionManagerService;
 import com.hazelcast.util.ConcurrencyUtil;
 import com.hazelcast.util.ConstructorFunction;
@@ -88,8 +91,11 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static com.hazelcast.instance.EndpointQualifier.CLIENT;
+import static com.hazelcast.instance.EndpointQualifier.MEMBER;
 import static com.hazelcast.spi.ExecutionService.CLIENT_MANAGEMENT_EXECUTOR;
 import static com.hazelcast.util.SetUtil.createHashSet;
+import static com.hazelcast.util.ThreadUtil.createThreadPoolName;
 
 /**
  * Class that requests, listeners from client handled in node side.
@@ -104,7 +110,8 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
     public static final String SERVICE_NAME = "hz:core:clientEngine";
 
     private static final int EXECUTOR_QUEUE_CAPACITY_PER_CORE = 100000;
-    private static final int THREADS_PER_CORE = 20;
+    private static final int BLOCKING_THREADS_PER_CORE = 20;
+    private static final int THREADS_PER_CORE = 1;
     private static final int QUERY_THREADS_PER_CORE = 1;
     private static final ConstructorFunction<String, AtomicLong> LAST_AUTH_CORRELATION_ID_CONSTRUCTOR_FUNC =
             new ConstructorFunction<String, AtomicLong>() {
@@ -116,15 +123,20 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
     private final Node node;
     private final NodeEngineImpl nodeEngine;
     private final Executor executor;
+    private final Executor blockingExecutor;
     private final ExecutorService clientManagementExecutor;
     private final Executor queryExecutor;
 
-    private final SerializationService serializationService;
     // client UUID -> member UUID
     private final ConcurrentMap<String, String> ownershipMappings = new ConcurrentHashMap<String, String>();
     // client UUID -> last authentication correlation ID
     private final ConcurrentMap<String, AtomicLong> lastAuthenticationCorrelationIds
             = new ConcurrentHashMap<String, AtomicLong>();
+
+    // client Address -> member Address, only used when advanced network config is enabled
+    private final Map<Address, Address> clientMemberAddressMap = new ConcurrentHashMap<Address, Address>();
+
+    private volatile ClientSelector clientSelector = ClientSelectors.any();
 
     private final ClientEndpointManagerImpl endpointManager;
     private final ILogger logger;
@@ -134,20 +146,22 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
     private final ClientExceptions clientExceptions;
     private final int endpointRemoveDelaySeconds;
     private final ClientPartitionListenerService partitionListenerService;
+    private final boolean advancedNetworkConfigEnabled;
 
     public ClientEngineImpl(Node node) {
         this.logger = node.getLogger(ClientEngine.class);
         this.node = node;
-        this.serializationService = node.getSerializationService();
         this.nodeEngine = node.nodeEngine;
         this.endpointManager = new ClientEndpointManagerImpl(nodeEngine);
         this.executor = newClientExecutor();
         this.queryExecutor = newClientQueryExecutor();
+        this.blockingExecutor = newBlockingExecutor();
         this.clientManagementExecutor = newClientsManagementExecutor();
         this.messageTaskFactory = new CompositeMessageTaskFactory(nodeEngine);
         this.clientExceptions = initClientExceptionFactory();
         this.endpointRemoveDelaySeconds = node.getProperties().getInteger(GroupProperty.CLIENT_ENDPOINT_REMOVE_DELAY_SECONDS);
         this.partitionListenerService = new ClientPartitionListenerService(nodeEngine);
+        this.advancedNetworkConfigEnabled = node.getConfig().getAdvancedNetworkConfig().isEnabled();
     }
 
     private ClientExceptions initClientExceptionFactory() {
@@ -175,9 +189,14 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
         }
         logger.finest("Creating new client executor with threadCount=" + threadCount);
 
+        String name = ExecutionService.CLIENT_EXECUTOR;
+        ClassLoader classLoader = nodeEngine.getConfigClassLoader();
+        String hzName = nodeEngine.getHazelcastInstance().getName();
+        String internalName = name.substring("hz:".length());
+        String threadNamePrefix = createThreadPoolName(hzName, internalName);
+        UnblockablePoolExecutorThreadFactory factory = new UnblockablePoolExecutorThreadFactory(threadNamePrefix, classLoader);
         return executionService.register(ExecutionService.CLIENT_EXECUTOR,
-                threadCount, coreSize * EXECUTOR_QUEUE_CAPACITY_PER_CORE,
-                ExecutorType.CONCRETE);
+                threadCount, coreSize * EXECUTOR_QUEUE_CAPACITY_PER_CORE, factory);
     }
 
     private Executor newClientQueryExecutor() {
@@ -195,14 +214,20 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
                 ExecutorType.CONCRETE);
     }
 
-    //needed for testing purposes
-    public ConnectionListener getConnectionListener() {
-        return connectionListener;
-    }
+    private Executor newBlockingExecutor() {
+        final ExecutionService executionService = nodeEngine.getExecutionService();
+        int coreSize = Runtime.getRuntime().availableProcessors();
 
-    @Override
-    public SerializationService getSerializationService() {
-        return serializationService;
+        int threadCount = node.getProperties().getInteger(GroupProperty.CLIENT_ENGINE_BLOCKING_THREAD_COUNT);
+        if (threadCount <= 0) {
+            threadCount = coreSize * BLOCKING_THREADS_PER_CORE;
+        }
+
+        logger.finest("Creating new client executor for blocking tasks with threadCount=" + threadCount);
+
+        return executionService.register(ExecutionService.CLIENT_BLOCKING_EXECUTOR,
+                threadCount, coreSize * EXECUTOR_QUEUE_CAPACITY_PER_CORE,
+                ExecutorType.CONCRETE);
     }
 
     @Override
@@ -221,6 +246,12 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
                 operationService.execute(new PriorityPartitionSpecificRunnable(messageTask));
             } else if (isQuery(messageTask)) {
                 queryExecutor.execute(messageTask);
+            } else if (messageTask instanceof TransactionalMessageTask) {
+                blockingExecutor.execute(messageTask);
+            } else if (messageTask instanceof BlockingMessageTask) {
+                blockingExecutor.execute(messageTask);
+            } else if (messageTask instanceof ListenerMessageTask) {
+                blockingExecutor.execute(messageTask);
             } else {
                 executor.execute(messageTask);
             }
@@ -234,8 +265,7 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
         return clazz == PingMessageTask.class
                 || clazz == GetPartitionsMessageTask.class
                 || clazz == AuthenticationMessageTask.class
-                || clazz == AuthenticationCustomCredentialsMessageTask.class
-                ;
+                || clazz == AuthenticationCustomCredentialsMessageTask.class;
     }
 
     private boolean isQuery(MessageTask messageTask) {
@@ -263,12 +293,12 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
     }
 
     @Override
-    public Address getMasterAddress() {
-        return node.getMasterAddress();
-    }
-
-    @Override
     public Address getThisAddress() {
+        if (advancedNetworkConfigEnabled) {
+            Address clientServerSocketAddress = node.getLocalMember().getAddressMap().get(CLIENT);
+            assert clientServerSocketAddress != null;
+            return clientServerSocketAddress;
+        }
         return node.getThisAddress();
     }
 
@@ -278,24 +308,16 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
     }
 
     @Override
-    public MemberImpl getLocalMember() {
-        return node.getLocalMember();
-    }
-
-    @Override
-    public Config getConfig() {
-        return node.getConfig();
-    }
-
-    @Override
     public ILogger getLogger(Class clazz) {
         return node.getLogger(clazz);
     }
 
+    @Override
     public ClientEndpointManager getEndpointManager() {
         return endpointManager;
     }
 
+    @Override
     public ClientExceptions getClientExceptions() {
         return clientExceptions;
     }
@@ -305,14 +327,44 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
         return node.securityContext;
     }
 
-    public void bind(final ClientEndpoint endpoint) {
-        final Connection conn = endpoint.getConnection();
+    @Override
+    public boolean bind(final ClientEndpoint endpoint) {
+        if (!clientSelector.select(endpoint)) {
+            return false;
+        }
+
+        if (!endpointManager.registerEndpoint(endpoint)) {
+            // connection exists just reauthenticated to promote to become an owner connection
+            return true;
+        }
+
+        Connection conn = endpoint.getConnection();
         if (conn instanceof TcpIpConnection) {
             InetSocketAddress socketAddress = conn.getRemoteSocketAddress();
             //socket address can be null if connection closed before bind
             if (socketAddress != null) {
                 Address address = new Address(socketAddress);
                 ((TcpIpConnection) conn).setEndPoint(address);
+            }
+        }
+
+        // Second check to catch concurrent change done via applySelector
+        if (!clientSelector.select(endpoint)) {
+            endpointManager.removeEndpoint(endpoint);
+            return false;
+        }
+        return true;
+    }
+
+
+    @Override
+    public void applySelector(ClientSelector newSelector) {
+        logger.info("Applying a new client selector :" + newSelector);
+        clientSelector = newSelector;
+
+        for (ClientEndpoint endpoint : endpointManager.getEndpoints()) {
+            if (!clientSelector.select(endpoint)) {
+                endpoint.getConnection().close("Client disconnected from cluster via Management Center", null);
             }
         }
     }
@@ -328,12 +380,27 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
 
     @Override
     public void memberAdded(MembershipServiceEvent event) {
+        if (advancedNetworkConfigEnabled) {
+            final Map<EndpointQualifier, Address> newMemberAddressMap = event.getMember().getAddressMap();
+            final Address memberAddress = newMemberAddressMap.get(MEMBER);
+            final Address clientAddress = newMemberAddressMap.get(CLIENT);
+            if (clientAddress != null) {
+                clientMemberAddressMap.put(clientAddress, memberAddress);
+            }
+        }
     }
 
     @Override
     public void memberRemoved(MembershipServiceEvent event) {
         if (event.getMember().localMember()) {
             return;
+        }
+
+        if (advancedNetworkConfigEnabled) {
+            final Address clientAddress = event.getMember().getAddressMap().get(CLIENT);
+            if (clientAddress != null) {
+                clientMemberAddressMap.remove(clientAddress);
+            }
         }
 
         final String deadMemberUuid = event.getMember().getUuid();
@@ -351,18 +418,17 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
     public void memberAttributeChanged(MemberAttributeServiceEvent event) {
     }
 
+    @Override
     public Collection<Client> getClients() {
-        final Collection<ClientEndpoint> endpoints = endpointManager.getEndpoints();
-        final Set<Client> clients = createHashSet(endpoints.size());
-        for (ClientEndpoint endpoint : endpoints) {
-            clients.add(endpoint);
-        }
+        Collection<ClientEndpoint> endpoints = endpointManager.getEndpoints();
+        Set<Client> clients = createHashSet(endpoints.size());
+        clients.addAll(endpoints);
         return clients;
     }
 
     @Override
     public void init(NodeEngine nodeEngine, Properties properties) {
-        node.getConnectionManager().addConnectionListener(connectionListener);
+        node.getEndpointManager(CLIENT).addConnectionListener(connectionListener);
 
         ClientHeartbeatMonitor heartbeatMonitor = new ClientHeartbeatMonitor(
                 endpointManager, getLogger(ClientHeartbeatMonitor.class), nodeEngine.getExecutionService(), node.getProperties());
@@ -404,7 +470,7 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
         AtomicLong lastCorrelationId = ConcurrencyUtil.getOrPutIfAbsent(lastAuthenticationCorrelationIds,
                 clientUuid,
                 LAST_AUTH_CORRELATION_ID_CONSTRUCTOR_FUNC);
-        return ConcurrencyUtil.setIfGreaterThan(lastCorrelationId, newCorrelationId);
+        return ConcurrencyUtil.setIfEqualOrGreaterThan(lastCorrelationId, newCorrelationId);
     }
 
     public String addOwnershipMapping(String clientUuid, String ownerUuid) {
@@ -420,12 +486,19 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
         return ownershipMappings.get(clientUuid);
     }
 
+    @Override
     public TransactionManagerService getTransactionManagerService() {
         return node.nodeEngine.getTransactionManagerService();
     }
 
+    @Override
     public ClientPartitionListenerService getPartitionListenerService() {
         return partitionListenerService;
+    }
+
+    @Override
+    public boolean isClientAllowed(Client client) {
+        return clientSelector.select(client);
     }
 
     private final class ConnectionListenerImpl implements ConnectionListener {
@@ -456,13 +529,15 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
             }
 
             String localMemberUuid = node.getThisUuid();
-            String ownerUuid = ownershipMappings.get(endpoint.getUuid());
+            final String clientUuid = endpoint.getUuid();
+            String ownerUuid = ownershipMappings.get(clientUuid);
             if (localMemberUuid.equals(ownerUuid)) {
+                final long authenticationCorrelationId = endpoint.getAuthenticationCorrelationId();
                 try {
                     nodeEngine.getExecutionService().schedule(new Runnable() {
                         @Override
                         public void run() {
-                            callDisconnectionOperation(endpoint);
+                            callDisconnectionOperation(clientUuid, authenticationCorrelationId);
                         }
                     }, endpointRemoveDelaySeconds, TimeUnit.SECONDS);
                 } catch (RejectedExecutionException e) {
@@ -473,11 +548,10 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
             }
         }
 
-        private void callDisconnectionOperation(ClientEndpointImpl endpoint) {
+        private void callDisconnectionOperation(String clientUuid, long authenticationCorrelationId) {
             Collection<Member> memberList = nodeEngine.getClusterService().getMembers();
             OperationService operationService = nodeEngine.getOperationService();
-            String memberUuid = getLocalMember().getUuid();
-            String clientUuid = endpoint.getUuid();
+            String memberUuid = getThisUuid();
 
             String ownerMember = ownershipMappings.get(clientUuid);
             if (!memberUuid.equals(ownerMember)) {
@@ -485,7 +559,7 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
                 return;
             }
 
-            if (lastAuthenticationCorrelationIds.get(clientUuid).get() > endpoint.getAuthenticationCorrelationId()) {
+            if (lastAuthenticationCorrelationIds.get(clientUuid).get() > authenticationCorrelationId) {
                 //a new authentication already made for that client. This check is needed to detect
                 // "a disconnected client is reconnected back to same node"
                 return;
@@ -508,7 +582,7 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
         @Override
         public void run() {
             InternalOperationService service = nodeEngine.getOperationService();
-            Address thisAddr = getLocalMember().getAddress();
+            Address thisAddr = node.getThisAddress();
             for (Map.Entry<String, String> entry : ownershipMappings.entrySet()) {
                 String clientUuid = entry.getKey();
                 String memberUuid = entry.getValue();
@@ -615,6 +689,42 @@ public class ClientEngineImpl implements ClientEngine, CoreService, PreJoinAware
             }
         }
         return statsMap;
+    }
+
+    @Override
+    public Address memberAddressOf(Address clientAddress) {
+        if (!advancedNetworkConfigEnabled) {
+            return clientAddress;
+        }
+
+        // clientMemberAddressMap is maintained in memberAdded/Removed
+        Address memberAddress = clientMemberAddressMap.get(clientAddress);
+        if (memberAddress != null) {
+            return memberAddress;
+        }
+
+        // lookup all members in membership manager
+        Set<Member> clusterMembers = node.getClusterService().getMembers();
+        for (Member member : clusterMembers) {
+            if (member.getAddressMap().get(CLIENT).equals(clientAddress)) {
+                memberAddress = member.getAddress();
+                clientMemberAddressMap.put(clientAddress, memberAddress);
+                return memberAddress;
+            }
+        }
+        throw new TargetNotMemberException("Could not locate member with client address " + clientAddress);
+    }
+
+    @Override
+    public Address clientAddressOf(Address memberAddress) {
+        if (!advancedNetworkConfigEnabled) {
+            return memberAddress;
+        }
+        Member member = node.getClusterService().getMember(memberAddress);
+        if (member != null) {
+            return member.getAddressMap().get(CLIENT);
+        }
+        throw new TargetNotMemberException("Could not locate member with member address " + memberAddress);
     }
 
     private static class PriorityPartitionSpecificRunnable implements PartitionSpecificRunnable, UrgentSystemOperation {

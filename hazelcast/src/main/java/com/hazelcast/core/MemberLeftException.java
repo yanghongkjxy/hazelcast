@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ import java.util.concurrent.ExecutionException;
 /**
  * A {@link ExecutionException} thrown when a member left during an invocation or execution.
  */
-public class MemberLeftException extends ExecutionException implements RetryableException {
+public class MemberLeftException extends ExecutionException implements RetryableException, IndeterminateOperationState {
 
     private transient Member member;
 
@@ -81,6 +81,10 @@ public class MemberLeftException extends ExecutionException implements Retryable
         boolean liteMember = in.readBoolean();
         MemberVersion version = (MemberVersion) in.readObject();
 
-        member = new MemberImpl(new Address(host, port), version, false, uuid, null, liteMember);
+        member = new MemberImpl.Builder(new Address(host, port))
+                .version(version)
+                .uuid(uuid)
+                .liteMember(liteMember)
+                .build();
     }
 }

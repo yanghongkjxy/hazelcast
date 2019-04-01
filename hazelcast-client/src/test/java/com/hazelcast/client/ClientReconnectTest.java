@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -152,7 +152,7 @@ public class ClientReconnectTest extends HazelcastTestSupport {
     }
 
     @Test(expected = HazelcastClientNotActiveException.class)
-    public void testExceptionAfterClientShutdown() throws Exception {
+    public void testExceptionAfterClientShutdown() {
         hazelcastFactory.newHazelcastInstance();
         ClientConfig clientConfig = new ClientConfig();
         HazelcastInstance client = hazelcastFactory.newHazelcastClient(clientConfig);
@@ -163,6 +163,18 @@ public class ClientReconnectTest extends HazelcastTestSupport {
         //to force weak references to be cleaned and get not active exception from serialization service
         System.gc();
         test.get("key");
+    }
+
+    @Test(expected = HazelcastClientNotActiveException.class)
+    public void testExceptionAfterClientShutdown_fromClientConnectionManager() {
+        hazelcastFactory.newHazelcastInstance();
+        ClientConfig clientConfig = new ClientConfig();
+        HazelcastInstance client = hazelcastFactory.newHazelcastClient(clientConfig);
+
+        IMap<Object, Object> test = client.getMap("test");
+        test.put("key", "value");
+        client.shutdown();
+        test.size();
     }
 
     @Test

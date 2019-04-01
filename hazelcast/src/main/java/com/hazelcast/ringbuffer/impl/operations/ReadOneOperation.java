@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,7 +50,12 @@ public class ReadOneOperation extends AbstractRingBufferOperation implements Blo
     @Override
     public boolean shouldWait() {
         RingbufferContainer ringbuffer = getRingBufferContainer();
-        return ringbuffer.shouldWait(sequence);
+        if (ringbuffer.isTooLargeSequence(sequence) || ringbuffer.isStaleSequence(sequence)) {
+            //no need to wait, let the operation continue and fail in beforeRun
+            return false;
+        }
+        // the sequence is not readable
+        return sequence == ringbuffer.tailSequence() + 1;
     }
 
     @Override

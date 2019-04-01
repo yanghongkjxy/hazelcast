@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package com.hazelcast.client.impl.protocol.task;
 import com.hazelcast.client.impl.ClientEndpoint;
 import com.hazelcast.client.impl.ClientEndpointImpl;
 import com.hazelcast.client.impl.ClientEndpointManager;
-import com.hazelcast.client.impl.ClientEngineImpl;
+import com.hazelcast.client.impl.ClientEngine;
 import com.hazelcast.client.impl.StubAuthenticationException;
 import com.hazelcast.client.impl.client.SecureRequest;
 import com.hazelcast.client.impl.protocol.ClientExceptions;
@@ -30,15 +30,20 @@ import com.hazelcast.instance.BuildInfo;
 import com.hazelcast.instance.Node;
 import com.hazelcast.internal.serialization.InternalSerializationService;
 import com.hazelcast.logging.ILogger;
+import com.hazelcast.nio.Address;
 import com.hazelcast.nio.Connection;
 import com.hazelcast.security.Credentials;
 import com.hazelcast.security.SecurityContext;
 import com.hazelcast.spi.exception.RetryableHazelcastException;
 import com.hazelcast.spi.impl.NodeEngineImpl;
 
+import java.lang.reflect.Field;
 import java.security.Permission;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.hazelcast.util.ExceptionUtil.peel;
 
@@ -56,7 +61,7 @@ public abstract class AbstractMessageTask<P> implements MessageTask, SecureReque
     protected final NodeEngineImpl nodeEngine;
     protected final InternalSerializationService serializationService;
     protected final ILogger logger;
-    protected final ClientEngineImpl clientEngine;
+    protected final ClientEngine clientEngine;
     protected P parameters;
     final ClientEndpointManager endpointManager;
     private final Node node;
@@ -98,25 +103,26 @@ public abstract class AbstractMessageTask<P> implements MessageTask, SecureReque
     @Override
     public final void run() {
         try {
-            doRun();
+            if (requiresAuthentication() && !endpoint.isAuthenticated()) {
+                handleAuthenticationFailure();
+            } else {
+                initializeAndProcessMessage();
+            }
         } catch (Throwable e) {
             handleProcessingFailure(e);
         }
     }
 
-    protected void doRun() throws Throwable {
-        if (!endpoint.isAuthenticated()) {
-            handleAuthenticationFailure();
-        } else {
-            initializeAndProcessMessage();
-        }
+    protected boolean requiresAuthentication() {
+        return true;
     }
 
-    void initializeAndProcessMessage() throws Throwable {
+    private void initializeAndProcessMessage() throws Throwable {
         if (!node.getNodeExtension().isStartCompleted()) {
             throw new HazelcastInstanceNotActiveException("Hazelcast instance is not ready yet!");
         }
         parameters = decodeClientMessage(clientMessage);
+        assert addressesDecodedWithTranslation() : formatWrongAddressInDecodedMessage();
         Credentials credentials = endpoint.getCredentials();
         interceptBefore(credentials);
         checkPermissions(endpoint);
@@ -185,8 +191,12 @@ public abstract class AbstractMessageTask<P> implements MessageTask, SecureReque
     protected abstract void processMessage() throws Throwable;
 
     protected void sendResponse(Object response) {
-        ClientMessage clientMessage = encodeResponse(response);
-        sendClientMessage(clientMessage);
+        try {
+            ClientMessage clientMessage = encodeResponse(response);
+            sendClientMessage(clientMessage);
+        } catch (Exception e) {
+            handleProcessingFailure(e);
+        }
     }
 
     protected void sendClientMessage(ClientMessage resultClientMessage) {
@@ -230,6 +240,42 @@ public abstract class AbstractMessageTask<P> implements MessageTask, SecureReque
 
     protected final BuildInfo getMemberBuildInfo() {
         return node.getBuildInfo();
+    }
+
+    protected boolean isAdvancedNetworkEnabled() {
+        return node.getConfig().getAdvancedNetworkConfig().isEnabled();
+    }
+
+    final boolean addressesDecodedWithTranslation() {
+        if (!isAdvancedNetworkEnabled()) {
+            return true;
+        }
+        Class<Address> addressClass = Address.class;
+        Field[] fields = parameters.getClass().getDeclaredFields();
+        Set<Address> addresses = new HashSet<Address>();
+        try {
+            for (Field field : fields) {
+                if (addressClass.isAssignableFrom(field.getType())) {
+                    addresses.add((Address) field.get(parameters));
+                }
+            }
+        } catch (IllegalAccessException e) {
+            logger.info("Could not reflectively access parameter fields", e);
+        }
+        if (!addresses.isEmpty()) {
+            Collection<Address> allMemberAddresses = node.clusterService.getMemberAddresses();
+            for (Address address : addresses) {
+                if (!allMemberAddresses.contains(address)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    final String formatWrongAddressInDecodedMessage() {
+        return "Decoded message of type " + parameters.getClass() + " contains untranslated addresses. "
+                + "Use ClientEngine.memberAddressOf to translate addresses while decoding this client message.";
     }
 
     private Throwable peelIfNeeded(Throwable t) {

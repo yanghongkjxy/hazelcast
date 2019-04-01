@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,7 @@
 package com.hazelcast.config;
 
 import com.hazelcast.internal.cluster.Versions;
-import com.hazelcast.map.eviction.LFUEvictionPolicy;
-import com.hazelcast.map.eviction.LRUEvictionPolicy;
 import com.hazelcast.map.eviction.MapEvictionPolicy;
-import com.hazelcast.map.eviction.RandomEvictionPolicy;
 import com.hazelcast.map.merge.PutIfAbsentMapMergePolicy;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
@@ -46,18 +43,18 @@ import static com.hazelcast.util.Preconditions.isNotNull;
 /**
  * Contains the configuration for an {@link com.hazelcast.core.IMap}.
  */
-public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSerializable, Versioned {
+public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSerializable, Versioned, NamedConfig {
 
     /**
-     * The number of minimum backup counter
+     * The minimum number of backups
      */
     public static final int MIN_BACKUP_COUNT = 0;
     /**
-     * The number of default backup counter
+     * The default number of backups
      */
     public static final int DEFAULT_BACKUP_COUNT = 1;
     /**
-     * The number of maximum backup counter
+     * The maximum number of backups
      */
     public static final int MAX_BACKUP_COUNT = IPartition.MAX_BACKUP_COUNT;
 
@@ -109,6 +106,11 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
      */
     public static final CacheDeserializedValues DEFAULT_CACHED_DESERIALIZED_VALUES = CacheDeserializedValues.INDEX_ONLY;
 
+    /**
+     * Default metadata policy
+     */
+    public static final MetadataPolicy DEFAULT_METADATA_POLICY = MetadataPolicy.CREATE_ON_UPDATE;
+
     private String name;
 
     private int backupCount = DEFAULT_BACKUP_COUNT;
@@ -159,6 +161,8 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
 
     private String quorumName;
 
+    private MetadataPolicy metadataPolicy = DEFAULT_METADATA_POLICY;
+
     private HotRestartConfig hotRestartConfig = new HotRestartConfig();
 
     private transient MapConfigReadOnly readOnly;
@@ -183,6 +187,7 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
         this.minEvictionCheckMillis = config.minEvictionCheckMillis;
         this.timeToLiveSeconds = config.timeToLiveSeconds;
         this.maxIdleSeconds = config.maxIdleSeconds;
+        this.metadataPolicy = config.metadataPolicy;
         this.maxSizeConfig = config.maxSizeConfig != null ? new MaxSizeConfig(config.maxSizeConfig) : null;
         this.evictionPolicy = config.evictionPolicy;
         this.mapEvictionPolicy = config.mapEvictionPolicy;
@@ -349,10 +354,10 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
      */
     public MapConfig setEvictionPercentage(final int evictionPercentage) {
         if (evictionPercentage < MIN_EVICTION_PERCENTAGE) {
-            throw new IllegalArgumentException("eviction percentage must be greater or equal than 0");
+            throw new IllegalArgumentException("Eviction percentage must be greater than or equal to 0");
         }
         if (evictionPercentage > MAX_EVICTION_PERCENTAGE) {
-            throw new IllegalArgumentException("eviction percentage must be smaller or equal than 100");
+            throw new IllegalArgumentException("Eviction percentage must be smaller than or equal to 100");
         }
         this.evictionPercentage = evictionPercentage;
         return this;
@@ -430,7 +435,8 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
      * idle (not touched) for more than {@code maxIdleSeconds} will get automatically evicted from the map.
      * Entry is touched if {@code get()}, {@code getAll()}, {@code put()} or {@code containsKey()} is called.
      * Any integer between {@code 0} and {@code Integer.MAX_VALUE}.
-     * {@code 0} means infinite. Default is {@code 0}.
+     * {@code 0} means infinite. Default is {@code 0}. The time precision is limited by 1 second. The MaxIdle that
+     * less than 1 second can lead to unexpected behaviour.
      *
      * @param maxIdleSeconds the maxIdleSeconds (the maximum number of seconds for each entry to stay idle in the map) to set
      */
@@ -464,23 +470,7 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
      */
     public MapConfig setEvictionPolicy(EvictionPolicy evictionPolicy) {
         this.evictionPolicy = checkNotNull(evictionPolicy, "evictionPolicy cannot be null");
-        this.mapEvictionPolicy = findMatchingMapEvictionPolicy(evictionPolicy);
         return this;
-    }
-
-    private static MapEvictionPolicy findMatchingMapEvictionPolicy(EvictionPolicy evictionPolicy) {
-        switch (evictionPolicy) {
-            case LRU:
-                return LRUEvictionPolicy.INSTANCE;
-            case LFU:
-                return LFUEvictionPolicy.INSTANCE;
-            case RANDOM:
-                return RandomEvictionPolicy.INSTANCE;
-            case NONE:
-                return null;
-            default:
-                throw new IllegalArgumentException("Not known eviction policy: " + evictionPolicy);
-        }
     }
 
     /**
@@ -724,6 +714,26 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
     }
 
     /**
+     * Returns {@link MetadataPolicy} for this map.
+     *
+     * @return {@link MetadataPolicy} for this map
+     */
+    public MetadataPolicy getMetadataPolicy() {
+        return metadataPolicy;
+    }
+
+    /**
+     * Sets the metadata policy. See {@link MetadataPolicy} for more
+     * information.
+     *
+     * @param metadataPolicy
+     */
+    public MapConfig setMetadataPolicy(MetadataPolicy metadataPolicy) {
+        this.metadataPolicy = metadataPolicy;
+        return this;
+    }
+
+    /**
      * Adds a new {@link QueryCacheConfig} to this {@code MapConfig}.
      *
      * @param queryCacheConfig the config to be added
@@ -956,6 +966,9 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
         if (inMemoryFormat != that.inMemoryFormat) {
             return false;
         }
+        if (metadataPolicy != that.metadataPolicy) {
+            return false;
+        }
         if (wanReplicationRef != null ? !wanReplicationRef.equals(that.wanReplicationRef) : that.wanReplicationRef != null) {
             return false;
         }
@@ -1001,6 +1014,7 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
         result = 31 * result + cacheDeserializedValues.hashCode();
         result = 31 * result + (mergePolicyConfig != null ? mergePolicyConfig.hashCode() : 0);
         result = 31 * result + inMemoryFormat.hashCode();
+        result = 31 * result + metadataPolicy.hashCode();
         result = 31 * result + (wanReplicationRef != null ? wanReplicationRef.hashCode() : 0);
         result = 31 * result + getEntryListenerConfigs().hashCode();
         result = 31 * result + getMapIndexConfigs().hashCode();
@@ -1019,6 +1033,7 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
         return "MapConfig{"
                 + "name='" + name + '\''
                 + ", inMemoryFormat=" + inMemoryFormat + '\''
+                + ", metadataPolicy=" + metadataPolicy
                 + ", backupCount=" + backupCount
                 + ", asyncBackupCount=" + asyncBackupCount
                 + ", timeToLiveSeconds=" + timeToLiveSeconds
@@ -1067,12 +1082,7 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
         out.writeObject(nearCacheConfig);
         out.writeBoolean(readBackupData);
         out.writeUTF(cacheDeserializedValues.name());
-        // RU_COMPAT_3_9
-        if (out.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            out.writeObject(mergePolicyConfig);
-        } else {
-            out.writeUTF(mergePolicyConfig.getPolicy());
-        }
+        out.writeObject(mergePolicyConfig);
         out.writeUTF(inMemoryFormat.name());
         out.writeObject(wanReplicationRef);
         writeNullableList(entryListenerConfigs, out);
@@ -1084,6 +1094,10 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
         out.writeObject(partitioningStrategyConfig);
         out.writeUTF(quorumName);
         out.writeObject(hotRestartConfig);
+        // RU_COMPAT_3_11
+        if (out.getVersion().isGreaterOrEqual(Versions.V3_12)) {
+            out.writeShort(metadataPolicy.getId());
+        }
     }
 
     @Override
@@ -1100,12 +1114,7 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
         nearCacheConfig = in.readObject();
         readBackupData = in.readBoolean();
         cacheDeserializedValues = CacheDeserializedValues.valueOf(in.readUTF());
-        // RU_COMPAT_3_9
-        if (in.getVersion().isGreaterOrEqual(Versions.V3_10)) {
-            mergePolicyConfig = in.readObject();
-        } else {
-            mergePolicyConfig.setPolicy(in.readUTF());
-        }
+        mergePolicyConfig = in.readObject();
         inMemoryFormat = InMemoryFormat.valueOf(in.readUTF());
         wanReplicationRef = in.readObject();
         entryListenerConfigs = readNullableList(in);
@@ -1117,5 +1126,9 @@ public class MapConfig implements SplitBrainMergeTypeProvider, IdentifiedDataSer
         partitioningStrategyConfig = in.readObject();
         quorumName = in.readUTF();
         hotRestartConfig = in.readObject();
+        // RU_COMPAT_3_11
+        if (in.getVersion().isGreaterOrEqual(Versions.V3_12)) {
+            metadataPolicy = MetadataPolicy.getById(in.readShort());
+        }
     }
 }

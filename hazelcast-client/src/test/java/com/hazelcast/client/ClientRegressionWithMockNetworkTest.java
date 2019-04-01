@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,8 +33,11 @@ import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IExecutorService;
 import com.hazelcast.core.ILock;
 import com.hazelcast.core.IMap;
+import com.hazelcast.core.ITopic;
 import com.hazelcast.core.LifecycleEvent;
 import com.hazelcast.core.LifecycleListener;
+import com.hazelcast.core.Message;
+import com.hazelcast.core.MessageListener;
 import com.hazelcast.logging.Logger;
 import com.hazelcast.map.MapInterceptor;
 import com.hazelcast.map.listener.MapListener;
@@ -46,12 +49,14 @@ import com.hazelcast.nio.serialization.PortableFactory;
 import com.hazelcast.nio.serialization.PortableReader;
 import com.hazelcast.nio.serialization.PortableWriter;
 import com.hazelcast.security.UsernamePasswordCredentials;
+import com.hazelcast.spi.properties.GroupProperty;
 import com.hazelcast.test.AssertTask;
 import com.hazelcast.test.HazelcastParallelClassRunner;
 import com.hazelcast.test.HazelcastTestSupport;
 import com.hazelcast.test.annotation.NightlyTest;
 import com.hazelcast.test.annotation.ParallelTest;
 import com.hazelcast.test.annotation.QuickTest;
+import com.hazelcast.test.annotation.SlowTest;
 import org.junit.After;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
@@ -65,6 +70,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.hazelcast.config.EvictionConfig.MaxSizePolicy.ENTRY_COUNT;
 import static com.hazelcast.core.LifecycleEvent.LifecycleState;
@@ -834,5 +840,48 @@ public class ClientRegressionWithMockNetworkTest extends HazelcastTestSupport {
         HazelcastInstance h2 = hazelcastFactory.newHazelcastInstance();
         String key = generateKeyOwnedBy(h2);
         map.get(key);
+    }
+
+
+    @Test
+    @Category(SlowTest.class)
+    public void testServerShouldNotCloseClientWhenClientOnlyListening() {
+        Config config = new Config();
+        int clientHeartbeatSeconds = 8;
+        config.setProperty(GroupProperty.CLIENT_HEARTBEAT_TIMEOUT_SECONDS.getName(), String.valueOf(clientHeartbeatSeconds));
+        hazelcastFactory.newHazelcastInstance(config);
+
+        ClientConfig clientConfig = new ClientConfig();
+        clientConfig.setProperty(ClientProperty.HEARTBEAT_INTERVAL.getName(), "1000");
+        HazelcastInstance client = hazelcastFactory.newHazelcastClient(clientConfig);
+        HazelcastInstance client2 = hazelcastFactory.newHazelcastClient();
+
+        final AtomicBoolean isClientDisconnected = new AtomicBoolean();
+        client.getLifecycleService().addLifecycleListener(new LifecycleListener() {
+            @Override
+            public void stateChanged(LifecycleEvent event) {
+                if (LifecycleState.CLIENT_DISCONNECTED.equals(event.getState())) {
+                    isClientDisconnected.set(true);
+                }
+            }
+        });
+
+        String key = "topicName";
+        ITopic topic = client.getTopic(key);
+        MessageListener listener = new MessageListener() {
+            public void onMessage(Message message) {
+            }
+        };
+        String id = topic.addMessageListener(listener);
+
+        ITopic<Object> client2Topic = client2.getTopic(key);
+        long begin = System.currentTimeMillis();
+
+        while (System.currentTimeMillis() - begin < TimeUnit.SECONDS.toMillis(clientHeartbeatSeconds * 2)) {
+            client2Topic.publish("message");
+        }
+
+        topic.removeMessageListener(id);
+        assertFalse(isClientDisconnected.get());
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package com.hazelcast.internal.partition.impl;
 
+import com.hazelcast.internal.partition.PartitionReplica;
 import com.hazelcast.internal.partition.NonFragmentedServiceNamespace;
 import com.hazelcast.nio.Address;
 import com.hazelcast.test.HazelcastParallelClassRunner;
@@ -46,8 +47,8 @@ public class ReplicaSyncInfoTest {
     public void setUp() throws Exception {
         int partitionId = 23;
         int replicaIndex = 42;
-        Address target = new Address("127.0.0.1", 5701);
-        Address otherTarget = new Address("127.0.0.1", 5702);
+        PartitionReplica target = new PartitionReplica(new Address("127.0.0.1", 5701), "5701");
+        PartitionReplica otherTarget = new PartitionReplica(new Address("127.0.0.1", 5702), "5702");
 
         replicaSyncInfo = new ReplicaFragmentSyncInfo(partitionId, NonFragmentedServiceNamespace.INSTANCE, replicaIndex, target);
         replicaSyncInfoSameAttributes

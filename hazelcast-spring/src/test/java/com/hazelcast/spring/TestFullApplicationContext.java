@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package com.hazelcast.spring;
 import com.hazelcast.config.AtomicLongConfig;
 import com.hazelcast.config.AtomicReferenceConfig;
 import com.hazelcast.config.AwsConfig;
+import com.hazelcast.config.AzureConfig;
 import com.hazelcast.config.CRDTReplicationConfig;
 import com.hazelcast.config.CacheDeserializedValues;
 import com.hazelcast.config.CacheSimpleConfig;
@@ -31,11 +32,13 @@ import com.hazelcast.config.DiscoveryConfig;
 import com.hazelcast.config.DiscoveryStrategyConfig;
 import com.hazelcast.config.DurableExecutorConfig;
 import com.hazelcast.config.EntryListenerConfig;
+import com.hazelcast.config.EurekaConfig;
 import com.hazelcast.config.EventJournalConfig;
 import com.hazelcast.config.EvictionConfig;
 import com.hazelcast.config.EvictionPolicy;
 import com.hazelcast.config.ExecutorConfig;
 import com.hazelcast.config.FlakeIdGeneratorConfig;
+import com.hazelcast.config.GcpConfig;
 import com.hazelcast.config.GlobalSerializerConfig;
 import com.hazelcast.config.GroupConfig;
 import com.hazelcast.config.HotRestartPersistenceConfig;
@@ -43,6 +46,7 @@ import com.hazelcast.config.IcmpFailureDetectorConfig;
 import com.hazelcast.config.InMemoryFormat;
 import com.hazelcast.config.ItemListenerConfig;
 import com.hazelcast.config.JavaSerializationFilterConfig;
+import com.hazelcast.config.KubernetesConfig;
 import com.hazelcast.config.ListConfig;
 import com.hazelcast.config.ListenerConfig;
 import com.hazelcast.config.LockConfig;
@@ -56,26 +60,32 @@ import com.hazelcast.config.MaxSizeConfig;
 import com.hazelcast.config.MemberAddressProviderConfig;
 import com.hazelcast.config.MemberAttributeConfig;
 import com.hazelcast.config.MemberGroupConfig;
+import com.hazelcast.config.MemcacheProtocolConfig;
 import com.hazelcast.config.MergePolicyConfig;
 import com.hazelcast.config.MerkleTreeConfig;
 import com.hazelcast.config.MultiMapConfig;
 import com.hazelcast.config.NativeMemoryConfig;
 import com.hazelcast.config.NearCacheConfig;
 import com.hazelcast.config.NetworkConfig;
+import com.hazelcast.config.OnJoinPermissionOperationName;
 import com.hazelcast.config.PNCounterConfig;
 import com.hazelcast.config.PartitionGroupConfig;
 import com.hazelcast.config.PermissionConfig;
 import com.hazelcast.config.PermissionConfig.PermissionType;
+import com.hazelcast.config.MetadataPolicy;
 import com.hazelcast.config.QueryCacheConfig;
 import com.hazelcast.config.QueueConfig;
 import com.hazelcast.config.QueueStoreConfig;
 import com.hazelcast.config.QuorumConfig;
 import com.hazelcast.config.ReliableTopicConfig;
 import com.hazelcast.config.ReplicatedMapConfig;
+import com.hazelcast.config.RestApiConfig;
+import com.hazelcast.config.RestEndpointGroup;
 import com.hazelcast.config.RingbufferConfig;
 import com.hazelcast.config.RingbufferStoreConfig;
 import com.hazelcast.config.SSLConfig;
 import com.hazelcast.config.ScheduledExecutorConfig;
+import com.hazelcast.config.SecurityConfig;
 import com.hazelcast.config.SemaphoreConfig;
 import com.hazelcast.config.SerializationConfig;
 import com.hazelcast.config.SerializerConfig;
@@ -93,8 +103,11 @@ import com.hazelcast.config.WanPublisherState;
 import com.hazelcast.config.WanReplicationConfig;
 import com.hazelcast.config.WanReplicationRef;
 import com.hazelcast.config.WanSyncConfig;
+import com.hazelcast.config.cp.CPSemaphoreConfig;
+import com.hazelcast.config.cp.CPSubsystemConfig;
+import com.hazelcast.config.cp.FencedLockConfig;
+import com.hazelcast.config.cp.RaftAlgorithmConfig;
 import com.hazelcast.core.EntryListener;
-import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IAtomicLong;
 import com.hazelcast.core.IAtomicReference;
@@ -119,6 +132,7 @@ import com.hazelcast.core.RingbufferStore;
 import com.hazelcast.core.RingbufferStoreFactory;
 import com.hazelcast.crdt.pncounter.PNCounter;
 import com.hazelcast.flakeidgen.FlakeIdGenerator;
+import com.hazelcast.instance.HazelcastInstanceFactory;
 import com.hazelcast.memory.MemoryUnit;
 import com.hazelcast.nio.SocketInterceptor;
 import com.hazelcast.nio.serialization.DataSerializableFactory;
@@ -134,6 +148,7 @@ import com.hazelcast.test.HazelcastTestSupport;
 import com.hazelcast.test.annotation.QuickTest;
 import com.hazelcast.topic.TopicOverloadPolicy;
 import com.hazelcast.wan.WanReplicationEndpoint;
+
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -147,9 +162,11 @@ import javax.annotation.Resource;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -268,7 +285,7 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
     @BeforeClass
     @AfterClass
     public static void start() {
-        Hazelcast.shutdownAll();
+        HazelcastInstanceFactory.terminateAll();
     }
 
     @Before
@@ -308,6 +325,7 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
         assertEquals(0, testMapConfig.getTimeToLiveSeconds());
         assertTrue(testMapConfig.getHotRestartConfig().isEnabled());
         assertTrue(testMapConfig.getHotRestartConfig().isFsync());
+        assertEquals(MetadataPolicy.OFF, testMapConfig.getMetadataPolicy());
         assertEquals(1000, testMapConfig.getMinEvictionCheckMillis());
         assertTrue(testMapConfig.isReadBackupData());
         assertEquals(2, testMapConfig.getMapIndexConfigs().size());
@@ -561,15 +579,21 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
 
     @Test
     public void testSecurity() {
-        final Set<PermissionConfig> clientPermissionConfigs = config.getSecurityConfig().getClientPermissionConfigs();
-        assertFalse(config.getSecurityConfig().getClientBlockUnmappedActions());
+        SecurityConfig securityConfig = config.getSecurityConfig();
+        assertEquals(OnJoinPermissionOperationName.SEND, securityConfig.getOnJoinPermissionOperation());
+        final Set<PermissionConfig> clientPermissionConfigs = securityConfig.getClientPermissionConfigs();
+        assertFalse(securityConfig.getClientBlockUnmappedActions());
         assertTrue(isNotEmpty(clientPermissionConfigs));
-        assertEquals(1, clientPermissionConfigs.size());
+        assertEquals(23, clientPermissionConfigs.size());
         final PermissionConfig pnCounterPermission = new PermissionConfig(PermissionType.PN_COUNTER, "pnCounterPermission", "*")
                 .addAction("create")
                 .setEndpoints(Collections.<String>emptySet());
-
         assertContains(clientPermissionConfigs, pnCounterPermission);
+        Set<PermissionType> permTypes = new HashSet<PermissionType>(Arrays.asList(PermissionType.values()));
+        for (PermissionConfig pc : clientPermissionConfigs) {
+            permTypes.remove(pc.getType());
+        }
+        assertTrue("All permission types should be listed in fullConfig. Not found ones: " + permTypes, permTypes.isEmpty());
     }
 
     @Test
@@ -803,6 +827,10 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
         assertEquals("127.0.0.1:5701", members.get(1));
         assertEquals("127.0.0.1:5700", tcp.getRequiredMember());
         assertAwsConfig(networkConfig.getJoin().getAwsConfig());
+        assertGcpConfig(networkConfig.getJoin().getGcpConfig());
+        assertAzureConfig(networkConfig.getJoin().getAzureConfig());
+        assertKubernetesConfig(networkConfig.getJoin().getKubernetesConfig());
+        assertEurekaConfig(networkConfig.getJoin().getEurekaConfig());
 
         assertTrue("reuse-address", networkConfig.isReuseAddress());
 
@@ -835,6 +863,35 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
         assertEquals("sample-tag-key", aws.getTagKey());
         assertEquals("sample-tag-value", aws.getTagValue());
         assertEquals("sample-role", aws.getIamRole());
+    }
+
+    private void assertGcpConfig(GcpConfig gcp) {
+        assertFalse(gcp.isEnabled());
+        assertEquals("us-east1-b,us-east1-c", gcp.getProperty("zones"));
+    }
+
+    private void assertAzureConfig(AzureConfig azure) {
+        assertFalse(azure.isEnabled());
+        assertEquals("CLIENT_ID", azure.getProperty("client-id"));
+        assertEquals("CLIENT_SECRET", azure.getProperty("client-secret"));
+        assertEquals("TENANT_ID", azure.getProperty("tenant-id"));
+        assertEquals("SUB_ID", azure.getProperty("subscription-id"));
+        assertEquals("HZLCAST001", azure.getProperty("cluster-id"));
+        assertEquals("GROUP-NAME", azure.getProperty("group-name"));
+    }
+
+    private void assertKubernetesConfig(KubernetesConfig kubernetes) {
+        assertFalse(kubernetes.isEnabled());
+        assertEquals("MY-KUBERNETES-NAMESPACE", kubernetes.getProperty("namespace"));
+        assertEquals("MY-SERVICE-NAME", kubernetes.getProperty("service-name"));
+        assertEquals("MY-SERVICE-LABEL-NAME", kubernetes.getProperty("service-label-name"));
+        assertEquals("MY-SERVICE-LABEL-VALUE", kubernetes.getProperty("service-label-value"));
+    }
+
+    private void assertEurekaConfig(EurekaConfig eureka) {
+        assertFalse(eureka.isEnabled());
+        assertEquals("true", eureka.getProperty("self-registration"));
+        assertEquals("hazelcast", eureka.getProperty("namespace"));
     }
 
     private void assertDiscoveryConfig(DiscoveryConfig discoveryConfig) {
@@ -927,6 +984,7 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
 
         WanPublisherConfig publisherConfig = wcfg.getWanPublisherConfigs().get(0);
         assertEquals("tokyo", publisherConfig.getGroupName());
+        assertEquals("tokyoPublisherId", publisherConfig.getPublisherId());
         assertEquals("com.hazelcast.enterprise.wan.replication.WanBatchReplication", publisherConfig.getClassName());
         assertEquals(WANQueueFullBehavior.THROW_EXCEPTION, publisherConfig.getQueueFullBehavior());
         assertEquals(WanPublisherState.STOPPED, publisherConfig.getInitialPublisherState());
@@ -941,6 +999,7 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
 
         WanPublisherConfig customPublisher = wcfg.getWanPublisherConfigs().get(1);
         assertEquals("istanbul", customPublisher.getGroupName());
+        assertEquals("istanbulPublisherId", customPublisher.getPublisherId());
         assertEquals("com.hazelcast.wan.custom.CustomPublisher", customPublisher.getClassName());
         assertEquals(WANQueueFullBehavior.THROW_EXCEPTION_ONLY_IF_REPLICATION_ACTIVE, customPublisher.getQueueFullBehavior());
         Map<String, Comparable> customPublisherProps = customPublisher.getProperties();
@@ -948,6 +1007,10 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
         assertEquals("5", customPublisherProps.get("discovery.period"));
         assertEquals("2", customPublisherProps.get("maxEndpoints"));
         assertAwsConfig(customPublisher.getAwsConfig());
+        assertGcpConfig(customPublisher.getGcpConfig());
+        assertAzureConfig(customPublisher.getAzureConfig());
+        assertKubernetesConfig(customPublisher.getKubernetesConfig());
+        assertEurekaConfig(customPublisher.getEurekaConfig());
         assertDiscoveryConfig(customPublisher.getDiscoveryConfig());
 
         WanPublisherConfig publisherPlaceHolderConfig = wcfg.getWanPublisherConfigs().get(2);
@@ -1056,6 +1119,7 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
         ManagementCenterConfig managementCenterConfig = config.getManagementCenterConfig();
         assertNotNull(managementCenterConfig);
         assertTrue(managementCenterConfig.isEnabled());
+        assertFalse(managementCenterConfig.isScriptingEnabled());
         assertEquals("myserver:80", managementCenterConfig.getUrl());
         assertEquals(2, managementCenterConfig.getUpdateInterval());
         assertTrue(managementCenterConfig.getMutualAuthConfig().isEnabled());
@@ -1264,6 +1328,7 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
         assertEquals(1111, hotRestartPersistenceConfig.getValidationTimeoutSeconds());
         assertEquals(2222, hotRestartPersistenceConfig.getDataLoadTimeoutSeconds());
         assertEquals(PARTIAL_RECOVERY_MOST_COMPLETE, hotRestartPersistenceConfig.getClusterDataRecoveryPolicy());
+        assertFalse(hotRestartPersistenceConfig.isAutoRemoveStaleData());
     }
 
     @Test
@@ -1366,5 +1431,52 @@ public class TestFullApplicationContext extends HazelcastTestSupport {
         assertEquals(2, whitelist.getPackages().size());
         assertTrue(whitelist.getPackages().contains("com.acme.app"));
         assertTrue(whitelist.getPackages().contains("com.acme.app.subpkg"));
+    }
+
+    @Test
+    public void testRestApiConfig() {
+        RestApiConfig restApiConfig = config.getNetworkConfig().getRestApiConfig();
+        assertNotNull(restApiConfig);
+        assertFalse(restApiConfig.isEnabled());
+        for (RestEndpointGroup group : RestEndpointGroup.values()) {
+            assertTrue("Unexpected status of REST Endpoint group" + group, restApiConfig.isGroupEnabled(group));
+        }
+    }
+
+    @Test
+    public void testMemcacheProtocolConfig() {
+        MemcacheProtocolConfig memcacheProtocolConfig = config.getNetworkConfig().getMemcacheProtocolConfig();
+        assertNotNull(memcacheProtocolConfig);
+        assertTrue(memcacheProtocolConfig.isEnabled());
+    }
+
+    public void testCPSubsystemConfig() {
+        CPSubsystemConfig cpSubsystemConfig = config.getCPSubsystemConfig();
+        assertEquals(10, cpSubsystemConfig.getCPMemberCount());
+        assertEquals(5, cpSubsystemConfig.getGroupSize());
+        assertEquals(15, cpSubsystemConfig.getSessionTimeToLiveSeconds());
+        assertEquals(3, cpSubsystemConfig.getSessionHeartbeatIntervalSeconds());
+        assertEquals(120, cpSubsystemConfig.getMissingCPMemberAutoRemovalSeconds());
+        assertTrue(cpSubsystemConfig.isFailOnIndeterminateOperationState());
+        RaftAlgorithmConfig raftAlgorithmConfig = cpSubsystemConfig.getRaftAlgorithmConfig();
+        assertEquals(500, raftAlgorithmConfig.getLeaderElectionTimeoutInMillis());
+        assertEquals(100, raftAlgorithmConfig.getLeaderHeartbeatPeriodInMillis());
+        assertEquals(3, raftAlgorithmConfig.getMaxMissedLeaderHeartbeatCount());
+        assertEquals(25, raftAlgorithmConfig.getAppendRequestMaxEntryCount());
+        assertEquals(250, raftAlgorithmConfig.getCommitIndexAdvanceCountToSnapshot());
+        assertEquals(75, raftAlgorithmConfig.getUncommittedEntryCountToRejectNewAppends());
+        assertEquals(50, raftAlgorithmConfig.getAppendRequestBackoffTimeoutInMillis());
+        CPSemaphoreConfig cpSemaphoreConfig1 = cpSubsystemConfig.findSemaphoreConfig("sem1");
+        CPSemaphoreConfig cpSemaphoreConfig2 = cpSubsystemConfig.findSemaphoreConfig("sem2");
+        assertNotNull(cpSemaphoreConfig1);
+        assertNotNull(cpSemaphoreConfig2);
+        assertTrue(cpSemaphoreConfig1.isJDKCompatible());
+        assertFalse(cpSemaphoreConfig2.isJDKCompatible());
+        FencedLockConfig lockConfig1 = cpSubsystemConfig.findLockConfig("lock1");
+        FencedLockConfig lockConfig2 = cpSubsystemConfig.findLockConfig("lock2");
+        assertNotNull(lockConfig1);
+        assertNotNull(lockConfig2);
+        assertEquals(1, lockConfig1.getLockAcquireLimit());
+        assertEquals(2, lockConfig2.getLockAcquireLimit());
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -191,8 +191,6 @@ abstract class AbstractMapServiceFactory implements MapServiceFactory {
         mapService.partitionAwareService = partitionAwareService;
         mapService.quorumAwareService = quorumAwareService;
         mapService.clientAwareService = clientAwareService;
-        // RU_COMPAT_3_9
-        mapService.mapIndexSynchronizer = new MapIndexSynchronizer(mapServiceContext, nodeEngine);
         mapServiceContext.setService(mapService);
         return mapService;
     }

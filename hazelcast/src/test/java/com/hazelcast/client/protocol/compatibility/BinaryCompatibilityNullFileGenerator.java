@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,24 +58,24 @@ public class BinaryCompatibilityNullFileGenerator {
         DataOutputStream outputStream = new DataOutputStream(out);
 
 {
-    ClientMessage clientMessage = ClientAuthenticationCodec.encodeRequest(   aString ,   aString ,   null ,   null ,   aBoolean ,   aString ,   aByte ,   aString   );
+    ClientMessage clientMessage = ClientAuthenticationCodec.encodeRequest(   aString ,   aString ,   null ,   null ,   aBoolean ,   aString ,   aByte ,   aString ,   aString ,   strings ,   null ,   null   );
      outputStream.writeInt(clientMessage.getFrameLength());
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
 {
-    ClientMessage clientMessage = ClientAuthenticationCodec.encodeResponse(   aByte ,   null ,   null ,   null ,   aByte ,   aString ,   null   );
+    ClientMessage clientMessage = ClientAuthenticationCodec.encodeResponse(   aByte ,   null ,   null ,   null ,   aByte ,   aString ,   null ,   anInt ,   aString   );
     outputStream.writeInt(clientMessage.getFrameLength());
     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
 
 
 {
-    ClientMessage clientMessage = ClientAuthenticationCustomCodec.encodeRequest(   aData ,   null ,   null ,   aBoolean ,   aString ,   aByte ,   aString   );
+    ClientMessage clientMessage = ClientAuthenticationCustomCodec.encodeRequest(   aData ,   null ,   null ,   aBoolean ,   aString ,   aByte ,   aString ,   aString ,   strings ,   null ,   null   );
      outputStream.writeInt(clientMessage.getFrameLength());
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
 {
-    ClientMessage clientMessage = ClientAuthenticationCustomCodec.encodeResponse(   aByte ,   null ,   null ,   null ,   aByte ,   aString ,   null   );
+    ClientMessage clientMessage = ClientAuthenticationCustomCodec.encodeResponse(   aByte ,   null ,   null ,   null ,   aByte ,   aString ,   null ,   anInt ,   aString   );
     outputStream.writeInt(clientMessage.getFrameLength());
     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
@@ -300,7 +300,19 @@ public class BinaryCompatibilityNullFileGenerator {
 
 
 {
-    ClientMessage clientMessage = MapPutCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong ,   aLong   );
+    ClientMessage clientMessage = ClientIsFailoverSupportedCodec.encodeRequest( );
+     outputStream.writeInt(clientMessage.getFrameLength());
+     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+{
+    ClientMessage clientMessage = ClientIsFailoverSupportedCodec.encodeResponse(   aBoolean   );
+    outputStream.writeInt(clientMessage.getFrameLength());
+    outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+
+
+{
+    ClientMessage clientMessage = MapPutCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong   );
      outputStream.writeInt(clientMessage.getFrameLength());
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
@@ -432,7 +444,7 @@ public class BinaryCompatibilityNullFileGenerator {
 
 
 {
-    ClientMessage clientMessage = MapTryPutCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong ,   aLong   );
+    ClientMessage clientMessage = MapTryPutCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong   );
      outputStream.writeInt(clientMessage.getFrameLength());
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
@@ -444,7 +456,7 @@ public class BinaryCompatibilityNullFileGenerator {
 
 
 {
-    ClientMessage clientMessage = MapPutTransientCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong ,   aLong   );
+    ClientMessage clientMessage = MapPutTransientCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong   );
      outputStream.writeInt(clientMessage.getFrameLength());
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
@@ -456,7 +468,7 @@ public class BinaryCompatibilityNullFileGenerator {
 
 
 {
-    ClientMessage clientMessage = MapPutIfAbsentCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong ,   aLong   );
+    ClientMessage clientMessage = MapPutIfAbsentCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong   );
      outputStream.writeInt(clientMessage.getFrameLength());
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
@@ -468,7 +480,7 @@ public class BinaryCompatibilityNullFileGenerator {
 
 
 {
-    ClientMessage clientMessage = MapSetCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong ,   aLong   );
+    ClientMessage clientMessage = MapSetCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong   );
      outputStream.writeInt(clientMessage.getFrameLength());
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
@@ -700,7 +712,7 @@ public class BinaryCompatibilityNullFileGenerator {
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
 {
-    ClientMessage clientMessage = MapGetEntryViewCodec.encodeResponse(   null   );
+    ClientMessage clientMessage = MapGetEntryViewCodec.encodeResponse(   null ,   aLong   );
     outputStream.writeInt(clientMessage.getFrameLength());
     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
@@ -1187,12 +1199,60 @@ public class BinaryCompatibilityNullFileGenerator {
 
 
 {
-    ClientMessage clientMessage = MapSetTTLCodec.encodeRequest(   aString ,   aData ,   aLong   );
+    ClientMessage clientMessage = MapSetTtlCodec.encodeRequest(   aString ,   aData ,   aLong   );
      outputStream.writeInt(clientMessage.getFrameLength());
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
 {
-    ClientMessage clientMessage = MapSetTTLCodec.encodeResponse( );
+    ClientMessage clientMessage = MapSetTtlCodec.encodeResponse(   aBoolean   );
+    outputStream.writeInt(clientMessage.getFrameLength());
+    outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+
+
+{
+    ClientMessage clientMessage = MapPutWithMaxIdleCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong ,   aLong   );
+     outputStream.writeInt(clientMessage.getFrameLength());
+     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+{
+    ClientMessage clientMessage = MapPutWithMaxIdleCodec.encodeResponse(   null   );
+    outputStream.writeInt(clientMessage.getFrameLength());
+    outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+
+
+{
+    ClientMessage clientMessage = MapPutTransientWithMaxIdleCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong ,   aLong   );
+     outputStream.writeInt(clientMessage.getFrameLength());
+     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+{
+    ClientMessage clientMessage = MapPutTransientWithMaxIdleCodec.encodeResponse(   null   );
+    outputStream.writeInt(clientMessage.getFrameLength());
+    outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+
+
+{
+    ClientMessage clientMessage = MapPutIfAbsentWithMaxIdleCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong ,   aLong   );
+     outputStream.writeInt(clientMessage.getFrameLength());
+     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+{
+    ClientMessage clientMessage = MapPutIfAbsentWithMaxIdleCodec.encodeResponse(   null   );
+    outputStream.writeInt(clientMessage.getFrameLength());
+    outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+
+
+{
+    ClientMessage clientMessage = MapSetWithMaxIdleCodec.encodeRequest(   aString ,   aData ,   aData ,   aLong ,   aLong ,   aLong   );
+     outputStream.writeInt(clientMessage.getFrameLength());
+     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+{
+    ClientMessage clientMessage = MapSetWithMaxIdleCodec.encodeResponse(   null   );
     outputStream.writeInt(clientMessage.getFrameLength());
     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
@@ -4079,7 +4139,7 @@ public class BinaryCompatibilityNullFileGenerator {
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
 {
-    ClientMessage clientMessage = CacheSetExpiryPolicyCodec.encodeResponse( );
+    ClientMessage clientMessage = CacheSetExpiryPolicyCodec.encodeResponse(   aBoolean   );
     outputStream.writeInt(clientMessage.getFrameLength());
     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
@@ -4866,7 +4926,7 @@ public class BinaryCompatibilityNullFileGenerator {
 
 
 {
-    ClientMessage clientMessage = DynamicConfigAddMapConfigCodec.encodeRequest(   aString ,   anInt ,   anInt ,   anInt ,   anInt ,   aString ,   aBoolean ,   aString ,   aString ,   aString ,   null ,   null ,   aBoolean ,   null ,   null ,   aString ,   anInt ,   null ,   null ,   null ,   null ,   null ,   null ,   null ,   null ,   null ,   anInt   );
+    ClientMessage clientMessage = DynamicConfigAddMapConfigCodec.encodeRequest(   aString ,   anInt ,   anInt ,   anInt ,   anInt ,   aString ,   aBoolean ,   aString ,   aString ,   aString ,   null ,   null ,   aBoolean ,   null ,   null ,   aString ,   anInt ,   null ,   null ,   null ,   null ,   null ,   null ,   null ,   null ,   null ,   anInt ,   anInt   );
      outputStream.writeInt(clientMessage.getFrameLength());
      outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }
@@ -4968,6 +5028,18 @@ public class BinaryCompatibilityNullFileGenerator {
 }
 {
     ClientMessage clientMessage = DynamicConfigAddPNCounterConfigCodec.encodeResponse( );
+    outputStream.writeInt(clientMessage.getFrameLength());
+    outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+
+
+{
+    ClientMessage clientMessage = DynamicConfigAddMerkleTreeConfigCodec.encodeRequest(   aString ,   aBoolean ,   anInt   );
+     outputStream.writeInt(clientMessage.getFrameLength());
+     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
+}
+{
+    ClientMessage clientMessage = DynamicConfigAddMerkleTreeConfigCodec.encodeResponse( );
     outputStream.writeInt(clientMessage.getFrameLength());
     outputStream.write(clientMessage.buffer().byteArray(), 0 , clientMessage.getFrameLength());
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package com.hazelcast.core;
 
 import com.hazelcast.cardinality.CardinalityEstimator;
 import com.hazelcast.config.Config;
+import com.hazelcast.cp.CPSubsystem;
 import com.hazelcast.crdt.pncounter.PNCounter;
 import com.hazelcast.durableexecutor.DurableExecutorService;
 import com.hazelcast.flakeidgen.FlakeIdGenerator;
@@ -37,9 +38,15 @@ import java.util.Collection;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * Hazelcast instance. Each Hazelcast instance is a member (node) in a cluster.
- * Multiple Hazelcast instances can be created on a JVM.
- * Each Hazelcast instance has its own socket, threads.
+ * Hazelcast instance. Each instance is a member and/or client in a Hazelcast cluster. When
+ * you want to use Hazelcast's distributed data structures, you must first create an instance.
+ * Multiple Hazelcast instances can be created on a single JVM.
+ *
+ * Instances should be shut down explicitly. See the {@link #shutdown()} method.
+ * If the instance is a client and you don't shut it down explicitly, it will continue to run and
+ * even connect to another live member if the one it was connected fails.
+ *
+ * Each Hazelcast instance has its own socket and threads.
  *
  * @see Hazelcast#newHazelcastInstance(Config config)
  */
@@ -147,7 +154,11 @@ public interface HazelcastInstance {
      *
      * @param key key of the lock instance
      * @return distributed lock instance for the specified key.
+     * @deprecated This implementation may lose strong consistency in case of network failures
+     * or server failures. Please use {@link CPSubsystem#getLock(String)} instead.
+     * This method will be removed in Hazelcast 4.0.
      */
+    @Deprecated
     ILock getLock(String key);
 
     /**
@@ -159,10 +170,10 @@ public interface HazelcastInstance {
     <E> Ringbuffer<E> getRingbuffer(String name);
 
     /**
-     * Creates or returns the reliable ReliableTopic instance with the specified name.
+     * Creates or returns the reliable topic instance with the specified name.
      *
-     * @param name name of the reliable ITopic
-     * @return the reliable ITopic
+     * @param name name of the reliable topic
+     * @return the reliable topic
      */
     <E> ITopic<E> getReliableTopic(String name);
 
@@ -296,7 +307,11 @@ public interface HazelcastInstance {
      *
      * @param name name of the {@link IAtomicLong} proxy
      * @return IAtomicLong proxy for the given name
+     * @deprecated This implementation may lose strong consistency in case of network failures
+     * or server failures. Please use {@link CPSubsystem#getAtomicLong(String)} instead.
+     * This method will be removed in Hazelcast 4.0.
      */
+    @Deprecated
     IAtomicLong getAtomicLong(String name);
 
     /**
@@ -305,7 +320,11 @@ public interface HazelcastInstance {
      *
      * @param name name of the {@link IAtomicReference} proxy
      * @return {@link IAtomicReference} proxy for the given name
+     * @deprecated This implementation may lose strong consistency in case of network failures
+     * or server failures. Please use {@link CPSubsystem#getAtomicReference(String)} instead.
+     * This method will be removed in Hazelcast 4.0.
      */
+    @Deprecated
     <E> IAtomicReference<E> getAtomicReference(String name);
 
     /**
@@ -314,7 +333,11 @@ public interface HazelcastInstance {
      *
      * @param name name of the {@link ICountDownLatch} proxy
      * @return {@link ICountDownLatch} proxy for the given name
+     * @deprecated This implementation may lose strong consistency in case of network failures
+     * or server failures. Please use {@link CPSubsystem#getCountDownLatch(String)} instead.
+     * This method will be removed in Hazelcast 4.0.
      */
+    @Deprecated
     ICountDownLatch getCountDownLatch(String name);
 
     /**
@@ -323,13 +346,23 @@ public interface HazelcastInstance {
      *
      * @param name name of the {@link ISemaphore} proxy
      * @return {@link ISemaphore} proxy for the given name
+     * @deprecated This implementation may lose strong consistency in case of network failures
+     * or server failures. Please use {@link CPSubsystem#getSemaphore(String)} instead.
+     * This method will be removed in Hazelcast 4.0.
      */
+    @Deprecated
     ISemaphore getSemaphore(String name);
 
     /**
-     * Returns all {@link DistributedObject}'s such as; queue, map, set, list, topic, lock, multimap.
+     * Returns all {@link DistributedObject}s, that is all maps, queues,
+     * topics, locks etc.
+     * <p>
+     * The results are returned on a best-effort basis. The result might miss
+     * just-created objects and contain just-deleted objects. An existing
+     * object can also be missing from the list occasionally. One cluster
+     * member is queried to obtain the list.
      *
-     * @return the collection of instances created by Hazelcast.
+     * @return the collection of all instances in the cluster
      */
     Collection<DistributedObject> getDistributedObjects();
 
@@ -484,6 +517,13 @@ public interface HazelcastInstance {
      * @return the scheduled executor service for the given name
      */
     IScheduledExecutorService getScheduledExecutorService(String name);
+
+    /**
+     * Returns the CP subsystem that offers a set of in-memory linearizable data structures
+     *
+     * @return the CP subsystem that offers a set of in-memory linearizable data structures
+     */
+    CPSubsystem getCPSubsystem();
 
     /**
      * Shuts down this HazelcastInstance. For more information see {@link com.hazelcast.core.LifecycleService#shutdown()}.

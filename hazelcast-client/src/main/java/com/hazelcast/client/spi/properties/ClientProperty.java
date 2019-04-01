@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -183,6 +183,18 @@ public final class ClientProperty {
     public static final HazelcastProperty RESPONSE_THREAD_COUNT
             = new HazelcastProperty("hazelcast.client.response.thread.count", 2);
 
+    /**
+     * Enabled dynamic switching between processing responses on the io threads
+     * and offloading the response threads.
+     *
+     * Under certain conditions (single threaded clients) processing on the io
+     * thread can increase performance because useless handover to the response
+     * thread is removed. Also the response thread isn't created until it is needed
+     * and especially for ephemeral clients reducing threads can lead to
+     * increased performance and reduced memory usage.
+     */
+    public static final HazelcastProperty RESPONSE_THREAD_DYNAMIC
+            = new HazelcastProperty("hazelcast.client.response.thread.dynamic", false);
 
     /**
      * Token to use when discovering cluster via hazelcast.cloud

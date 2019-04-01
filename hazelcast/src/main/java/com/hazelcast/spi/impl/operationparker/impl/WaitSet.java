@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -96,6 +96,8 @@ public class WaitSet implements LiveOperationsTracker, Iterable<WaitSetEntry> {
                 if (entry.isExpired()) {
                     // expired
                     entry.onExpire();
+                } else if (entry.isCancelled()) {
+                    entry.onCancel();
                 } else {
                     if (entry.shouldWait()) {
                         return;
@@ -125,7 +127,7 @@ public class WaitSet implements LiveOperationsTracker, Iterable<WaitSetEntry> {
      * response.
      * Invoked on the migration destination. This is executed under partition migration lock!
      */
-    public void onPartitionMigrate(Address thisAddress, MigrationInfo migrationInfo) {
+    void onPartitionMigrate(MigrationInfo migrationInfo) {
         Iterator<WaitSetEntry> it = queue.iterator();
         int partitionId = migrationInfo.getPartitionId();
         while (it.hasNext()) {
@@ -140,7 +142,7 @@ public class WaitSet implements LiveOperationsTracker, Iterable<WaitSetEntry> {
             Operation op = entry.getOperation();
             if (partitionId == op.getPartitionId()) {
                 entry.setValid(false);
-                PartitionMigratingException pme = new PartitionMigratingException(thisAddress,
+                PartitionMigratingException pme = new PartitionMigratingException(nodeEngine.getThisAddress(),
                         partitionId, op.getClass().getName(), op.getServiceName());
                 op.sendResponse(pme);
                 it.remove();
@@ -179,6 +181,18 @@ public class WaitSet implements LiveOperationsTracker, Iterable<WaitSetEntry> {
             Operation op = entry.getOperation();
             if (callerUuid.equals(op.getCallerUuid())) {
                 entry.setValid(false);
+            }
+        }
+    }
+
+    public void cancelAll(String callerUuid, Throwable cause) {
+        for (WaitSetEntry entry : queue) {
+            if (!entry.isValid()) {
+                continue;
+            }
+            Operation op = entry.getOperation();
+            if (callerUuid.equals(op.getCallerUuid())) {
+                entry.cancel(cause);
             }
         }
     }

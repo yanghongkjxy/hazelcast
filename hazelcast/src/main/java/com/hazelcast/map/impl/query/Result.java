@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,7 +31,8 @@ import java.util.Map;
 public interface Result<T extends Result> extends IdentifiedDataSerializable {
 
     /**
-     * @return partition IDs of this result.
+     * Returns partition IDs associated with this result or {@code null} if this
+     * result is an empty/failure result.
      */
     Collection<Integer> getPartitionIds();
 

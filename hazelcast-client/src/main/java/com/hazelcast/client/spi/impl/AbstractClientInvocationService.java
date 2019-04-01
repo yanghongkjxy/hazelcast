@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import com.hazelcast.spi.impl.sequence.CallIdFactory;
 import com.hazelcast.spi.impl.sequence.CallIdSequence;
 import com.hazelcast.spi.properties.HazelcastProperties;
 import com.hazelcast.spi.properties.HazelcastProperty;
+import com.hazelcast.util.function.Consumer;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -79,11 +80,17 @@ public abstract class AbstractClientInvocationService implements ClientInvocatio
         HazelcastProperties properties = client.getProperties();
         int maxAllowedConcurrentInvocations = properties.getInteger(MAX_CONCURRENT_INVOCATIONS);
         long backofftimeoutMs = properties.getLong(BACKPRESSURE_BACKOFF_TIMEOUT_MILLIS);
-        boolean isBackPressureEnabled = maxAllowedConcurrentInvocations != Integer.MAX_VALUE;
-        callIdSequence = CallIdFactory
-                .newCallIdSequence(isBackPressureEnabled, maxAllowedConcurrentInvocations, backofftimeoutMs);
+        // clients needs to have a call id generator capable of determining how many
+        // pending calls there are. So backpressure needs to be on
+        this.callIdSequence = CallIdFactory
+                .newCallIdSequence(true, maxAllowedConcurrentInvocations, backofftimeoutMs);
 
         client.getMetricsRegistry().scanAndRegister(this, "invocations");
+    }
+
+    @Override
+    public long concurrentInvocations() {
+        return callIdSequence.concurrentInvocations();
     }
 
     private long initInvocationRetryPauseMillis() {
@@ -129,7 +136,7 @@ public abstract class AbstractClientInvocationService implements ClientInvocatio
     }
 
     @Override
-    public ClientResponseHandler getResponseHandler() {
+    public Consumer<ClientMessage> getResponseHandler() {
         return responseHandlerSupplier.get();
     }
 

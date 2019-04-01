@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -142,7 +142,7 @@ public class TransactionalMapDataStructureAdapter<K, V> implements DataStructure
 
     @Override
     @MethodNotAvailable
-    public void setTTL(K key, long duration, TimeUnit timeUnit) {
+    public void setTtl(K key, long duration, TimeUnit timeUnit) {
         throw new MethodNotAvailableException();
     }
 
@@ -292,6 +292,12 @@ public class TransactionalMapDataStructureAdapter<K, V> implements DataStructure
     @Override
     @MethodNotAvailable
     public void setExpiryPolicy(Set<K> keys, ExpiryPolicy expiryPolicy) {
+        throw new MethodNotAvailableException();
+    }
+
+    @Override
+    @MethodNotAvailable
+    public boolean setExpiryPolicy(K key, ExpiryPolicy expiryPolicy) {
         throw new MethodNotAvailableException();
     }
 

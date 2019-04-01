@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import com.hazelcast.instance.Node;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.Connection;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 
 /**
@@ -47,6 +49,7 @@ public class AuthenticationCustomCredentialsMessageTask
     }
 
     @Override
+    @SuppressWarnings("checkstyle:npathcomplexity")
     protected ClientAuthenticationCustomCodec.RequestParameters decodeClientMessage(ClientMessage clientMessage) {
         ClientAuthenticationCustomCodec.RequestParameters parameters = ClientAuthenticationCustomCodec
                 .decodeRequest(clientMessage);
@@ -60,6 +63,18 @@ public class AuthenticationCustomCredentialsMessageTask
         if (parameters.clientHazelcastVersionExist) {
             clientVersion = parameters.clientHazelcastVersion;
         }
+
+        if (parameters.clientNameExist) {
+            clientName = parameters.clientName;
+        }
+
+        if (parameters.labelsExist) {
+            labels = Collections.unmodifiableSet(new HashSet<String>(parameters.labels));
+        } else {
+            labels = Collections.emptySet();
+        }
+        partitionCount = parameters.partitionCountExist ? parameters.partitionCount : null;
+        clusterId = parameters.clusterIdExist ? parameters.clusterId : null;
         return parameters;
     }
 
@@ -70,10 +85,10 @@ public class AuthenticationCustomCredentialsMessageTask
 
     @Override
     protected ClientMessage encodeAuth(byte status, Address thisAddress, String uuid, String ownerUuid, byte version,
-                                       List<Member> cleanedUpMembers) {
+                                       List<Member> cleanedUpMembers, int partitionCount, String clusterId) {
         return ClientAuthenticationCustomCodec
                 .encodeResponse(status, thisAddress, uuid, ownerUuid, version, getMemberBuildInfo().getVersion(),
-                        cleanedUpMembers);
+                        cleanedUpMembers, partitionCount, clusterId);
     }
 
     @Override

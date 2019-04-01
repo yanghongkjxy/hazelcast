@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,17 @@ public class SocketInterceptorConfig {
     private String className;
     private Object implementation;
     private Properties properties = new Properties();
+
+    public SocketInterceptorConfig() {
+    }
+
+    public SocketInterceptorConfig(SocketInterceptorConfig socketInterceptorConfig) {
+        enabled = socketInterceptorConfig.enabled;
+        className = socketInterceptorConfig.className;
+        implementation = socketInterceptorConfig.implementation;
+        properties = new Properties();
+        properties.putAll(socketInterceptorConfig.properties);
+    }
 
     /**
      * Returns the name of the {@link com.hazelcast.nio.SocketInterceptor} implementation class.

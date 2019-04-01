@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,102 +17,90 @@
 package com.hazelcast.internal.ascii;
 
 import com.hazelcast.config.Config;
-import com.hazelcast.config.JoinConfig;
 import com.hazelcast.config.PermissionConfig;
+import com.hazelcast.config.RestApiConfig;
 import com.hazelcast.config.WanReplicationConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 import com.hazelcast.core.IQueue;
+import com.hazelcast.instance.EndpointQualifier;
 import com.hazelcast.internal.management.dto.WanReplicationConfigDTO;
 import com.hazelcast.internal.management.request.UpdatePermissionConfigRequest;
-import com.hazelcast.spi.properties.GroupProperty;
-import com.hazelcast.test.HazelcastSerialClassRunner;
+import com.hazelcast.test.HazelcastParallelClassRunner;
 import com.hazelcast.test.HazelcastTestSupport;
-import com.hazelcast.test.annotation.SlowTest;
+import com.hazelcast.test.TestAwareInstanceFactory;
+import com.hazelcast.test.annotation.QuickTest;
 import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.hazelcast.nio.IOUtil.readFully;
+import static com.hazelcast.test.HazelcastTestSupport.getNode;
+import static com.hazelcast.test.HazelcastTestSupport.randomMapName;
+import static com.hazelcast.test.HazelcastTestSupport.randomName;
+import static com.hazelcast.test.HazelcastTestSupport.randomString;
+import static com.hazelcast.test.HazelcastTestSupport.sleepAtLeastSeconds;
+import static com.hazelcast.util.StringUtil.bytesToString;
+import static com.hazelcast.util.StringUtil.stringToBytes;
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
+import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
- * This test is intentionally not in the {@link com.hazelcast.test.annotation.ParallelTest} category,
- * since it starts real HazelcastInstances which have REST enabled.
+ * Tests HTTP REST API.
  */
-@RunWith(HazelcastSerialClassRunner.class)
-@Category(SlowTest.class)
-public class RestTest extends HazelcastTestSupport {
+@RunWith(HazelcastParallelClassRunner.class)
+@Category(QuickTest.class)
+public class RestTest {
 
-    private static final AtomicInteger PORT = new AtomicInteger(5701);
+    protected final TestAwareInstanceFactory factory = new TestAwareInstanceFactory();
 
-    private HazelcastInstance instance;
-    private HazelcastInstance remoteInstance;
-    private HTTPCommunicator communicator;
-    private Config config = new Config();
+    protected HazelcastInstance instance;
+    protected HazelcastInstance remoteInstance;
+    protected HTTPCommunicator communicator;
+    protected Config config = new Config();
 
     @BeforeClass
     public static void beforeClass() {
         Hazelcast.shutdownAll();
     }
 
-    @AfterClass
-    public static void afterClass() {
-        Hazelcast.shutdownAll();
-    }
-
-    @Before
-    public void setup() {
-        config.getGroupConfig().setName(randomString());
-        config.setProperty(GroupProperty.REST_ENABLED.getName(), "true");
-
-        int firstPort = PORT.getAndIncrement();
-        int secondPort = PORT.getAndIncrement();
-
-        // we start pairs of HazelcastInstances which form a cluster to have remote invocations for all operations
-        JoinConfig join = config.getNetworkConfig().getJoin();
-        join.getMulticastConfig()
-                .setEnabled(false);
-        join.getTcpIpConfig()
-                .setEnabled(true)
-                .addMember("127.0.0.1:" + firstPort)
-                .addMember("127.0.0.1:" + secondPort);
-
-        config.getNetworkConfig().setPort(firstPort);
-        instance = Hazelcast.newHazelcastInstance(config);
-
-        config.getNetworkConfig().setPort(secondPort);
-        remoteInstance = Hazelcast.newHazelcastInstance(config);
-
+    public Config setup() {
+        Config config = new Config();
+        RestApiConfig restApiConfig = new RestApiConfig().setEnabled(true).enableAllGroups();
+        config.getNetworkConfig().setRestApiConfig(restApiConfig);
+        instance = factory.newHazelcastInstance(config);
         communicator = new HTTPCommunicator(instance);
+        return config;
     }
 
     @After
     public void tearDown() {
-        instance.getLifecycleService().terminate();
-        remoteInstance.getLifecycleService().terminate();
+        factory.terminateAll();
     }
 
     @Test
     public void testMapPutGet() throws Exception {
+        setup();
         testMapPutGet0();
     }
 
     @Test
     public void testMapPutGet_chunked() throws Exception {
+        setup();
         communicator.enableChunkedStreaming();
         testMapPutGet0();
     }
@@ -130,6 +118,7 @@ public class RestTest extends HazelcastTestSupport {
 
     @Test
     public void testMapPutDelete() throws Exception {
+        setup();
         String name = randomMapName();
 
         String key = "key";
@@ -142,6 +131,7 @@ public class RestTest extends HazelcastTestSupport {
 
     @Test
     public void testMapDeleteAll() throws Exception {
+        setup();
         String name = randomMapName();
 
         int count = 10;
@@ -159,6 +149,7 @@ public class RestTest extends HazelcastTestSupport {
     // issue #1783
     @Test
     public void testMapTtl() throws Exception {
+        Config config = setup();
         String name = randomMapName();
         config.getMapConfig(name)
                 .setTimeToLiveSeconds(2);
@@ -174,6 +165,7 @@ public class RestTest extends HazelcastTestSupport {
 
     @Test
     public void testQueueOfferPoll() throws Exception {
+        setup();
         String name = randomName();
 
         String item = communicator.queuePoll(name, 1);
@@ -191,6 +183,7 @@ public class RestTest extends HazelcastTestSupport {
 
     @Test
     public void testQueueSize() throws Exception {
+        setup();
         String name = randomName();
         IQueue<Integer> queue = instance.getQueue(name);
         for (int i = 0; i < 10; i++) {
@@ -202,48 +195,55 @@ public class RestTest extends HazelcastTestSupport {
 
     @Test
     public void syncMapOverWAN() throws Exception {
+        setup();
         String result = communicator.syncMapOverWAN("atob", "b", "default");
         assertEquals("{\"status\":\"fail\",\"message\":\"WAN sync for map is not supported.\"}", result);
     }
 
     @Test
     public void syncAllMapsOverWAN() throws Exception {
+        setup();
         String result = communicator.syncMapsOverWAN("atob", "b");
         assertEquals("{\"status\":\"fail\",\"message\":\"WAN sync is not supported.\"}", result);
     }
 
     @Test
     public void wanClearQueues() throws Exception {
+        setup();
         String result = communicator.wanClearQueues("atob", "b");
         assertEquals("{\"status\":\"fail\",\"message\":\"Clearing WAN replication queues is not supported.\"}", result);
     }
 
     @Test
     public void addWanConfig() throws Exception {
+        setup();
         WanReplicationConfig wanConfig = new WanReplicationConfig();
         wanConfig.setName("test");
         WanReplicationConfigDTO dto = new WanReplicationConfigDTO(wanConfig);
         String result = communicator.addWanConfig(dto.toJson().toString());
-        assertEquals("{\"status\":\"fail\",\"message\":\"java.lang.UnsupportedOperationException: Adding new WAN config is not supported.\"}", result);
+        assertEquals("{\"status\":\"fail\",\"message\":\"Adding new WAN config is not supported.\"}", result);
     }
 
     @Test
     public void updatePermissions() throws Exception {
+        Config config = setup();
         Set<PermissionConfig> permissionConfigs = new HashSet<PermissionConfig>();
         permissionConfigs.add(new PermissionConfig(PermissionConfig.PermissionType.MAP, "test", "*"));
         UpdatePermissionConfigRequest request = new UpdatePermissionConfigRequest(permissionConfigs);
         String result = communicator.updatePermissions(config.getGroupConfig().getName(),
-                config.getGroupConfig().getPassword(), request.toJson().toString());
+                "", request.toJson().toString());
         assertEquals("{\"status\":\"forbidden\"}", result);
     }
 
     @Test
     public void testMap_PutGet_withLargeValue() throws IOException {
+        setup();
         testMap_PutGet_withLargeValue0();
     }
 
     @Test
     public void testMap_PutGet_withLargeValue_chunked() throws IOException {
+        setup();
         communicator.enableChunkedStreaming();
         testMap_PutGet_withLargeValue0();
     }
@@ -267,11 +267,13 @@ public class RestTest extends HazelcastTestSupport {
 
     @Test
     public void testMap_PutGet_withLargeKey() throws IOException {
+        setup();
         testMap_PutGet_withLargeKey0();
     }
 
     @Test
     public void testMap_PutGet_withLargeKey_chunked() throws IOException {
+        setup();
         communicator.enableChunkedStreaming();
         testMap_PutGet_withLargeKey0();
     }
@@ -292,19 +294,89 @@ public class RestTest extends HazelcastTestSupport {
 
     @Test
     public void testMap_HeadRequest() throws IOException {
+        setup();
         int response = communicator.headRequestToMapURI().responseCode;
         assertEquals(HTTP_OK, response);
     }
 
     @Test
     public void testQueue_HeadRequest() throws IOException {
+        setup();
         int response = communicator.headRequestToQueueURI().responseCode;
         assertEquals(HTTP_OK, response);
     }
 
     @Test
     public void testUndefined_HeadRequest() throws IOException {
+        setup();
         int response = communicator.headRequestToUndefinedURI().responseCode;
+        assertEquals(HTTP_NOT_FOUND, response);
+    }
+
+    @Test
+    public void testUndefined_GetRequest() throws IOException {
+        setup();
+        int response = communicator.getRequestToUndefinedURI().responseCode;
+        assertEquals(HTTP_NOT_FOUND, response);
+    }
+
+    @Test
+    public void testUndefined_PostRequest() throws IOException {
+        setup();
+        int response = communicator.postRequestToUndefinedURI().responseCode;
+        assertEquals(HTTP_NOT_FOUND, response);
+    }
+
+    @Test
+    public void testUndefined_DeleteRequest() throws IOException {
+        setup();
+        int response = communicator.deleteRequestToUndefinedURI().responseCode;
+        assertEquals(HTTP_NOT_FOUND, response);
+    }
+
+    @Test
+    public void testBad_GetRequest() throws IOException {
+        setup();
+        int response = communicator.getBadRequestURI().responseCode;
         assertEquals(HTTP_BAD_REQUEST, response);
     }
+
+    @Test
+    public void testBad_PostRequest() throws IOException {
+        setup();
+        int response = communicator.postBadRequestURI().responseCode;
+        assertEquals(HTTP_BAD_REQUEST, response);
+    }
+
+    @Test
+    public void testBad_DeleteRequest() throws IOException {
+        setup();
+        int response = communicator.deleteBadRequestURI().responseCode;
+        assertEquals(HTTP_BAD_REQUEST, response);
+    }
+
+    /**
+     * Regression test for <a href="https://github.com/hazelcast/hazelcast/issues/14353">Issue #14353</a>.
+     */
+    @Test
+    public void testNoHeaders() throws IOException {
+        setup();
+        InetSocketAddress address = getNode(instance).getLocalMember().getSocketAddress(EndpointQualifier.REST);
+
+        HazelcastTestSupport.getAddress(instance);
+        Socket socket = new Socket(address.getAddress(), address.getPort());
+        socket.setSoTimeout(5000);
+        try {
+            OutputStream os = socket.getOutputStream();
+            os.write(stringToBytes("GET /hazelcast/rest/management/cluster/version HTTP/1.0\r\n\r\n"));
+            os.flush();
+            String expectedResponseHead = "HTTP/1.1 200";
+            byte[] responseCode = new byte[expectedResponseHead.length()];
+            readFully(socket.getInputStream(), responseCode);
+            assertEquals(expectedResponseHead, bytesToString(responseCode));
+        } finally {
+            socket.close();
+        }
+    }
+
 }

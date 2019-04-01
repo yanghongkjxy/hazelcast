@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import java.util.Map;
 
 import static com.hazelcast.util.Preconditions.checkNotNull;
 import static com.hazelcast.util.Preconditions.isNotNull;
+import static com.hazelcast.util.StringUtil.isNullOrEmptyAfterTrim;
 
 /**
  * Configuration object for a WAN publisher. A single publisher defines how
@@ -40,12 +41,14 @@ import static com.hazelcast.util.Preconditions.isNotNull;
  * @see DiscoveryConfig
  * @see AwsConfig
  */
+@SuppressWarnings("checkstyle:methodcount")
 public class WanPublisherConfig implements IdentifiedDataSerializable, Versioned {
 
     private static final int DEFAULT_QUEUE_CAPACITY = 10000;
     private static final WANQueueFullBehavior DEFAULT_QUEUE_FULL_BEHAVIOR = WANQueueFullBehavior.DISCARD_AFTER_MUTATION;
 
     private String groupName = "dev";
+    private String publisherId;
     private int queueCapacity = DEFAULT_QUEUE_CAPACITY;
     private WANQueueFullBehavior queueFullBehavior = DEFAULT_QUEUE_FULL_BEHAVIOR;
     private WanPublisherState initialPublisherState = WanPublisherState.REPLICATING;
@@ -53,8 +56,23 @@ public class WanPublisherConfig implements IdentifiedDataSerializable, Versioned
     private String className;
     private Object implementation;
     private AwsConfig awsConfig = new AwsConfig();
+    private GcpConfig gcpConfig = new GcpConfig();
+    private AzureConfig azureConfig = new AzureConfig();
+    private KubernetesConfig kubernetesConfig = new KubernetesConfig();
+    private EurekaConfig eurekaConfig = new EurekaConfig();
     private DiscoveryConfig discoveryConfig = new DiscoveryConfig();
     private WanSyncConfig wanSyncConfig = new WanSyncConfig();
+    /**
+     * WAN endpoint configuration qualifier. When using pre-3.12 network configuration, its value
+     * can be {@code null} and is not taken into account. With 3.12+ advanced network config,
+     * an {@link EndpointConfig} or {@link ServerSocketEndpointConfig} is looked up with
+     * protocol type {@code WAN} and this string as identifier. If such an {@link EndpointConfig}
+     * is found, its configuration is used when the WAN publisher opens a connection to the
+     * target cluster members.
+     *
+     * @since 3.12
+     */
+    private String endpoint;
 
     /**
      * Returns the config for the WAN sync mechanism.
@@ -75,26 +93,60 @@ public class WanPublisherConfig implements IdentifiedDataSerializable, Versioned
     }
 
     /**
-     * Returns the group name of this publisher. The group name is used for
-     * identifying the publisher in a {@link WanReplicationConfig} and for
-     * authentication on the target endpoint.
+     * Returns the group name used as an endpoint group name for authentication
+     * on the target endpoint.
+     * If there is no separate publisher ID property defined, this group name
+     * will also be used as a WAN publisher ID. This ID is then used for
+     * identifying the publisher in a {@link WanReplicationConfig}.
      *
-     * @return the publisher group name
+     * @return the WAN endpoint group name
+     * @see #getPublisherId()
      */
     public String getGroupName() {
         return groupName;
     }
 
     /**
-     * Set the group name of this publisher. The group name is used for
-     * identifying the publisher in a {@link WanReplicationConfig} and for
-     * authentication on the target endpoint.
+     * Sets the group name used as an endpoint group name for authentication
+     * on the target endpoint.
+     * If there is no separate publisher ID property defined, this group name
+     * will also be used as a WAN publisher ID. This ID is then used for
+     * identifying the publisher in a {@link WanReplicationConfig}.
      *
-     * @param groupName the publisher group name
+     * @param groupName the WAN endpoint group name
      * @return this config
+     * @see #getPublisherId()
      */
     public WanPublisherConfig setGroupName(String groupName) {
         this.groupName = groupName;
+        return this;
+    }
+
+    /**
+     * Returns the publisher ID used for identifying the publisher in a
+     * {@link WanReplicationConfig}.
+     * If there is no publisher ID defined (it is empty), the group name will
+     * be used as a publisher ID.
+     *
+     * @return the WAN publisher ID or {@code null} if no publisher ID is set
+     * @see #getGroupName()
+     */
+    public String getPublisherId() {
+        return publisherId;
+    }
+
+    /**
+     * Sets the publisher ID used for identifying the publisher in a
+     * {@link WanReplicationConfig}.
+     * If there is no publisher ID defined (it is empty), the group name will
+     * be used as a publisher ID.
+     *
+     * @param publisherId the WAN publisher ID
+     * @return this config
+     * @see #getGroupName()
+     */
+    public WanPublisherConfig setPublisherId(String publisherId) {
+        this.publisherId = !isNullOrEmptyAfterTrim(publisherId) ? publisherId : null;
         return this;
     }
 
@@ -261,6 +313,90 @@ public class WanPublisherConfig implements IdentifiedDataSerializable, Versioned
     }
 
     /**
+     * Returns the {@link GcpConfig} used by the discovery mechanism for this
+     * WAN publisher.
+     */
+    public GcpConfig getGcpConfig() {
+        return gcpConfig;
+    }
+
+    /**
+     * Sets the {@link GcpConfig} used by the discovery mechanism for this
+     * WAN publisher.
+     *
+     * @param gcpConfig the GCP discovery configuration
+     * @return this config
+     * @throws IllegalArgumentException if gcpConfig is null
+     */
+    public WanPublisherConfig setGcpConfig(final GcpConfig gcpConfig) {
+        this.gcpConfig = isNotNull(gcpConfig, "gcpConfig");
+        return this;
+    }
+
+    /**
+     * Returns the {@link AzureConfig} used by the discovery mechanism for this
+     * WAN publisher.
+     */
+    public AzureConfig getAzureConfig() {
+        return azureConfig;
+    }
+
+    /**
+     * Sets the {@link AzureConfig} used by the discovery mechanism for this
+     * WAN publisher.
+     *
+     * @param azureConfig the Azure discovery configuration
+     * @return this config
+     * @throws IllegalArgumentException if azureConfig is null
+     */
+    public WanPublisherConfig setAzureConfig(final AzureConfig azureConfig) {
+        this.azureConfig = isNotNull(azureConfig, "azureConfig");
+        return this;
+    }
+
+    /**
+     * Returns the {@link KubernetesConfig} used by the discovery mechanism for this
+     * WAN publisher.
+     */
+    public KubernetesConfig getKubernetesConfig() {
+        return kubernetesConfig;
+    }
+
+    /**
+     * Sets the {@link KubernetesConfig} used by the discovery mechanism for this
+     * WAN publisher.
+     *
+     * @param kubernetesConfig the Kubernetes discovery configuration
+     * @return this config
+     * @throws IllegalArgumentException if kubernetesConfig is null
+     */
+    public WanPublisherConfig setKubernetesConfig(final KubernetesConfig kubernetesConfig) {
+        this.kubernetesConfig = isNotNull(kubernetesConfig, "kubernetesConfig");
+        return this;
+    }
+
+    /**
+     * Returns the {@link EurekaConfig} used by the discovery mechanism for this
+     * WAN publisher.
+     */
+    public EurekaConfig getEurekaConfig() {
+        return eurekaConfig;
+    }
+
+    /**
+     * Sets the {@link EurekaConfig} used by the discovery mechanism for this
+     * WAN publisher.
+     *
+     * @param eurekaConfig the Eureka discovery configuration
+     * @return this config
+     * @throws IllegalArgumentException if eurekaConfig is null
+     */
+    public WanPublisherConfig setEurekaConfig(final EurekaConfig eurekaConfig) {
+        this.eurekaConfig = isNotNull(eurekaConfig, "eurekaConfig");
+        return this;
+    }
+
+    /**
      * Returns the currently defined {@link DiscoveryConfig} used by the
      * discovery mechanism for this WAN publisher.
      *
@@ -283,10 +419,20 @@ public class WanPublisherConfig implements IdentifiedDataSerializable, Versioned
         return this;
     }
 
+    public String getEndpoint() {
+        return endpoint;
+    }
+
+    public WanPublisherConfig setEndpoint(String endpoint) {
+        this.endpoint = endpoint;
+        return this;
+    }
+
     @Override
     public String toString() {
         return "WanPublisherConfig{"
                 + "groupName='" + groupName + '\''
+                + ", publisherId='" + publisherId + '\''
                 + ", queueCapacity=" + queueCapacity
                 + ", queueFullBehavior=" + queueFullBehavior
                 + ", initialPublisherState=" + initialPublisherState
@@ -295,7 +441,12 @@ public class WanPublisherConfig implements IdentifiedDataSerializable, Versioned
                 + ", className='" + className + '\''
                 + ", implementation=" + implementation
                 + ", awsConfig=" + awsConfig
+                + ", gcpConfig=" + gcpConfig
+                + ", azureConfig=" + azureConfig
+                + ", kubernetesConfig=" + kubernetesConfig
+                + ", eurekaConfig=" + eurekaConfig
                 + ", discoveryConfig=" + discoveryConfig
+                + ", endpoint=" + endpoint
                 + '}';
     }
 
@@ -327,6 +478,17 @@ public class WanPublisherConfig implements IdentifiedDataSerializable, Versioned
         if (out.getVersion().isGreaterOrEqual(Versions.V3_11)) {
             out.writeByte(initialPublisherState.getId());
             out.writeObject(wanSyncConfig);
+            out.writeUTF(publisherId);
+        }
+        // RU_COMPAT_3_11
+        if (out.getVersion().isGreaterOrEqual(Versions.V3_12)) {
+            out.writeObject(awsConfig);
+            out.writeObject(gcpConfig);
+            out.writeObject(azureConfig);
+            out.writeObject(kubernetesConfig);
+            out.writeObject(eurekaConfig);
+            out.writeObject(discoveryConfig);
+            out.writeUTF(endpoint);
         }
     }
 
@@ -346,6 +508,99 @@ public class WanPublisherConfig implements IdentifiedDataSerializable, Versioned
         if (in.getVersion().isGreaterOrEqual(Versions.V3_11)) {
             initialPublisherState = WanPublisherState.getByType(in.readByte());
             wanSyncConfig = in.readObject();
+            publisherId = in.readUTF();
         }
+        // RU_COMPAT_3_11
+        if (in.getVersion().isGreaterOrEqual(Versions.V3_12)) {
+            awsConfig = in.readObject();
+            gcpConfig = in.readObject();
+            azureConfig = in.readObject();
+            kubernetesConfig = in.readObject();
+            eurekaConfig = in.readObject();
+            discoveryConfig = in.readObject();
+            endpoint = in.readUTF();
+        }
+    }
+
+    @Override
+    @SuppressWarnings({"checkstyle:cyclomaticcomplexity", "checkstyle:npathcomplexity"})
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        WanPublisherConfig that = (WanPublisherConfig) o;
+
+        if (queueCapacity != that.queueCapacity) {
+            return false;
+        }
+        if (groupName != null ? !groupName.equals(that.groupName) : that.groupName != null) {
+            return false;
+        }
+        if (publisherId != null ? !publisherId.equals(that.publisherId) : that.publisherId != null) {
+            return false;
+        }
+        if (queueFullBehavior != that.queueFullBehavior) {
+            return false;
+        }
+        if (initialPublisherState != that.initialPublisherState) {
+            return false;
+        }
+        if (properties != null ? !properties.equals(that.properties) : that.properties != null) {
+            return false;
+        }
+        if (className != null ? !className.equals(that.className) : that.className != null) {
+            return false;
+        }
+        if (implementation != null ? !implementation.equals(that.implementation) : that.implementation != null) {
+            return false;
+        }
+        if (!awsConfig.equals(that.awsConfig)) {
+            return false;
+        }
+        if (!gcpConfig.equals(that.gcpConfig)) {
+            return false;
+        }
+        if (!azureConfig.equals(that.azureConfig)) {
+            return false;
+        }
+        if (!kubernetesConfig.equals(that.kubernetesConfig)) {
+            return false;
+        }
+        if (!eurekaConfig.equals(that.eurekaConfig)) {
+            return false;
+        }
+        if (!discoveryConfig.equals(that.discoveryConfig)) {
+            return false;
+        }
+        if (endpoint != null ? !endpoint.equals(that.endpoint) : that.endpoint != null) {
+            return false;
+        }
+        return wanSyncConfig != null ? wanSyncConfig.equals(that.wanSyncConfig) : that.wanSyncConfig == null;
+    }
+
+    @Override
+    @SuppressWarnings("checkstyle:npathcomplexity")
+    public int hashCode() {
+        int result = groupName != null ? groupName.hashCode() : 0;
+        result = 31 * result + (publisherId != null ? publisherId.hashCode() : 0);
+        result = 31 * result + queueCapacity;
+        result = 31 * result + (queueFullBehavior != null ? queueFullBehavior.hashCode() : 0);
+        result = 31 * result + initialPublisherState.hashCode();
+        result = 31 * result + (properties != null ? properties.hashCode() : 0);
+        result = 31 * result + (className != null ? className.hashCode() : 0);
+        result = 31 * result + (implementation != null ? implementation.hashCode() : 0);
+        result = 31 * result + awsConfig.hashCode();
+        result = 31 * result + gcpConfig.hashCode();
+        result = 31 * result + azureConfig.hashCode();
+        result = 31 * result + kubernetesConfig.hashCode();
+        result = 31 * result + eurekaConfig.hashCode();
+        result = 31 * result + discoveryConfig.hashCode();
+        result = 31 * result + (wanSyncConfig != null ? wanSyncConfig.hashCode() : 0);
+        result = 31 * result + (endpoint != null ? endpoint.hashCode() : 0);
+        return result;
     }
 }

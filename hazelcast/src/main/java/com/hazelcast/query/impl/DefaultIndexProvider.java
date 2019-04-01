@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ import com.hazelcast.query.impl.getters.Extractors;
 public class DefaultIndexProvider implements IndexProvider {
 
     @Override
-    public InternalIndex createIndex(String attributeName, boolean ordered, Extractors extractors,
+    public InternalIndex createIndex(String name, String[] components, boolean ordered, Extractors extractors,
                                      InternalSerializationService ss, IndexCopyBehavior copyBehavior, PerIndexStats stats) {
-        return new IndexImpl(attributeName, ordered, ss, extractors, copyBehavior, stats);
+        return new IndexImpl(name, components, ordered, ss, extractors, copyBehavior, stats);
     }
 
 }

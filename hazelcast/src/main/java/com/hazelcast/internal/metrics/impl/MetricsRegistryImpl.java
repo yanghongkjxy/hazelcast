@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,7 +63,7 @@ public class MetricsRegistryImpl implements MetricsRegistry {
     final ILogger logger;
     private final ProbeLevel minimumLevel;
 
-    private final ScheduledExecutorService scheduledExecutorService;
+    private final ScheduledExecutorService scheduler;
     private final ConcurrentMap<String, ProbeInstance> probeInstances = new ConcurrentHashMap<String, ProbeInstance>();
 
     // use ConcurrentReferenceHashMap to allow unreferenced Class instances to be garbage collected
@@ -99,8 +99,7 @@ public class MetricsRegistryImpl implements MetricsRegistry {
     public MetricsRegistryImpl(String name, ILogger logger, ProbeLevel minimumLevel) {
         this.logger = checkNotNull(logger, "logger can't be null");
         this.minimumLevel = checkNotNull(minimumLevel, "minimumLevel can't be null");
-
-        scheduledExecutorService = new ScheduledThreadPoolExecutor(2,
+        this.scheduler = new ScheduledThreadPoolExecutor(2,
                 new ThreadFactoryImpl(createThreadPoolName(name, "MetricsRegistry")));
 
         if (logger.isFinestEnabled()) {
@@ -335,12 +334,16 @@ public class MetricsRegistryImpl implements MetricsRegistry {
     }
 
     @Override
-    public void scheduleAtFixedRate(final Runnable publisher, long period, TimeUnit timeUnit) {
-        scheduledExecutorService.scheduleAtFixedRate(publisher, 0, period, timeUnit);
+    public void scheduleAtFixedRate(Runnable publisher, long period, TimeUnit timeUnit, ProbeLevel probeLevel) {
+        if (!probeLevel.isEnabled(minimumLevel)) {
+            return;
+        }
+        scheduler.scheduleAtFixedRate(publisher, 0, period, timeUnit);
     }
 
     public void shutdown() {
-        scheduledExecutorService.shutdown();
+        // we want to immediately terminate; we don't want to wait till pending tasks have completed.
+        scheduler.shutdownNow();
     }
 
     private static class SortedProbeInstances {

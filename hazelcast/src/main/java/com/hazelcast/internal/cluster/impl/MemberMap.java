@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -132,7 +132,7 @@ final class MemberMap {
             }
         }
 
-        return new MemberMap(source.version + 1, addressMap, uuidMap);
+        return new MemberMap(source.version + excludeMembers.length, addressMap, uuidMap);
     }
 
     /**
@@ -179,22 +179,10 @@ final class MemberMap {
         MemberImpl member1 = addressToMemberMap.get(address);
         MemberImpl member2 = uuidToMemberMap.get(uuid);
 
-        if (member1 != null && member2 != null && member1.equals(member2)) {
+        if (member1 != null && member1.equals(member2)) {
             return member1;
         }
         return null;
-    }
-
-    public int getMemberIndex(MemberImpl member) {
-        int i = 0;
-        for (MemberImpl m : members) {
-            if (m.equals(member)) {
-                return i;
-            }
-            i++;
-        }
-
-        throw new IllegalArgumentException(member + " is not present in " + members);
     }
 
     boolean contains(Address address) {

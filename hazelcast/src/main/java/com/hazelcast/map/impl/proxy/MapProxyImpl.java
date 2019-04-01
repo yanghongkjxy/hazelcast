@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import com.hazelcast.core.IMap;
 import com.hazelcast.core.ManagedContext;
 import com.hazelcast.internal.journal.EventJournalInitialSubscriberState;
 import com.hazelcast.internal.journal.EventJournalReader;
+import com.hazelcast.internal.util.SimpleCompletedFuture;
 import com.hazelcast.map.EntryProcessor;
 import com.hazelcast.map.MapInterceptor;
 import com.hazelcast.map.QueryCache;
@@ -41,7 +42,6 @@ import com.hazelcast.map.impl.query.AggregationResult;
 import com.hazelcast.map.impl.query.QueryResult;
 import com.hazelcast.map.impl.query.Target;
 import com.hazelcast.map.impl.querycache.QueryCacheContext;
-import com.hazelcast.map.impl.querycache.subscriber.NodeQueryCacheEndToEndConstructor;
 import com.hazelcast.map.impl.querycache.subscriber.QueryCacheEndToEndProvider;
 import com.hazelcast.map.impl.querycache.subscriber.QueryCacheRequest;
 import com.hazelcast.map.impl.querycache.subscriber.SubscriberContext;
@@ -74,6 +74,7 @@ import com.hazelcast.util.executor.DelegatingFuture;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -88,6 +89,7 @@ import static com.hazelcast.map.impl.MapService.SERVICE_NAME;
 import static com.hazelcast.map.impl.query.QueryResultUtils.transformToSet;
 import static com.hazelcast.map.impl.querycache.subscriber.QueryCacheRequest.newQueryCacheRequest;
 import static com.hazelcast.map.impl.recordstore.RecordStore.DEFAULT_MAX_IDLE;
+import static com.hazelcast.util.ExceptionUtil.rethrow;
 import static com.hazelcast.util.MapUtil.createHashMap;
 import static com.hazelcast.util.Preconditions.checkNoNullInside;
 import static com.hazelcast.util.Preconditions.checkNotInstanceOf;
@@ -444,10 +446,10 @@ public class MapProxyImpl<K, V> extends MapProxySupport<K, V> implements EventJo
     }
 
     @Override
-    public void setTTL(K key, long ttl, TimeUnit timeunit) {
+    public boolean setTtl(K key, long ttl, TimeUnit timeunit) {
         checkNotNull(key);
         checkNotNull(timeunit);
-        setTTLInternal(key, ttl, timeunit);
+        return setTtlInternal(key, ttl, timeunit);
     }
 
     @Override
@@ -731,6 +733,7 @@ public class MapProxyImpl<K, V> extends MapProxySupport<K, V> implements EventJo
     private Set executePredicate(Predicate predicate, IterationType iterationType, boolean uniqueResult) {
         checkNotNull(predicate, NULL_PREDICATE_IS_NOT_ALLOWED);
         QueryResult result = executeQueryInternal(predicate, iterationType, Target.ALL_NODES);
+        incrementOtherOperationsStat();
         return transformToSet(serializationService, result, predicate, iterationType, uniqueResult, false);
     }
 
@@ -744,6 +747,7 @@ public class MapProxyImpl<K, V> extends MapProxySupport<K, V> implements EventJo
     public Set<K> localKeySet(Predicate predicate) {
         checkNotNull(predicate, NULL_PREDICATE_IS_NOT_ALLOWED);
         QueryResult result = executeQueryInternal(predicate, IterationType.KEY, Target.LOCAL_NODE);
+        incrementOtherOperationsStat();
         return transformToSet(serializationService, result, predicate, IterationType.KEY, false, false);
     }
 
@@ -758,14 +762,25 @@ public class MapProxyImpl<K, V> extends MapProxySupport<K, V> implements EventJo
 
     @Override
     public Map<K, Object> executeOnKeys(Set<K> keys, EntryProcessor entryProcessor) {
+        try {
+            return submitToKeys(keys, entryProcessor).get();
+        } catch (Exception e) {
+            throw rethrow(e);
+        }
+    }
+
+    /**
+     * Async version of {@link #executeOnKeys}.
+     */
+    public ICompletableFuture<Map<K, Object>> submitToKeys(Set<K> keys, EntryProcessor entryProcessor) {
         checkNotNull(keys, NULL_KEYS_ARE_NOT_ALLOWED);
+        if (keys.isEmpty()) {
+            return new SimpleCompletedFuture<Map<K, Object>>(Collections.<K, Object>emptyMap());
+        }
         handleHazelcastInstanceAwareParams(entryProcessor);
 
-        if (keys.isEmpty()) {
-            return emptyMap();
-        }
         Set<Data> dataKeys = createHashSet(keys.size());
-        return executeOnKeysInternal(keys, dataKeys, entryProcessor);
+        return submitToKeysInternal(keys, dataKeys, entryProcessor);
     }
 
     @Override
@@ -991,7 +1006,7 @@ public class MapProxyImpl<K, V> extends MapProxySupport<K, V> implements EventJo
             int maxSize,
             int partitionId,
             com.hazelcast.util.function.Predicate<? super EventJournalMapEvent<K, V>> predicate,
-            Projection<? super EventJournalMapEvent<K, V>, ? extends T> projection) {
+            com.hazelcast.util.function.Function<? super EventJournalMapEvent<K, V>, ? extends T> projection) {
         if (maxSize < minSize) {
             throw new IllegalArgumentException("maxSize " + maxSize
                     + " must be greater or equal to minSize " + minSize);
@@ -1057,7 +1072,7 @@ public class MapProxyImpl<K, V> extends MapProxySupport<K, V> implements EventJo
         SubscriberContext subscriberContext = queryCacheContext.getSubscriberContext();
         QueryCacheEndToEndProvider queryCacheEndToEndProvider = subscriberContext.getEndToEndQueryCacheProvider();
         return queryCacheEndToEndProvider.getOrCreateQueryCache(request.getMapName(), request.getCacheName(),
-                new NodeQueryCacheEndToEndConstructor(request));
+                subscriberContext.newEndToEndConstructor(request));
     }
 
     private static void checkNotPagingPredicate(Predicate predicate, String method) {

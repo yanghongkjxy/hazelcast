@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package com.hazelcast.internal.partition.impl;
 
+import com.hazelcast.cluster.ClusterState;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.ListenerConfig;
 import com.hazelcast.core.HazelcastInstance;
@@ -25,6 +26,8 @@ import com.hazelcast.internal.partition.InternalPartitionService;
 import com.hazelcast.internal.partition.MigrationInfo;
 import com.hazelcast.internal.partition.impl.InternalMigrationListenerTest.InternalMigrationListenerImpl;
 import com.hazelcast.internal.partition.impl.InternalMigrationListenerTest.MigrationProgressNotification;
+import com.hazelcast.logging.LogEvent;
+import com.hazelcast.logging.LogListener;
 import com.hazelcast.nio.Address;
 import com.hazelcast.spi.properties.GroupProperty;
 import com.hazelcast.test.AssertTask;
@@ -42,6 +45,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.logging.Level;
 
 import static com.hazelcast.internal.partition.MigrationInfo.MigrationStatus.SUCCESS;
 import static com.hazelcast.internal.partition.impl.InternalMigrationListenerTest.MigrationProgressEvent.COMMIT;
@@ -49,6 +53,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(HazelcastParallelClassRunner.class)
@@ -461,7 +466,7 @@ public class MigrationCommitTest extends HazelcastTestSupport {
                 InternalPartitionServiceImpl partitionService = (InternalPartitionServiceImpl) getPartitionService(hz1);
                 boolean found = false;
                 for (MigrationInfo migrationInfo : partitionService.getMigrationManager().getCompletedMigrationsCopy()) {
-                    if (migrationInfo.getStatus() == SUCCESS && migrationInfo.getDestination().equals(getAddress(hz3))) {
+                    if (migrationInfo.getStatus() == SUCCESS && migrationInfo.getDestinationAddress().equals(getAddress(hz3))) {
                         found = true;
                     }
                 }
@@ -480,6 +485,33 @@ public class MigrationCommitTest extends HazelcastTestSupport {
         }, 10);
 
         migrationCommitLatch.countDown();
+    }
+
+    @Test
+    public void assignCompletelyLostPartitionsIsCalledNoExceptions() {
+        Config config = createConfig();
+        config.setLiteMember(true);
+        HazelcastInstance hz1 = factory.newHazelcastInstance(config);
+        HazelcastInstance hz2 = factory.newHazelcastInstance(createConfig());
+
+        warmUpPartitions(hz1, hz2);
+        waitAllForSafeState(hz1, hz2);
+
+        final AtomicReference<Throwable> exceptionRef = new AtomicReference<Throwable>();
+        hz1.getLoggingService().addLogListener(Level.WARNING, new LogListener() {
+            @Override
+            public void log(LogEvent logEvent) {
+                if (logEvent.getLogRecord().getThrown() != null) {
+                    exceptionRef.set(logEvent.getLogRecord().getThrown());
+                }
+            }
+        });
+
+        hz1.getCluster().changeClusterState(ClusterState.NO_MIGRATION);
+        hz2.getLifecycleService().shutdown();
+        waitAllForSafeState(hz1);
+
+        assertNull(exceptionRef.get());
     }
 
     private Config createConfig() {

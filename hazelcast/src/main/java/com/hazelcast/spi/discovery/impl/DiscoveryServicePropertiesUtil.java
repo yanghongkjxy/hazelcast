@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,14 +54,14 @@ final class DiscoveryServicePropertiesUtil {
 
         for (PropertyDefinition propertyDefinition : propertyDefinitions) {
             String propertyKey = propertyDefinition.key();
-            Comparable value = properties.get(propertyKey);
-            if (value == null) {
+            if (!properties.containsKey(propertyKey)) {
                 if (!propertyDefinition.optional()) {
                     throw new InvalidConfigurationException(
                             String.format("Missing property '%s' on discovery strategy", propertyKey));
                 }
                 continue;
             }
+            Comparable value = properties.get(propertyKey);
 
             TypeConverter typeConverter = propertyDefinition.typeConverter();
             Comparable mappedValue = typeConverter.convert(value);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ public class MapPutMessageTask
     protected Operation prepareOperation() {
         MapOperationProvider operationProvider = getMapOperationProvider(parameters.name);
         MapOperation op = operationProvider.createPutOperation(parameters.name, parameters.key,
-                parameters.value, parameters.ttl, parameters.maxIdleExist ? parameters.maxIdle : DEFAULT_MAX_IDLE);
+                parameters.value, parameters.ttl, DEFAULT_MAX_IDLE);
         op.setThreadId(parameters.threadId);
         return op;
     }

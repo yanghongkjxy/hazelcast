@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -104,10 +104,10 @@ public class QueryAdvancedTest extends HazelcastTestSupport {
 
     @Test
     @SuppressWarnings("deprecation")
-    public void testQueryWithTTL() throws Exception {
+    public void testQueryWithTTL() {
         Config config = getConfig();
         String mapName = "default";
-        config.getMapConfig(mapName).setTimeToLiveSeconds(5);
+        config.getMapConfig(mapName).setTimeToLiveSeconds(10);
 
         HazelcastInstance instance = createHazelcastInstance(config);
 
@@ -140,7 +140,9 @@ public class QueryAdvancedTest extends HazelcastTestSupport {
 
         // check the query result before eviction
         Collection values = map.values(new SqlPredicate("active"));
-        assertEquals(activeEmployees, values.size());
+        assertEquals(String.format("Expected %s results but got %s. Number of evicted entries: %s.",
+                activeEmployees, values.size(), allEmployees - latch.getCount()),
+                activeEmployees, values.size());
 
         // wait until eviction is completed
         assertOpenEventually(latch);
@@ -151,7 +153,7 @@ public class QueryAdvancedTest extends HazelcastTestSupport {
     }
 
     @Test
-    public void testTwoNodesWithPartialIndexes() throws Exception {
+    public void testTwoNodesWithPartialIndexes() {
         Config config = getConfig();
         TestHazelcastInstanceFactory nodeFactory = createHazelcastInstanceFactory(2);
         HazelcastInstance instance1 = nodeFactory.newHazelcastInstance(config);
@@ -197,7 +199,7 @@ public class QueryAdvancedTest extends HazelcastTestSupport {
     }
 
     @Test
-    public void testTwoNodesWithIndexes() throws Exception {
+    public void testTwoNodesWithIndexes() {
         Config config = getConfig();
         TestHazelcastInstanceFactory nodeFactory = createHazelcastInstanceFactory(2);
         HazelcastInstance instance1 = nodeFactory.newHazelcastInstance(config);

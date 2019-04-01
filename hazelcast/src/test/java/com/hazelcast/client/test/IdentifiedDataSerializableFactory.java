@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,9 @@
 
 package com.hazelcast.client.test;
 
+import com.hazelcast.client.test.ringbuffer.filter.StartsWithStringFilter;
+import com.hazelcast.core.HazelcastInstance;
+import com.hazelcast.core.HazelcastInstanceAware;
 import com.hazelcast.map.EntryBackupProcessor;
 import com.hazelcast.map.EntryProcessor;
 import com.hazelcast.map.MapInterceptor;
@@ -48,7 +51,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
         }
 
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         public int getId() {
@@ -78,7 +81,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
         }
 
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         public int getClassId() {
@@ -106,7 +109,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
         }
 
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         public int getId() {
@@ -127,7 +130,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
 
         @Override
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         @Override
@@ -168,7 +171,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
 
         @Override
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         @Override
@@ -212,7 +215,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
     class KeyMultiplierWithNullableResult extends KeyMultiplier {
         @Override
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         @Override
@@ -234,7 +237,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
 
         @Override
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         @Override
@@ -263,7 +266,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
 
         @Override
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         @Override
@@ -368,7 +371,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
 
         @Override
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         @Override
@@ -424,7 +427,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
 
         @Override
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         @Override
@@ -448,7 +451,7 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
     class BaseDataSerializable implements IdentifiedDataSerializable {
         @Override
         public int getFactoryId() {
-            return 666;
+            return FACTORY_ID;
         }
 
         @Override
@@ -481,6 +484,56 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
         }
     }
 
+    public static class CallableSignalsRunAndSleep implements Callable, IdentifiedDataSerializable, HazelcastInstanceAware {
+
+        private transient HazelcastInstance hazelcastInstance;
+        private String startSignalLatchName;
+
+        public CallableSignalsRunAndSleep() {
+
+        }
+
+        public CallableSignalsRunAndSleep(String startSignalLatchName) {
+            this.startSignalLatchName = startSignalLatchName;
+        }
+
+        @Override
+        public Object call() {
+            hazelcastInstance.getCountDownLatch("callableStartedLatch").countDown();
+            try {
+                Thread.sleep(Long.MAX_VALUE);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+
+        @Override
+        public void setHazelcastInstance(HazelcastInstance hazelcastInstance) {
+            this.hazelcastInstance = hazelcastInstance;
+        }
+
+        @Override
+        public int getFactoryId() {
+            return FACTORY_ID;
+        }
+
+        @Override
+        public int getId() {
+            return 13;
+        }
+
+        @Override
+        public void writeData(ObjectDataOutput out) throws IOException {
+            out.writeUTF(startSignalLatchName);
+        }
+
+        @Override
+        public void readData(ObjectDataInput in) throws IOException {
+            startSignalLatchName = in.readUTF();
+        }
+    }
+
     @Override
     public IdentifiedDataSerializable create(int typeId) {
         switch (typeId) {
@@ -508,8 +561,20 @@ public class IdentifiedDataSerializableFactory implements DataSerializableFactor
                 return new Derived1DataSerializable();
             case 12:
                 return new Derived2DataSerializable();
+            case 13:
+                return new CallableSignalsRunAndSleep();
+            case StartsWithStringFilter.CLASS_ID:
+                return new StartsWithStringFilter();
             default:
                 return null;
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        return o != null && getClass() == o.getClass();
     }
 }

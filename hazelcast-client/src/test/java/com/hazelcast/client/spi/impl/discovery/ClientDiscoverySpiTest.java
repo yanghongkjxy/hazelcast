@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.config.ClientNetworkConfig;
 import com.hazelcast.client.config.XmlClientConfigBuilder;
 import com.hazelcast.client.connection.AddressTranslator;
-import com.hazelcast.config.AwsConfig;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.DiscoveryConfig;
 import com.hazelcast.config.DiscoveryStrategyConfig;
@@ -119,9 +118,6 @@ public class ClientDiscoverySpiTest extends HazelcastTestSupport {
         ClientConfig clientConfig = new XmlClientConfigBuilder(xmlResource).build();
 
         ClientNetworkConfig networkConfig = clientConfig.getNetworkConfig();
-
-        AwsConfig awsConfig = networkConfig.getAwsConfig();
-        assertNull(awsConfig);
 
         DiscoveryConfig discoveryConfig = networkConfig.getDiscoveryConfig();
         assertTrue(discoveryConfig.isEnabled());
@@ -364,6 +360,7 @@ public class ClientDiscoverySpiTest extends HazelcastTestSupport {
         ClientNetworkConfig networkConfig = config.getNetworkConfig();
         networkConfig.setConnectionAttemptLimit(1);
         networkConfig.setConnectionAttemptPeriod(1);
+        networkConfig.getDiscoveryConfig().addDiscoveryStrategyConfig(new DiscoveryStrategyConfig());
         networkConfig.getDiscoveryConfig().setDiscoveryServiceProvider(discoveryServiceProvider);
 
         try {
@@ -381,15 +378,16 @@ public class ClientDiscoverySpiTest extends HazelcastTestSupport {
         config.setProperty(GroupProperty.DISCOVERY_SPI_ENABLED.getName(), "true");
 
         final DiscoveryService discoveryService = mock(DiscoveryService.class);
+        when(discoveryService.discoverNodes()).thenReturn(Collections.<DiscoveryNode>emptyList());
         DiscoveryServiceProvider discoveryServiceProvider = new DiscoveryServiceProvider() {
             public DiscoveryService newDiscoveryService(DiscoveryServiceSettings arg0) {
-                when(discoveryService.discoverNodes()).thenReturn(Collections.<DiscoveryNode>emptyList());
                 return discoveryService;
             }
         };
         ClientNetworkConfig networkConfig = config.getNetworkConfig();
         networkConfig.setConnectionAttemptLimit(1);
         networkConfig.setConnectionAttemptPeriod(1);
+        networkConfig.getDiscoveryConfig().addDiscoveryStrategyConfig(new DiscoveryStrategyConfig());
         networkConfig.getDiscoveryConfig().setDiscoveryServiceProvider(discoveryServiceProvider);
 
         try {

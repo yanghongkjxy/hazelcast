@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -338,7 +338,7 @@ public final class StringUtil {
             return null;
         }
         String[] splitWithEmptyValues = trim(input).split("\\s*,\\s*", -1);
-        return allowEmpty ? splitWithEmptyValues : subraction(splitWithEmptyValues, new String[]{""});
+        return allowEmpty ? splitWithEmptyValues : subtraction(splitWithEmptyValues, new String[]{""});
     }
 
     /**
@@ -367,7 +367,7 @@ public final class StringUtil {
      * @param arr2 second array
      * @return arr1 without values which are not present in arr2
      */
-    public static String[] subraction(String[] arr1, String[] arr2) {
+    public static String[] subtraction(String[] arr1, String[] arr2) {
         if (arr1 == null || arr1.length == 0 || arr2 == null || arr2.length == 0) {
             return arr1;
         }

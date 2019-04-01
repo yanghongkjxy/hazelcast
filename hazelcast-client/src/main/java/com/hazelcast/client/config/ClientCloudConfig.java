@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,14 @@ public class ClientCloudConfig {
     private String discoveryToken;
     private boolean enabled;
 
+    public ClientCloudConfig() {
+    }
+
+    public ClientCloudConfig(ClientCloudConfig cloudConfig) {
+        discoveryToken = cloudConfig.discoveryToken;
+        enabled = cloudConfig.enabled;
+    }
+
     /**
      * hazelcast.cloud discoveryToken of your cluster
      *
@@ -35,7 +43,7 @@ public class ClientCloudConfig {
 
     /**
      * @param discoveryToken hazelcast.cloud discoveryToken of your cluster
-     * @return this for chaining
+     * @return configured {@link com.hazelcast.client.config.ClientCloudConfig} for chaining
      */
     public ClientCloudConfig setDiscoveryToken(String discoveryToken) {
         this.discoveryToken = discoveryToken;
@@ -51,8 +59,34 @@ public class ClientCloudConfig {
 
     /**
      * @param enabled true to use hazelcast.cloud
+     * @return configured {@link com.hazelcast.client.config.ClientCloudConfig} for chaining
      */
-    public void setEnabled(boolean enabled) {
+    public ClientCloudConfig setEnabled(boolean enabled) {
         this.enabled = enabled;
+        return this;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        ClientCloudConfig that = (ClientCloudConfig) o;
+
+        if (enabled != that.enabled) {
+            return false;
+        }
+        return discoveryToken != null ? discoveryToken.equals(that.discoveryToken) : that.discoveryToken == null;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = discoveryToken != null ? discoveryToken.hashCode() : 0;
+        result = 31 * result + (enabled ? 1 : 0);
+        return result;
     }
 }

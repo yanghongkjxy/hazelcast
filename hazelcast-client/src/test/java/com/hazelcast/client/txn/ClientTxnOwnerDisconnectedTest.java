@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,21 +18,16 @@ package com.hazelcast.client.txn;
 
 import com.atomikos.icatch.jta.UserTransactionManager;
 import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.client.HazelcastClientFactory;
-import com.hazelcast.client.HazelcastClientManager;
+import com.hazelcast.client.HazelcastClientUtil;
 import com.hazelcast.client.config.ClientConfig;
 import com.hazelcast.client.connection.AddressProvider;
-import com.hazelcast.client.impl.clientside.ClientConnectionManagerFactory;
-import com.hazelcast.client.impl.clientside.HazelcastClientInstanceImpl;
-import com.hazelcast.client.impl.clientside.HazelcastClientProxy;
+import com.hazelcast.client.connection.Addresses;
 import com.hazelcast.client.spi.properties.ClientProperty;
 import com.hazelcast.client.test.ClientTestSupport;
-import com.hazelcast.client.util.AddressHelper;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.LifecycleEvent;
 import com.hazelcast.core.LifecycleListener;
-import com.hazelcast.nio.Address;
 import com.hazelcast.test.HazelcastSerialClassRunner;
 import com.hazelcast.test.annotation.QuickTest;
 import com.hazelcast.transaction.HazelcastXAResource;
@@ -47,9 +42,10 @@ import org.junit.runner.RunWith;
 import javax.transaction.Transaction;
 import java.io.File;
 import java.io.FilenameFilter;
-import java.util.Collection;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import static com.hazelcast.client.util.AddressHelper.getSocketAddresses;
 
 @RunWith(HazelcastSerialClassRunner.class)
 @Category(QuickTest.class)
@@ -75,7 +71,7 @@ public class ClientTxnOwnerDisconnectedTest extends ClientTestSupport {
         final CountDownLatch testFinished = new CountDownLatch(1);
         final AddressProvider addressProvider = new AddressProvider() {
             @Override
-            public Collection<Address> loadAddresses() {
+            public Addresses loadAddresses() {
                 if (waitFlag.get()) {
                     try {
                         testFinished.await();
@@ -83,22 +79,12 @@ public class ClientTxnOwnerDisconnectedTest extends ClientTestSupport {
                         e.printStackTrace();
                     }
                 }
-                return AddressHelper.getSocketAddresses("127.0.0.1");
+                return getSocketAddresses("127.0.0.1");
             }
         };
         clientConfig.getNetworkConfig().setConnectionAttemptLimit(Integer.MAX_VALUE);
         clientConfig.setProperty(ClientProperty.INVOCATION_TIMEOUT_SECONDS.getName(), "3");
-        final HazelcastInstance client = HazelcastClientManager.newHazelcastClient(clientConfig, new HazelcastClientFactory() {
-            @Override
-            public HazelcastClientInstanceImpl createHazelcastInstanceClient(ClientConfig config, ClientConnectionManagerFactory factory) {
-                return new HazelcastClientInstanceImpl(config, factory, addressProvider);
-            }
-
-            @Override
-            public HazelcastClientProxy createProxy(HazelcastClientInstanceImpl client) {
-                return new HazelcastClientProxy(client);
-            }
-        });
+        HazelcastInstance client = HazelcastClientUtil.newHazelcastClient(addressProvider, clientConfig);
 
         Hazelcast.newHazelcastInstance();
         final TransactionContext context = client.newTransactionContext();
@@ -133,7 +119,7 @@ public class ClientTxnOwnerDisconnectedTest extends ClientTestSupport {
         final CountDownLatch testFinished = new CountDownLatch(1);
         final AddressProvider addressProvider = new AddressProvider() {
             @Override
-            public Collection<Address> loadAddresses() {
+            public Addresses loadAddresses() {
                 if (waitFlag.get()) {
                     try {
                         testFinished.await();
@@ -141,23 +127,12 @@ public class ClientTxnOwnerDisconnectedTest extends ClientTestSupport {
                         e.printStackTrace();
                     }
                 }
-                return AddressHelper.getSocketAddresses("127.0.0.1");
+                return getSocketAddresses("127.0.0.1");
             }
         };
         clientConfig.getNetworkConfig().setConnectionAttemptLimit(Integer.MAX_VALUE);
         clientConfig.setProperty(ClientProperty.INVOCATION_TIMEOUT_SECONDS.getName(), "3");
-        final HazelcastInstance client = HazelcastClientManager.newHazelcastClient(clientConfig, new HazelcastClientFactory() {
-            @Override
-            public HazelcastClientInstanceImpl createHazelcastInstanceClient(ClientConfig config, ClientConnectionManagerFactory factory) {
-                return new HazelcastClientInstanceImpl(config, factory, addressProvider);
-            }
-
-            @Override
-            public HazelcastClientProxy createProxy(HazelcastClientInstanceImpl client) {
-                return new HazelcastClientProxy(client);
-            }
-        });
-
+        HazelcastInstance client = HazelcastClientUtil.newHazelcastClient(addressProvider, clientConfig);
 
         Hazelcast.newHazelcastInstance();
 
@@ -191,7 +166,7 @@ public class ClientTxnOwnerDisconnectedTest extends ClientTestSupport {
         final CountDownLatch testFinished = new CountDownLatch(1);
         final AddressProvider addressProvider = new AddressProvider() {
             @Override
-            public Collection<Address> loadAddresses() {
+            public Addresses loadAddresses() {
                 if (waitFlag.get()) {
                     try {
                         testFinished.await();
@@ -199,23 +174,13 @@ public class ClientTxnOwnerDisconnectedTest extends ClientTestSupport {
                         e.printStackTrace();
                     }
                 }
-                return AddressHelper.getSocketAddresses("127.0.0.1");
+                return getSocketAddresses("127.0.0.1");
             }
         };
         clientConfig.getNetworkConfig().setConnectionAttemptLimit(Integer.MAX_VALUE);
         clientConfig.setProperty(ClientProperty.INVOCATION_TIMEOUT_SECONDS.getName(), "3");
         clientConfig.setProperty(ClientProperty.ALLOW_INVOCATIONS_WHEN_DISCONNECTED.getName(), "true");
-        final HazelcastInstance client = HazelcastClientManager.newHazelcastClient(clientConfig, new HazelcastClientFactory() {
-            @Override
-            public HazelcastClientInstanceImpl createHazelcastInstanceClient(ClientConfig config, ClientConnectionManagerFactory factory) {
-                return new HazelcastClientInstanceImpl(config, factory, addressProvider);
-            }
-
-            @Override
-            public HazelcastClientProxy createProxy(HazelcastClientInstanceImpl client) {
-                return new HazelcastClientProxy(client);
-            }
-        });
+        HazelcastInstance client = HazelcastClientUtil.newHazelcastClient(addressProvider, clientConfig);
 
         Hazelcast.newHazelcastInstance();
 

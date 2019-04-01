@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -75,6 +75,7 @@ public class ClientInvocation implements Runnable {
     private volatile ClientConnection sendConnection;
     private EventHandler handler;
     private volatile long invokeCount;
+    private volatile long invocationTimeoutMillis;
 
     protected ClientInvocation(HazelcastClientInstanceImpl client,
                                ClientMessage clientMessage,
@@ -97,6 +98,7 @@ public class ClientInvocation implements Runnable {
         this.callIdSequence = invocationService.getCallIdSequence();
         this.clientInvocationFuture = new ClientInvocationFuture(this, executionService,
                 clientMessage, logger, callIdSequence);
+        this.invocationTimeoutMillis = invocationService.getInvocationTimeoutMillis();
     }
 
     /**
@@ -195,6 +197,10 @@ public class ClientInvocation implements Runnable {
         }
     }
 
+    public void setInvocationTimeoutMillis(long invocationTimeoutMillis) {
+        this.invocationTimeoutMillis = invocationTimeoutMillis;
+    }
+
     public void notify(ClientMessage clientMessage) {
         if (clientMessage == null) {
             throw new IllegalArgumentException("response can't be null");
@@ -224,7 +230,7 @@ public class ClientInvocation implements Runnable {
         }
 
         long timePassed = System.currentTimeMillis() - startTimeMillis;
-        if (timePassed > invocationService.getInvocationTimeoutMillis()) {
+        if (timePassed > invocationTimeoutMillis) {
             if (logger.isFinestEnabled()) {
                 logger.finest("Exception will not be retried because invocation timed out", exception);
             }
@@ -236,7 +242,7 @@ public class ClientInvocation implements Runnable {
         try {
             execute();
         } catch (RejectedExecutionException e) {
-            clientInvocationFuture.complete(exception);
+            clientInvocationFuture.complete(new HazelcastClientNotActiveException("Client is shutting down", exception));
         }
 
     }

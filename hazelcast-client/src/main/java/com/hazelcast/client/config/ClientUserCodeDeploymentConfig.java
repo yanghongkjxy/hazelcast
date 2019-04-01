@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 
 package com.hazelcast.client.config;
 
-import com.hazelcast.spi.annotation.Beta;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.hazelcast.util.Preconditions.isNotNull;
 
 /**
  * Configuration of User Code Deployment.
@@ -28,12 +28,22 @@ import java.util.List;
  * This simplifies deployment as you do not have to deploy your domain classes into classpath of all
  * cluster members.
  */
-@Beta
 public class ClientUserCodeDeploymentConfig {
 
     private boolean enabled;
-    private final List<String> classNames = new ArrayList<String>();
-    private final List<String> jarPaths = new ArrayList<String>();
+    private final List<String> classNames;
+    private final List<String> jarPaths;
+
+    public ClientUserCodeDeploymentConfig() {
+        classNames = new ArrayList<String>();
+        jarPaths = new ArrayList<String>();
+    }
+
+    public ClientUserCodeDeploymentConfig(ClientUserCodeDeploymentConfig userCodeDeploymentConfig) {
+        enabled = userCodeDeploymentConfig.enabled;
+        classNames = new ArrayList<String>(userCodeDeploymentConfig.classNames);
+        jarPaths = new ArrayList<String>(userCodeDeploymentConfig.jarPaths);
+    }
 
     /**
      * @return {{@code true}} when User Code Deployment is enabled
@@ -70,6 +80,7 @@ public class ClientUserCodeDeploymentConfig {
      * @return this for chaining
      */
     public ClientUserCodeDeploymentConfig setClassNames(List<String> classNames) {
+        isNotNull(classNames, "classNames");
         this.classNames.clear();
         this.classNames.addAll(classNames);
         return this;
@@ -85,6 +96,7 @@ public class ClientUserCodeDeploymentConfig {
      * @return this for chaining
      */
     public ClientUserCodeDeploymentConfig setJarPaths(List<String> jarPaths) {
+        isNotNull(jarPaths, "jarPaths");
         this.jarPaths.clear();
         this.jarPaths.addAll(jarPaths);
         return this;
@@ -131,4 +143,31 @@ public class ClientUserCodeDeploymentConfig {
         return this;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        ClientUserCodeDeploymentConfig that = (ClientUserCodeDeploymentConfig) o;
+
+        if (enabled != that.enabled) {
+            return false;
+        }
+        if (!classNames.equals(that.classNames)) {
+            return false;
+        }
+        return jarPaths.equals(that.jarPaths);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = (enabled ? 1 : 0);
+        result = 31 * result + classNames.hashCode();
+        result = 31 * result + jarPaths.hashCode();
+        return result;
+    }
 }

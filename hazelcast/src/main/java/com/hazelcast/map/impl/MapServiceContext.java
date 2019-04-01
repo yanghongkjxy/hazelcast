@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,18 +22,18 @@ import com.hazelcast.config.MapConfig;
 import com.hazelcast.config.PartitioningStrategyConfig;
 import com.hazelcast.core.PartitioningStrategy;
 import com.hazelcast.internal.eviction.ExpirationManager;
+import com.hazelcast.internal.util.comparators.ValueComparator;
 import com.hazelcast.map.impl.event.MapEventPublisher;
 import com.hazelcast.map.impl.eviction.MapClearExpiredRecordsTask;
 import com.hazelcast.map.impl.journal.MapEventJournal;
 import com.hazelcast.map.impl.nearcache.MapNearCacheManager;
 import com.hazelcast.map.impl.operation.MapOperationProvider;
-import com.hazelcast.map.impl.query.MapQueryEngine;
+import com.hazelcast.map.impl.query.QueryEngine;
 import com.hazelcast.map.impl.query.PartitionScanRunner;
 import com.hazelcast.map.impl.query.QueryRunner;
 import com.hazelcast.map.impl.query.ResultProcessorRegistry;
 import com.hazelcast.map.impl.querycache.QueryCacheContext;
 import com.hazelcast.map.impl.record.Record;
-import com.hazelcast.map.impl.record.RecordComparator;
 import com.hazelcast.map.impl.recordstore.RecordStore;
 import com.hazelcast.map.impl.recordstore.RecordStoreMutationObserver;
 import com.hazelcast.map.merge.MergePolicyProvider;
@@ -67,8 +67,6 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @see MapManagedService
  */
 public interface MapServiceContext extends MapServiceContextInterceptorSupport, MapServiceContextEventListenerSupport {
-
-    RecordComparator getRecordComparator(InMemoryFormat inMemoryFormat);
 
     Object toObject(Object data);
 
@@ -147,7 +145,7 @@ public interface MapServiceContext extends MapServiceContextInterceptorSupport, 
 
     MapEventJournal getEventJournal();
 
-    MapQueryEngine getMapQueryEngine(String name);
+    QueryEngine getQueryEngine(String name);
 
     QueryRunner getMapQueryRunner(String name);
 
@@ -202,4 +200,6 @@ public interface MapServiceContext extends MapServiceContextInterceptorSupport, 
      * @return The collection of the observers
      */
     Collection<RecordStoreMutationObserver<Record>> createRecordStoreMutationObservers(String mapName, int partitionId);
+
+    ValueComparator getValueComparatorOf(InMemoryFormat inMemoryFormat);
 }

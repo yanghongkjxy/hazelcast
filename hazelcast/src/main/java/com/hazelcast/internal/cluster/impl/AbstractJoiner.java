@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,11 +49,13 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static com.hazelcast.cluster.ClusterState.FROZEN;
 import static com.hazelcast.cluster.ClusterState.IN_TRANSITION;
+import static com.hazelcast.instance.EndpointQualifier.MEMBER;
 import static com.hazelcast.spi.impl.OperationResponseHandlerFactory.createEmptyResponseHandler;
 import static com.hazelcast.util.FutureUtil.waitWithDeadline;
 import static java.lang.Thread.currentThread;
 
-public abstract class AbstractJoiner implements Joiner {
+public abstract class AbstractJoiner
+        implements Joiner {
 
     private static final int JOIN_TRY_COUNT = 5;
     private static final int SPLIT_BRAIN_MERGE_TIMEOUT_SECONDS = 30;
@@ -133,9 +135,9 @@ public abstract class AbstractJoiner implements Joiner {
     public final void join() {
         blacklistedAddresses.clear();
         doJoin();
-        if (!clusterService.isJoined() && shouldResetHotRestartData()) {
+        if (!clusterService.isJoined() && isMemberExcludedFromHotRestart()) {
             logger.warning("Could not join to the cluster because hot restart data must be reset.");
-            node.getNodeExtension().getInternalHotRestartService().resetHotRestartData();
+            node.getNodeExtension().getInternalHotRestartService().forceStartBeforeJoin();
             reset();
             doJoin();
         }
@@ -143,10 +145,10 @@ public abstract class AbstractJoiner implements Joiner {
     }
 
     protected final boolean shouldRetry() {
-        return node.isRunning() && !clusterService.isJoined() && !shouldResetHotRestartData();
+        return node.isRunning() && !clusterService.isJoined() && !isMemberExcludedFromHotRestart();
     }
 
-    private boolean shouldResetHotRestartData() {
+    private boolean isMemberExcludedFromHotRestart() {
         final NodeExtension nodeExtension = node.getNodeExtension();
         return !nodeExtension.isStartCompleted()
                 && nodeExtension.getInternalHotRestartService().isMemberExcluded(node.getThisAddress(), node.getThisUuid());
@@ -186,7 +188,7 @@ public abstract class AbstractJoiner implements Joiner {
                 boolean allConnected = true;
                 Collection<Member> members = clusterService.getMembers();
                 for (Member member : members) {
-                    if (!member.localMember() && node.connectionManager.getOrConnect(member.getAddress()) == null) {
+                    if (!member.localMember() && node.getEndpointManager(MEMBER).getOrConnect(member.getAddress()) == null) {
                         allConnected = false;
                         if (logger.isFineEnabled()) {
                             logger.fine("Not-connected to " + member.getAddress());
@@ -236,7 +238,7 @@ public abstract class AbstractJoiner implements Joiner {
             logger.fine("Sending SplitBrainJoinMessage to " + target);
         }
 
-        Connection conn = node.connectionManager.getOrConnect(target, true);
+        Connection conn = node.getEndpointManager(MEMBER).getOrConnect(target, true);
         long timeout = SPLIT_BRAIN_CONN_TIMEOUT_MILLIS;
         while (conn == null) {
             timeout -= SPLIT_BRAIN_SLEEP_TIME_MILLIS;
@@ -251,7 +253,7 @@ public abstract class AbstractJoiner implements Joiner {
                 currentThread().interrupt();
                 return null;
             }
-            conn = node.connectionManager.getConnection(target);
+            conn = node.getEndpointManager(MEMBER).getConnection(target);
         }
 
         NodeEngine nodeEngine = node.nodeEngine;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,8 +45,7 @@ public class IOBalancerTest {
 
         ioBalancer.channelAdded(inboundPipeline, outboundPipeline);
 
-        assertTrue(ioBalancer.getInLoadTracker().tasks.isEmpty());
-        assertTrue(ioBalancer.getOutLoadTracker().tasks.isEmpty());
+        assertTrue(ioBalancer.getWorkQueue().isEmpty());
     }
 
     // https://github.com/hazelcast/hazelcast/issues/11501
@@ -58,7 +57,6 @@ public class IOBalancerTest {
 
         ioBalancer.channelRemoved(inboundPipeline, outboundPipelines);
 
-        assertTrue(ioBalancer.getInLoadTracker().tasks.isEmpty());
-        assertTrue(ioBalancer.getOutLoadTracker().tasks.isEmpty());
+        assertTrue(ioBalancer.getWorkQueue().isEmpty());
     }
 }

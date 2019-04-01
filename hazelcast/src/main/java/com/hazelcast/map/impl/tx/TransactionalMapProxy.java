@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package com.hazelcast.map.impl.tx;
 
 import com.hazelcast.core.TransactionalMap;
 import com.hazelcast.map.impl.MapService;
-import com.hazelcast.map.impl.query.MapQueryEngine;
+import com.hazelcast.map.impl.query.QueryEngine;
 import com.hazelcast.map.impl.query.Query;
 import com.hazelcast.map.impl.query.QueryResult;
 import com.hazelcast.map.impl.query.QueryResultUtils;
@@ -60,6 +60,10 @@ public class TransactionalMapProxy extends TransactionalMapProxySupport implemen
 
     @Override
     public boolean containsKey(Object key) {
+        return containsKey(key, false);
+    }
+
+    public boolean containsKey(Object key, boolean skipNearCacheLookup) {
         checkTransactionState();
         checkNotNull(key, "key can't be null");
 
@@ -68,7 +72,7 @@ public class TransactionalMapProxy extends TransactionalMapProxySupport implemen
         if (valueWrapper != null) {
             return (valueWrapper.type != Type.REMOVED);
         }
-        return containsKeyInternal(keyData, key);
+        return containsKeyInternal(keyData, key, skipNearCacheLookup);
     }
 
     @Override
@@ -97,17 +101,20 @@ public class TransactionalMapProxy extends TransactionalMapProxySupport implemen
 
     @Override
     public Object get(Object key) {
+        return get(key, false);
+    }
+
+    public Object get(Object key, boolean skipNearCacheLookup) {
         checkTransactionState();
         checkNotNull(key, "key can't be null");
 
         Object nearCacheKey = toNearCacheKeyWithStrategy(key);
         Data keyData = mapServiceContext.toData(nearCacheKey, partitionStrategy);
-
         TxnValueWrapper currentValue = txMap.get(keyData);
         if (currentValue != null) {
             return checkIfRemoved(currentValue);
         }
-        return toObjectIfNeeded(getInternal(nearCacheKey, keyData));
+        return toObjectIfNeeded(getInternal(nearCacheKey, keyData, skipNearCacheLookup));
     }
 
     @Override
@@ -350,7 +357,7 @@ public class TransactionalMapProxy extends TransactionalMapProxySupport implemen
         checkNotNull(predicate, "Predicate should not be null!");
         checkNotInstanceOf(PagingPredicate.class, predicate, "Paging is not supported for Transactional queries!");
 
-        MapQueryEngine queryEngine = mapServiceContext.getMapQueryEngine(name);
+        QueryEngine queryEngine = mapServiceContext.getQueryEngine(name);
 
         Query query = Query.of().mapName(name).predicate(predicate).iterationType(IterationType.KEY).build();
         QueryResult queryResult = queryEngine.execute(query, Target.ALL_NODES);
@@ -394,7 +401,7 @@ public class TransactionalMapProxy extends TransactionalMapProxySupport implemen
         checkNotNull(predicate, "Predicate can not be null!");
         checkNotInstanceOf(PagingPredicate.class, predicate, "Paging is not supported for Transactional queries");
 
-        MapQueryEngine queryEngine = mapServiceContext.getMapQueryEngine(name);
+        QueryEngine queryEngine = mapServiceContext.getQueryEngine(name);
 
         Query query = Query.of().mapName(name).predicate(predicate).iterationType(IterationType.ENTRY).build();
         QueryResult queryResult = queryEngine.execute(query, Target.ALL_NODES);

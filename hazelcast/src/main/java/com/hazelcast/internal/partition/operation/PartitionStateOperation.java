@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package com.hazelcast.internal.partition.operation;
 
+import com.hazelcast.internal.cluster.Versions;
 import com.hazelcast.internal.cluster.impl.operations.JoinOperation;
 import com.hazelcast.internal.partition.InternalPartitionService;
 import com.hazelcast.internal.partition.MigrationCycleOperation;
@@ -26,6 +27,8 @@ import com.hazelcast.logging.ILogger;
 import com.hazelcast.nio.Address;
 import com.hazelcast.nio.ObjectDataInput;
 import com.hazelcast.nio.ObjectDataOutput;
+import com.hazelcast.nio.serialization.impl.Versioned;
+import com.hazelcast.version.Version;
 
 import java.io.IOException;
 
@@ -36,17 +39,13 @@ import java.io.IOException;
  * @see InternalPartitionServiceImpl#syncPartitionRuntimeState
  */
 public final class PartitionStateOperation extends AbstractPartitionOperation
-        implements MigrationCycleOperation, JoinOperation {
+        implements MigrationCycleOperation, JoinOperation, Versioned {
 
     private PartitionRuntimeState partitionState;
     private boolean sync;
     private boolean success;
 
     public PartitionStateOperation() {
-    }
-
-    public PartitionStateOperation(PartitionRuntimeState partitionState) {
-        this(partitionState, false);
     }
 
     public PartitionStateOperation(PartitionRuntimeState partitionState, boolean sync) {
@@ -57,7 +56,7 @@ public final class PartitionStateOperation extends AbstractPartitionOperation
     @Override
     public void run() {
         Address callerAddress = getCallerAddress();
-        partitionState.setEndpoint(callerAddress);
+        partitionState.setMaster(callerAddress);
         InternalPartitionServiceImpl partitionService = getService();
         success = partitionService.processPartitionRuntimeState(partitionState);
 
@@ -87,15 +86,27 @@ public final class PartitionStateOperation extends AbstractPartitionOperation
     @Override
     protected void readInternal(ObjectDataInput in) throws IOException {
         super.readInternal(in);
-        partitionState = new PartitionRuntimeState();
-        partitionState.readData(in);
+        // RU_COMPAT_3_11
+        Version version = in.getVersion();
+        if (version.isGreaterOrEqual(Versions.V3_12)) {
+            partitionState = in.readObject();
+        } else {
+            partitionState = new PartitionRuntimeState();
+            partitionState.readData(in);
+        }
         sync = in.readBoolean();
     }
 
     @Override
     protected void writeInternal(ObjectDataOutput out) throws IOException {
         super.writeInternal(out);
-        partitionState.writeData(out);
+        // RU_COMPAT_3_11
+        Version version = out.getVersion();
+        if (version.isGreaterOrEqual(Versions.V3_12)) {
+            out.writeObject(partitionState);
+        } else {
+            partitionState.writeData(out);
+        }
         out.writeBoolean(sync);
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,19 +29,22 @@ import com.hazelcast.config.SocketInterceptorConfig;
 import com.hazelcast.config.matcher.MatchingPointConfigPatternMatcher;
 import com.hazelcast.core.ManagedContext;
 import com.hazelcast.flakeidgen.FlakeIdGenerator;
-import com.hazelcast.logging.ILogger;
-import com.hazelcast.logging.Logger;
+import com.hazelcast.internal.config.ConfigUtils;
 import com.hazelcast.security.Credentials;
+import com.hazelcast.util.Preconditions;
+import com.hazelcast.util.function.BiConsumer;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
-import static com.hazelcast.config.NearCacheConfigAccessor.initDefaultMaxSizeForOnHeapMaps;
 import static com.hazelcast.internal.config.ConfigUtils.lookupByPattern;
 import static com.hazelcast.partition.strategy.StringPartitioningStrategy.getBaseName;
 import static com.hazelcast.util.Preconditions.checkFalse;
@@ -49,9 +52,8 @@ import static com.hazelcast.util.Preconditions.checkFalse;
 /**
  * Main configuration to setup a Hazelcast Client
  */
+@SuppressWarnings("checkstyle:classdataabstractioncoupling")
 public class ClientConfig {
-
-    private static final ILogger LOGGER = Logger.getLogger(ClientConfig.class);
 
     /**
      * To pass properties
@@ -85,42 +87,91 @@ public class ClientConfig {
      * List of listeners that Hazelcast will automatically add as a part of initialization process.
      * Currently only supports {@link com.hazelcast.core.LifecycleListener}.
      */
-    private List<ListenerConfig> listenerConfigs = new LinkedList<ListenerConfig>();
+    private final List<ListenerConfig> listenerConfigs;
 
     /**
      * pool-size for internal ExecutorService which handles responses etc.
      */
     private int executorPoolSize = -1;
-
     private String instanceName;
-
     private ConfigPatternMatcher configPatternMatcher = new MatchingPointConfigPatternMatcher();
-
-    private final Map<String, NearCacheConfig> nearCacheConfigMap = new ConcurrentHashMap<String, NearCacheConfig>();
-
-    private final Map<String, ClientReliableTopicConfig> reliableTopicConfigMap
-            = new ConcurrentHashMap<String, ClientReliableTopicConfig>();
-
-    private Map<String, Map<String, QueryCacheConfig>> queryCacheConfigs;
-
+    private final Map<String, NearCacheConfig> nearCacheConfigMap;
+    private final Map<String, ClientReliableTopicConfig> reliableTopicConfigMap;
+    private final Map<String, Map<String, QueryCacheConfig>> queryCacheConfigs;
     private SerializationConfig serializationConfig = new SerializationConfig();
-
     private NativeMemoryConfig nativeMemoryConfig = new NativeMemoryConfig();
-
-    private final List<ProxyFactoryConfig> proxyFactoryConfigs = new LinkedList<ProxyFactoryConfig>();
-
+    private final List<ProxyFactoryConfig> proxyFactoryConfigs;
     private ManagedContext managedContext;
-
     private ClassLoader classLoader;
-
     private String licenseKey;
-
     private ClientConnectionStrategyConfig connectionStrategyConfig = new ClientConnectionStrategyConfig();
-
     private ClientUserCodeDeploymentConfig userCodeDeploymentConfig = new ClientUserCodeDeploymentConfig();
+    private final Map<String, ClientFlakeIdGeneratorConfig> flakeIdGeneratorConfigMap;
+    private final Set<String> labels;
+    private final ConcurrentMap<String, Object> userContext;
 
-    private final Map<String, ClientFlakeIdGeneratorConfig> flakeIdGeneratorConfigMap =
-            new ConcurrentHashMap<String, ClientFlakeIdGeneratorConfig>();
+    public ClientConfig() {
+        listenerConfigs = new LinkedList<ListenerConfig>();
+        nearCacheConfigMap = new ConcurrentHashMap<String, NearCacheConfig>();
+        reliableTopicConfigMap = new ConcurrentHashMap<String, ClientReliableTopicConfig>();
+        proxyFactoryConfigs = new LinkedList<ProxyFactoryConfig>();
+        flakeIdGeneratorConfigMap = new ConcurrentHashMap<String, ClientFlakeIdGeneratorConfig>();
+        queryCacheConfigs = new ConcurrentHashMap<String, Map<String, QueryCacheConfig>>();
+        labels = new HashSet<String>();
+        userContext = new ConcurrentHashMap<String, Object>();
+    }
+
+    @SuppressWarnings({"checkstyle:npathcomplexity", "checkstyle:executablestatementcount"})
+    public ClientConfig(ClientConfig config) {
+        properties = new Properties();
+        properties.putAll(config.properties);
+        groupConfig = new GroupConfig(config.groupConfig);
+        securityConfig = new ClientSecurityConfig(config.securityConfig);
+        networkConfig = new ClientNetworkConfig(config.networkConfig);
+        loadBalancer = config.loadBalancer;
+        listenerConfigs = new LinkedList<ListenerConfig>();
+        for (ListenerConfig listenerConfig : config.listenerConfigs) {
+            listenerConfigs.add(new ListenerConfig(listenerConfig));
+        }
+        executorPoolSize = config.executorPoolSize;
+        instanceName = config.instanceName;
+        configPatternMatcher = config.configPatternMatcher;
+        nearCacheConfigMap = new ConcurrentHashMap<String, NearCacheConfig>();
+        for (Entry<String, NearCacheConfig> entry : config.nearCacheConfigMap.entrySet()) {
+            nearCacheConfigMap.put(entry.getKey(), new NearCacheConfig(entry.getValue()));
+        }
+        reliableTopicConfigMap = new ConcurrentHashMap<String, ClientReliableTopicConfig>();
+        for (Entry<String, ClientReliableTopicConfig> entry : config.reliableTopicConfigMap.entrySet()) {
+            reliableTopicConfigMap.put(entry.getKey(), new ClientReliableTopicConfig(entry.getValue()));
+        }
+        queryCacheConfigs = new ConcurrentHashMap<String, Map<String, QueryCacheConfig>>();
+        for (Entry<String, Map<String, QueryCacheConfig>> entry : config.queryCacheConfigs.entrySet()) {
+            Map<String, QueryCacheConfig> value = entry.getValue();
+
+            ConcurrentHashMap<String, QueryCacheConfig> map = new ConcurrentHashMap<String, QueryCacheConfig>();
+            for (Entry<String, QueryCacheConfig> cacheConfigEntry : value.entrySet()) {
+                map.put(cacheConfigEntry.getKey(), new QueryCacheConfig(cacheConfigEntry.getValue()));
+            }
+            queryCacheConfigs.put(entry.getKey(), map);
+        }
+        serializationConfig = new SerializationConfig(config.serializationConfig);
+        nativeMemoryConfig = new NativeMemoryConfig(config.nativeMemoryConfig);
+        proxyFactoryConfigs = new LinkedList<ProxyFactoryConfig>();
+        for (ProxyFactoryConfig factoryConfig : config.proxyFactoryConfigs) {
+            proxyFactoryConfigs.add(new ProxyFactoryConfig(factoryConfig));
+        }
+        managedContext = config.managedContext;
+        classLoader = config.classLoader;
+        licenseKey = config.licenseKey;
+        connectionStrategyConfig = new ClientConnectionStrategyConfig(config.connectionStrategyConfig);
+        userCodeDeploymentConfig = new ClientUserCodeDeploymentConfig(config.userCodeDeploymentConfig);
+        flakeIdGeneratorConfigMap = new ConcurrentHashMap<String, ClientFlakeIdGeneratorConfig>();
+        for (Entry<String, ClientFlakeIdGeneratorConfig> entry : config.flakeIdGeneratorConfigMap.entrySet()) {
+            flakeIdGeneratorConfigMap.put(entry.getKey(), new ClientFlakeIdGeneratorConfig(entry.getValue()));
+        }
+        labels = new HashSet<String>(config.labels);
+        userContext = new ConcurrentHashMap<String, Object>(config.userContext);
+    }
 
     /**
      * Sets the pattern matcher which is used to match item names to
@@ -131,9 +182,7 @@ public class ClientConfig {
      * @throws IllegalArgumentException if the pattern matcher is {@code null}
      */
     public void setConfigPatternMatcher(ConfigPatternMatcher configPatternMatcher) {
-        if (configPatternMatcher == null) {
-            throw new IllegalArgumentException("ConfigPatternMatcher is not allowed to be null!");
-        }
+        Preconditions.isNotNull(configPatternMatcher, "configPatternMatcher");
         this.configPatternMatcher = configPatternMatcher;
     }
 
@@ -187,6 +236,7 @@ public class ClientConfig {
      * @return configured {@link com.hazelcast.client.config.ClientConfig} for chaining
      */
     public ClientConfig setProperties(final Properties properties) {
+        Preconditions.isNotNull(properties, "properties");
         this.properties = properties;
         return this;
     }
@@ -209,6 +259,7 @@ public class ClientConfig {
      * @see com.hazelcast.client.config.ClientSecurityConfig
      */
     public ClientConfig setSecurityConfig(ClientSecurityConfig securityConfig) {
+        Preconditions.isNotNull(securityConfig, "securityConfig");
         this.securityConfig = securityConfig;
         return this;
     }
@@ -231,6 +282,7 @@ public class ClientConfig {
      * @see com.hazelcast.client.config.ClientNetworkConfig
      */
     public ClientConfig setNetworkConfig(ClientNetworkConfig networkConfig) {
+        Preconditions.isNotNull(networkConfig, "networkConfig");
         this.networkConfig = networkConfig;
         return this;
     }
@@ -253,12 +305,13 @@ public class ClientConfig {
      * @return the found config. If none is found, a default configured one is returned.
      */
     public ClientReliableTopicConfig getReliableTopicConfig(String name) {
-        ClientReliableTopicConfig reliableTopicConfig = lookupByPattern(configPatternMatcher, reliableTopicConfigMap, name);
-        if (reliableTopicConfig == null) {
-            reliableTopicConfig = new ClientReliableTopicConfig(name);
-            addReliableTopicConfig(reliableTopicConfig);
-        }
-        return reliableTopicConfig;
+        return ConfigUtils.getConfig(configPatternMatcher, reliableTopicConfigMap, name,
+                ClientReliableTopicConfig.class, new BiConsumer<ClientReliableTopicConfig, String>() {
+                    @Override
+                    public void accept(ClientReliableTopicConfig clientReliableTopicConfig, String name) {
+                        clientReliableTopicConfig.setName(name);
+                    }
+                });
     }
 
     /**
@@ -327,7 +380,6 @@ public class ClientConfig {
                 nearCacheConfig = new NearCacheConfig(nearCacheConfig);
             }
         }
-        initDefaultMaxSizeForOnHeapMaps(nearCacheConfig);
         return nearCacheConfig;
     }
 
@@ -348,6 +400,7 @@ public class ClientConfig {
      * @return configured {@link com.hazelcast.client.config.ClientConfig} for chaining
      */
     public ClientConfig setNearCacheConfigMap(Map<String, NearCacheConfig> nearCacheConfigMap) {
+        Preconditions.isNotNull(nearCacheConfigMap, "nearCacheConfigMap");
         this.nearCacheConfigMap.clear();
         this.nearCacheConfigMap.putAll(nearCacheConfigMap);
         for (Entry<String, NearCacheConfig> entry : this.nearCacheConfigMap.entrySet()) {
@@ -419,20 +472,13 @@ public class ClientConfig {
      * @see #getConfigPatternMatcher()
      */
     public ClientFlakeIdGeneratorConfig getFlakeIdGeneratorConfig(String name) {
-        String baseName = getBaseName(name);
-        ClientFlakeIdGeneratorConfig config = lookupByPattern(configPatternMatcher, flakeIdGeneratorConfigMap, baseName);
-        if (config != null) {
-            return config;
-        }
-        ClientFlakeIdGeneratorConfig defConfig = flakeIdGeneratorConfigMap.get("default");
-        if (defConfig == null) {
-            defConfig = new ClientFlakeIdGeneratorConfig("default");
-            flakeIdGeneratorConfigMap.put(defConfig.getName(), defConfig);
-        }
-        config = new ClientFlakeIdGeneratorConfig(defConfig);
-        config.setName(name);
-        flakeIdGeneratorConfigMap.put(config.getName(), config);
-        return config;
+        return ConfigUtils.getConfig(configPatternMatcher, getFlakeIdGeneratorConfigMap(), name,
+                ClientFlakeIdGeneratorConfig.class, new BiConsumer<ClientFlakeIdGeneratorConfig, String>() {
+                    @Override
+                    public void accept(ClientFlakeIdGeneratorConfig flakeIdGeneratorConfig, String name) {
+                        flakeIdGeneratorConfig.setName(name);
+                    }
+                });
     }
 
     /**
@@ -457,12 +503,42 @@ public class ClientConfig {
      * @return this config instance
      */
     public ClientConfig setFlakeIdGeneratorConfigMap(Map<String, ClientFlakeIdGeneratorConfig> map) {
+        Preconditions.isNotNull(map, "flakeIdGeneratorConfigMap");
         flakeIdGeneratorConfigMap.clear();
         flakeIdGeneratorConfigMap.putAll(map);
         for (Entry<String, ClientFlakeIdGeneratorConfig> entry : map.entrySet()) {
             entry.getValue().setName(entry.getKey());
         }
         return this;
+    }
+
+    /**
+     * Sets the map of {@link ClientReliableTopicConfig},
+     * mapped by config name. The config name may be a pattern with which the
+     * configuration will be obtained in the future.
+     *
+     * @param map the FlakeIdGenerator configuration map to set
+     * @return this config instance
+     */
+    public ClientConfig setReliableTopicConfigMap(Map<String, ClientReliableTopicConfig> map) {
+        Preconditions.isNotNull(map, "reliableTopicConfigMap");
+        reliableTopicConfigMap.clear();
+        reliableTopicConfigMap.putAll(map);
+        for (Entry<String, ClientReliableTopicConfig> entry : map.entrySet()) {
+            entry.getValue().setName(entry.getKey());
+        }
+        return this;
+    }
+
+    /**
+     * Returns the map of reliable topic configurations,
+     * mapped by config name. The config name may be a pattern with which the
+     * configuration was initially obtained.
+     *
+     * @return the map configurations mapped by config name
+     */
+    public Map<String, ClientReliableTopicConfig> getReliableTopicConfigMap() {
+        return reliableTopicConfigMap;
     }
 
     /**
@@ -614,6 +690,7 @@ public class ClientConfig {
      * @return configured {@link com.hazelcast.client.config.ClientConfig} for chaining
      */
     public ClientConfig setGroupConfig(GroupConfig groupConfig) {
+        Preconditions.isNotNull(groupConfig, "groupConfig");
         this.groupConfig = groupConfig;
         return this;
     }
@@ -636,7 +713,9 @@ public class ClientConfig {
      * @see com.hazelcast.config.ListenerConfig
      */
     public ClientConfig setListenerConfigs(List<ListenerConfig> listenerConfigs) {
-        this.listenerConfigs = listenerConfigs;
+        Preconditions.isNotNull(listenerConfigs, "listenerConfigs");
+        this.listenerConfigs.clear();
+        this.listenerConfigs.addAll(listenerConfigs);
         return this;
     }
 
@@ -775,6 +854,7 @@ public class ClientConfig {
      * @return configured {@link com.hazelcast.client.config.ClientConfig} for chaining
      */
     public ClientConfig setProxyFactoryConfigs(List<ProxyFactoryConfig> proxyFactoryConfigs) {
+        Preconditions.isNotNull(proxyFactoryConfigs, "proxyFactoryConfigs");
         this.proxyFactoryConfigs.clear();
         this.proxyFactoryConfigs.addAll(proxyFactoryConfigs);
         return this;
@@ -798,6 +878,7 @@ public class ClientConfig {
      * @see com.hazelcast.config.SerializationConfig
      */
     public ClientConfig setSerializationConfig(SerializationConfig serializationConfig) {
+        Preconditions.isNotNull(serializationConfig, "serializationConfig");
         this.serializationConfig = serializationConfig;
         return this;
     }
@@ -807,6 +888,7 @@ public class ClientConfig {
     }
 
     public ClientConfig setNativeMemoryConfig(NativeMemoryConfig nativeMemoryConfig) {
+        Preconditions.isNotNull(nativeMemoryConfig, "nativeMemoryConfig");
         this.nativeMemoryConfig = nativeMemoryConfig;
         return this;
     }
@@ -841,14 +923,13 @@ public class ClientConfig {
     }
 
     public Map<String, Map<String, QueryCacheConfig>> getQueryCacheConfigs() {
-        if (queryCacheConfigs == null) {
-            queryCacheConfigs = new ConcurrentHashMap<String, Map<String, QueryCacheConfig>>();
-        }
         return queryCacheConfigs;
     }
 
     public void setQueryCacheConfigs(Map<String, Map<String, QueryCacheConfig>> queryCacheConfigs) {
-        this.queryCacheConfigs = queryCacheConfigs;
+        Preconditions.isNotNull(queryCacheConfigs, "queryCacheConfigs");
+        this.queryCacheConfigs.clear();
+        this.queryCacheConfigs.putAll(queryCacheConfigs);
     }
 
     public String getInstanceName() {
@@ -864,6 +945,7 @@ public class ClientConfig {
     }
 
     public ClientConfig setConnectionStrategyConfig(ClientConnectionStrategyConfig connectionStrategyConfig) {
+        Preconditions.isNotNull(connectionStrategyConfig, "connectionStrategyConfig");
         this.connectionStrategyConfig = connectionStrategyConfig;
         return this;
     }
@@ -886,6 +968,7 @@ public class ClientConfig {
      * @since 3.9
      */
     public ClientConfig setUserCodeDeploymentConfig(ClientUserCodeDeploymentConfig userCodeDeploymentConfig) {
+        Preconditions.isNotNull(userCodeDeploymentConfig, "userCodeDeploymentConfig");
         this.userCodeDeploymentConfig = userCodeDeploymentConfig;
         return this;
     }
@@ -930,5 +1013,160 @@ public class ClientConfig {
         }
 
         return lookupByPattern(configPatternMatcher, queryCacheConfigsForMap, cacheName);
+    }
+
+    /**
+     * Adds a label for this client {@link com.hazelcast.core.Client} available
+     *
+     * @param label The label to be added.
+     * @return configured {@link com.hazelcast.client.config.ClientConfig} for chaining
+     */
+    public ClientConfig addLabel(String label) {
+        Preconditions.isNotNull(label, "label");
+        labels.add(label);
+        return this;
+    }
+
+    /**
+     * @return all the labels assigned to this client
+     */
+    public Set<String> getLabels() {
+        return labels;
+    }
+
+    /**
+     * Set labels for the client. Deletes old labels if added earlier.
+     *
+     * @param labels The labels to be set
+     * @return configured {@link com.hazelcast.client.config.ClientConfig} for chaining
+     */
+    public ClientConfig setLabels(Set<String> labels) {
+        Preconditions.isNotNull(labels, "labels");
+        this.labels.clear();
+        this.labels.addAll(labels);
+        return this;
+    }
+
+    public ClientConfig setUserContext(ConcurrentMap<String, Object> userContext) {
+        Preconditions.isNotNull(userContext, "userContext");
+        this.userContext.clear();
+        this.userContext.putAll(userContext);
+        return this;
+    }
+
+    public ConcurrentMap<String, Object> getUserContext() {
+        return userContext;
+    }
+
+    @Override
+    @SuppressWarnings({"checkstyle:methodlength", "checkstyle:cyclomaticcomplexity",
+            "checkstyle:npathcomplexity", "checkstyle:executablestatementcount"})
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        ClientConfig that = (ClientConfig) o;
+
+        if (executorPoolSize != that.executorPoolSize) {
+            return false;
+        }
+        if (!properties.equals(that.properties)) {
+            return false;
+        }
+        if (!groupConfig.equals(that.groupConfig)) {
+            return false;
+        }
+        if (!securityConfig.equals(that.securityConfig)) {
+            return false;
+        }
+        if (!networkConfig.equals(that.networkConfig)) {
+            return false;
+        }
+        if (loadBalancer != null ? !loadBalancer.equals(that.loadBalancer) : that.loadBalancer != null) {
+            return false;
+        }
+        if (!listenerConfigs.equals(that.listenerConfigs)) {
+            return false;
+        }
+        if (instanceName != null ? !instanceName.equals(that.instanceName) : that.instanceName != null) {
+            return false;
+        }
+        if (configPatternMatcher != null
+                ? !configPatternMatcher.equals(that.configPatternMatcher) : that.configPatternMatcher != null) {
+            return false;
+        }
+        if (!nearCacheConfigMap.equals(that.nearCacheConfigMap)) {
+            return false;
+        }
+        if (!reliableTopicConfigMap.equals(that.reliableTopicConfigMap)) {
+            return false;
+        }
+        if (!queryCacheConfigs.equals(that.queryCacheConfigs)) {
+            return false;
+        }
+        if (!serializationConfig.equals(that.serializationConfig)) {
+            return false;
+        }
+        if (!nativeMemoryConfig.equals(that.nativeMemoryConfig)) {
+            return false;
+        }
+        if (!proxyFactoryConfigs.equals(that.proxyFactoryConfigs)) {
+            return false;
+        }
+        if (managedContext != null ? !managedContext.equals(that.managedContext) : that.managedContext != null) {
+            return false;
+        }
+        if (classLoader != null ? !classLoader.equals(that.classLoader) : that.classLoader != null) {
+            return false;
+        }
+        if (licenseKey != null ? !licenseKey.equals(that.licenseKey) : that.licenseKey != null) {
+            return false;
+        }
+        if (!connectionStrategyConfig.equals(that.connectionStrategyConfig)) {
+            return false;
+        }
+        if (!userCodeDeploymentConfig.equals(that.userCodeDeploymentConfig)) {
+            return false;
+        }
+        if (!flakeIdGeneratorConfigMap.equals(that.flakeIdGeneratorConfigMap)) {
+            return false;
+        }
+        if (!labels.equals(that.labels)) {
+            return false;
+        }
+        return userContext.equals(that.userContext);
+    }
+
+    @Override
+    @SuppressWarnings({"checkstyle:npathcomplexity"})
+    public int hashCode() {
+        int result = properties.hashCode();
+        result = 31 * result + groupConfig.hashCode();
+        result = 31 * result + securityConfig.hashCode();
+        result = 31 * result + networkConfig.hashCode();
+        result = 31 * result + (loadBalancer != null ? loadBalancer.hashCode() : 0);
+        result = 31 * result + listenerConfigs.hashCode();
+        result = 31 * result + executorPoolSize;
+        result = 31 * result + (instanceName != null ? instanceName.hashCode() : 0);
+        result = 31 * result + (configPatternMatcher != null ? configPatternMatcher.hashCode() : 0);
+        result = 31 * result + nearCacheConfigMap.hashCode();
+        result = 31 * result + reliableTopicConfigMap.hashCode();
+        result = 31 * result + queryCacheConfigs.hashCode();
+        result = 31 * result + serializationConfig.hashCode();
+        result = 31 * result + nativeMemoryConfig.hashCode();
+        result = 31 * result + proxyFactoryConfigs.hashCode();
+        result = 31 * result + (managedContext != null ? managedContext.hashCode() : 0);
+        result = 31 * result + (classLoader != null ? classLoader.hashCode() : 0);
+        result = 31 * result + (licenseKey != null ? licenseKey.hashCode() : 0);
+        result = 31 * result + connectionStrategyConfig.hashCode();
+        result = 31 * result + userCodeDeploymentConfig.hashCode();
+        result = 31 * result + flakeIdGeneratorConfigMap.hashCode();
+        result = 31 * result + labels.hashCode();
+        result = 31 * result + userContext.hashCode();
+        return result;
     }
 }

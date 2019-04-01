@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package com.hazelcast.spi.impl.operationservice.impl;
 
 import com.hazelcast.core.ExecutionCallback;
+import com.hazelcast.core.ICompletableFuture;
 import com.hazelcast.core.LocalMemberResetException;
 import com.hazelcast.instance.MemberImpl;
 import com.hazelcast.instance.Node;
@@ -27,7 +28,6 @@ import com.hazelcast.internal.metrics.MetricsRegistry;
 import com.hazelcast.internal.metrics.Probe;
 import com.hazelcast.internal.partition.InternalPartitionService;
 import com.hazelcast.internal.serialization.InternalSerializationService;
-import com.hazelcast.internal.util.RuntimeAvailableProcessors;
 import com.hazelcast.internal.util.counters.Counter;
 import com.hazelcast.internal.util.counters.MwCounter;
 import com.hazelcast.logging.ILogger;
@@ -49,8 +49,6 @@ import com.hazelcast.spi.impl.operationexecutor.slowoperationdetector.SlowOperat
 import com.hazelcast.spi.impl.operationservice.InternalOperationService;
 import com.hazelcast.spi.impl.operationservice.PartitionTaskFactory;
 import com.hazelcast.spi.properties.GroupProperty;
-import com.hazelcast.util.executor.ExecutorType;
-import com.hazelcast.util.executor.ManagedExecutorService;
 
 import java.util.ArrayList;
 import java.util.BitSet;
@@ -66,6 +64,7 @@ import static com.hazelcast.spi.InvocationBuilder.DEFAULT_CALL_TIMEOUT;
 import static com.hazelcast.spi.InvocationBuilder.DEFAULT_DESERIALIZE_RESULT;
 import static com.hazelcast.spi.InvocationBuilder.DEFAULT_REPLICA_INDEX;
 import static com.hazelcast.spi.impl.operationutil.Operations.isJoinOperation;
+import static com.hazelcast.spi.impl.operationutil.Operations.isWanReplicationOperation;
 import static com.hazelcast.spi.properties.GroupProperty.FAIL_ON_INDETERMINATE_OPERATION_STATE;
 import static com.hazelcast.spi.properties.GroupProperty.OPERATION_CALL_TIMEOUT_MILLIS;
 import static com.hazelcast.util.CollectionUtil.toIntegerList;
@@ -97,7 +96,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 @SuppressWarnings({"checkstyle:classdataabstractioncoupling", "checkstyle:classfanoutcomplexity", "checkstyle:methodcount"})
 public final class OperationServiceImpl implements InternalOperationService, MetricsProvider, LiveOperationsTracker {
 
-    private static final int ASYNC_QUEUE_CAPACITY = 100000;
     private static final long TERMINATION_TIMEOUT_MILLIS = SECONDS.toMillis(10);
 
     // contains the current executing asyncOperations. This information is needed for the operation-heartbeats.
@@ -151,7 +149,7 @@ public final class OperationServiceImpl implements InternalOperationService, Met
         this.backpressureRegulator = new BackpressureRegulator(
                 node.getProperties(), node.getLogger(BackpressureRegulator.class));
 
-        this.outboundResponseHandler = new OutboundResponseHandler(thisAddress, serializationService, node,
+        this.outboundResponseHandler = new OutboundResponseHandler(thisAddress, serializationService,
                 node.getLogger(OutboundResponseHandler.class));
 
         this.invocationRegistry = new InvocationRegistry(
@@ -356,9 +354,10 @@ public final class OperationServiceImpl implements InternalOperationService, Met
 
     @Override
     public boolean isCallTimedOut(Operation op) {
-        // Join operations should not be checked for timeout because caller is not member of this cluster
-        // and can have a different clock.
-        if (isJoinOperation(op)) {
+        // Join and WAN replication operations should not be checked for timeout
+        // because caller is not member of this cluster and can have a different
+        // clock.
+        if (isJoinOperation(op) || isWanReplicationOperation(op)) {
             return false;
         }
 
@@ -387,9 +386,25 @@ public final class OperationServiceImpl implements InternalOperationService, Met
     }
 
     @Override
-    public <T> Map<Integer, T> invokeOnPartitions(String serviceName, OperationFactory operationFactory,
-                                                   Collection<Integer> partitions) throws Exception {
+    public <T> ICompletableFuture<Map<Integer, T>> invokeOnAllPartitionsAsync(String serviceName,
+                                                                              OperationFactory operationFactory) {
 
+        Map<Address, List<Integer>> memberPartitions = nodeEngine.getPartitionService().getMemberPartitionsMap();
+        InvokeOnPartitions invokeOnPartitions =
+                new InvokeOnPartitions(this, serviceName, operationFactory, memberPartitions);
+        return invokeOnPartitions.invokeAsync();
+    }
+
+    @Override
+    public <T> Map<Integer, T> invokeOnPartitions(String serviceName, OperationFactory operationFactory,
+                                                  Collection<Integer> partitions) throws Exception {
+
+        Map<Address, List<Integer>> memberPartitions = getMemberPartitions(partitions);
+        InvokeOnPartitions invokeOnPartitions = new InvokeOnPartitions(this, serviceName, operationFactory, memberPartitions);
+        return invokeOnPartitions.invoke();
+    }
+
+    private Map<Address, List<Integer>> getMemberPartitions(Collection<Integer> partitions) {
         Map<Address, List<Integer>> memberPartitions = createHashMap(3);
         InternalPartitionService partitionService = nodeEngine.getPartitionService();
         for (int partition : partitions) {
@@ -401,8 +416,17 @@ public final class OperationServiceImpl implements InternalOperationService, Met
 
             memberPartitions.get(owner).add(partition);
         }
-        InvokeOnPartitions invokeOnPartitions = new InvokeOnPartitions(this, serviceName, operationFactory, memberPartitions);
-        return invokeOnPartitions.invoke();
+        return memberPartitions;
+    }
+
+    @Override
+    public <T> ICompletableFuture<Map<Integer, T>> invokeOnPartitionsAsync(
+            String serviceName, OperationFactory operationFactory, Collection<Integer> partitions) {
+
+        Map<Address, List<Integer>> memberPartitions = getMemberPartitions(partitions);
+        InvokeOnPartitions invokeOnPartitions =
+                new InvokeOnPartitions(this, serviceName, operationFactory, memberPartitions);
+        return invokeOnPartitions.invokeAsync();
     }
 
     @Override
@@ -420,6 +444,11 @@ public final class OperationServiceImpl implements InternalOperationService, Met
         invocationMonitor.onMemberLeft(member);
     }
 
+    @Override
+    public void onEndpointLeft(Address endpoint) {
+        invocationMonitor.onEndpointLeft(endpoint);
+    }
+
     public void reset() {
         Throwable cause = new LocalMemberResetException(node.getLocalMember() + " has reset.");
         invocationRegistry.reset(cause);
@@ -435,7 +464,6 @@ public final class OperationServiceImpl implements InternalOperationService, Met
         logger.finest("Starting OperationService");
 
         initInvocationContext();
-
         invocationMonitor.start();
         operationExecutor.start();
         inboundResponseHandlerSupplier.start();
@@ -443,15 +471,11 @@ public final class OperationServiceImpl implements InternalOperationService, Met
     }
 
     private void initInvocationContext() {
-        ManagedExecutorService asyncExecutor = nodeEngine.getExecutionService().register(
-                ExecutionService.ASYNC_EXECUTOR, RuntimeAvailableProcessors.get(),
-                ASYNC_QUEUE_CAPACITY, ExecutorType.CONCRETE);
-
         this.invocationContext = new Invocation.Context(
-                asyncExecutor,
+                nodeEngine.getExecutionService().getExecutor(ExecutionService.ASYNC_EXECUTOR),
                 nodeEngine.getClusterService().getClusterClock(),
                 nodeEngine.getClusterService(),
-                node.connectionManager,
+                node.networkingService,
                 node.nodeEngine.getExecutionService(),
                 nodeEngine.getProperties().getMillis(OPERATION_CALL_TIMEOUT_MILLIS),
                 invocationRegistry,
@@ -465,7 +489,12 @@ public final class OperationServiceImpl implements InternalOperationService, Met
                 retryCount,
                 serializationService,
                 nodeEngine.getThisAddress(),
-                outboundOperationHandler);
+                outboundOperationHandler,
+                node.getEndpointManager());
+    }
+
+    public Invocation.Context getInvocationContext() {
+        return invocationContext;
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2008-2018, Hazelcast, Inc. All Rights Reserved.
+ * Copyright (c) 2008-2019, Hazelcast, Inc. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,6 +83,7 @@ public interface ClientClusterService {
 
     /**
      * Gets the number of members that satisfy the given {@link com.hazelcast.core.MemberSelector} instance.
+     *
      * @param selector {@link com.hazelcast.core.MemberSelector} instance that filters members to be counted.
      * @return the number of members that satisfy the given {@link com.hazelcast.core.MemberSelector} instance.
      */
@@ -107,4 +108,5 @@ public interface ClientClusterService {
      */
     boolean removeMembershipListener(String registrationId);
 
+    void reset();
 }
